@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CaptureWithKi — Khiara Netherly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CaptureWithKi — Khiara Netherly
+   Palette, type and layout structure follow the Odette reference.
+   Signature layer (unique to Ki): film-archive frame marks,
+   filmstrip hero scrubber, hover frame captions, Ki monogram,
+   warm grain, drifting values band.
+   NOTE: photos are temporary placeholders. Pricing is placeholder.
+   ============================================================ */
+
+:root{
+  --cream:  #EBE5DC;
+  --bg:     #F7F5F1;
+  --paper:  #FCFBF9;
+  --ink:    #171614;
+  --muted:  #6B6560;
+  --line:   #D9D2C7;
+  --white:  #FFFFFF;
+
+  --display: "Cormorant Garamond", "Times New Roman", serif;
+  --sans:    "Jost", "Futura", "Helvetica Neue", Arial, sans-serif;
+
+  --gutter: 5vw;
+  --nav-h: 78px;
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-weight:300;font-size:15px;line-height:1.9;
+  -webkit-font-smoothing:antialiased;
+}
+/* warm film grain over the whole site */
+body::after{
+  content:"";position:fixed;inset:0;z-index:80;pointer-events:none;
+  opacity:.05;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+img{display:block;width:100%;height:100%;object-fit:cover;}
+a{color:inherit;text-decoration:none;}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;}
+
+/* ---------- type ---------- */
+.display{font-family:var(--display);font-weight:300;text-transform:uppercase;letter-spacing:.06em;line-height:.98;margin:0;}
+.script{font-family:var(--display);font-style:italic;font-weight:300;letter-spacing:.01em;line-height:1.5;margin:0;}
+.eyebrow{font-family:var(--sans);font-weight:400;font-size:11px;text-transform:uppercase;letter-spacing:.24em;color:var(--muted);margin:0;}
+.h2{font-family:var(--display);font-weight:300;font-size:clamp(30px,4vw,50px);line-height:1.15;letter-spacing:.01em;margin:0;}
+.h3{font-family:var(--display);font-weight:400;font-size:clamp(22px,2.4vw,28px);line-height:1.3;margin:0;}
+p{margin:0 0 1.1em;color:var(--muted);max-width:52ch;}
+p:last-child{margin-bottom:0;}
+
+/* index label — the archive voice used across the site */
+.index{
+  font-family:var(--sans);font-size:10px;font-weight:400;
+  letter-spacing:.3em;text-transform:uppercase;color:var(--muted);
+  display:inline-flex;align-items:center;gap:12px;
+}
+.index::before{content:"";width:26px;height:1px;background:currentColor;opacity:.6;}
+
+.link{
+  display:inline-block;font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+  padding-bottom:6px;border-bottom:1px solid var(--ink);color:var(--ink);
+  transition:opacity .3s ease, letter-spacing .4s ease;
+}
+.link:hover{opacity:.55;letter-spacing:.3em;}
+.link.on-dark{color:var(--white);border-color:rgba(255,255,255,.7);}
+
+/* ---------- intro curtain ---------- */
+.curtain{
+  position:fixed;inset:0;z-index:90;background:var(--cream);
+  display:flex;align-items:center;justify-content:center;
+  animation:lift 1.5s cubic-bezier(.7,0,.2,1) forwards;
+}
+.curtain svg{width:78px;height:78px;animation:markIn 1s ease both;}
+@keyframes lift{0%,55%{transform:translateY(0);}100%{transform:translateY(-101%);}}
+@keyframes markIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:none;}}
+
+/* Ki monogram */
+.mark circle{fill:none;stroke:var(--ink);stroke-width:.8;opacity:.55;}
+.mark text{font-family:var(--display);font-style:italic;font-size:26px;fill:var(--ink);}
+
+/* ---------- nav ---------- */
+.nav{
+  position:fixed;inset:0 0 auto 0;z-index:60;height:var(--nav-h);
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  padding:0 var(--gutter);color:var(--white);
+  transition:background .45s ease,color .45s ease,box-shadow .45s ease;
+}
+.nav.solid{background:var(--bg);color:var(--ink);box-shadow:0 1px 0 rgba(23,22,20,.07);}
+.nav ul{list-style:none;display:flex;gap:44px;margin:0;padding:0;}
+.nav .right{justify-content:flex-end;}
+.nav a,.nav .drop-toggle{
+  font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:400;
+  position:relative;padding:6px 0;white-space:nowrap;
+}
+.nav a::after,.nav .drop-toggle::after{
+  content:"";position:absolute;left:0;bottom:0;height:1px;width:0;background:currentColor;transition:width .35s ease;
+}
+.nav a:hover::after,.nav li:hover>.drop-toggle::after{width:100%;}
+.brand{display:flex;flex-direction:column;align-items:center;line-height:1;}
+.wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:27px;letter-spacing:.02em;white-space:nowrap;}
+.brand .sub{font-size:8.5px;letter-spacing:.42em;text-transform:uppercase;margin-top:6px;opacity:.7;}
+.has-drop{position:relative;}
+.drop{
+  position:absolute;top:100%;left:50%;transform:translate(-50%,8px);
+  background:var(--bg);color:var(--ink);padding:16px 26px;min-width:190px;
+  display:flex;flex-direction:column;gap:12px;opacity:0;visibility:hidden;transition:.28s ease;
+  box-shadow:0 12px 30px rgba(23,22,20,.08);
+}
+.has-drop:hover .drop{opacity:1;visibility:visible;transform:translate(-50%,0);}
+.drop a{font-size:10.5px;letter-spacing:.2em;}
+.burger{display:none;}
+.mobile{display:none;}
+
+/* ---------- pages ---------- */
+.page{display:none;}
+.page.active{display:block;animation:fade .6s ease both;}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.inner-top{padding-top:calc(var(--nav-h) + 70px);}
+
+/* ---------- hero ---------- */
+.hero{position:relative;height:100vh;min-height:660px;overflow:hidden;background:var(--cream);}
+.slide{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;}
+.slide.on{opacity:1;}
+.slide.on img{animation:drift 16s ease-out both;}
+@keyframes drift{from{transform:scale(1.07);}to{transform:scale(1);}}
+.slide::after{content:"";position:absolute;inset:0;background:rgba(23,22,20,.14);}
+.hero-copy{
+  position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;color:var(--white);padding:0 var(--gutter);
+}
+.hero-copy .display{font-size:clamp(42px,7vw,102px);text-shadow:0 2px 30px rgba(0,0,0,.18);}
+.hero-copy .display em{font-style:italic;text-transform:none;letter-spacing:.01em;font-weight:300;}
+.hero-copy .script{font-size:clamp(19px,2vw,27px);margin-top:18px;text-shadow:0 2px 24px rgba(0,0,0,.2);}
+.rise{animation:rise 1.1s cubic-bezier(.2,.7,.3,1) both;}
+.rise.d1{animation-delay:1.05s;}
+.rise.d2{animation-delay:1.25s;}
+.rise.d3{animation-delay:1.45s;}
+@keyframes rise{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:none;}}
+
+/* status line */
+.status{
+  position:absolute;left:var(--gutter);bottom:150px;z-index:4;color:var(--white);
+  font-size:10px;letter-spacing:.3em;text-transform:uppercase;display:flex;align-items:center;gap:10px;
+}
+.status i{width:5px;height:5px;border-radius:50%;background:#fff;animation:pulse 2.6s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:.35;}50%{opacity:1;}}
+
+/* hero bar with filmstrip */
+.hero-bar{
+  position:absolute;left:0;right:0;bottom:0;z-index:4;background:var(--cream);
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px;padding:16px var(--gutter);
+}
+.hero-bar .script{grid-column:2;text-align:center;font-size:19px;}
+.strip{grid-column:3;justify-self:end;display:flex;align-items:center;gap:16px;}
+.strip .frames{display:flex;gap:7px;}
+.strip .frames button{width:52px;height:34px;overflow:hidden;filter:grayscale(1);opacity:.45;transition:.4s;position:relative;}
+.strip .frames button.on{filter:none;opacity:1;}
+.strip .frames button::after{content:"";position:absolute;inset:0;border:1px solid var(--ink);opacity:0;transition:.3s;}
+.strip .frames button.on::after{opacity:.9;}
+.strip .no{font-size:10px;letter-spacing:.24em;color:var(--muted);}
+.arrow{width:34px;height:1px;background:var(--ink);position:relative;transition:opacity .3s;}
+.arrow:hover{opacity:.5;}
+.arrow::before{content:"";position:absolute;top:-4px;width:8px;height:8px;border-top:1px solid var(--ink);border-left:1px solid var(--ink);}
+.arrow.prev::before{left:0;transform:rotate(-45deg);}
+.arrow.next::before{right:0;transform:rotate(135deg);}
+
+/* ---------- sections ---------- */
+.section{padding:clamp(80px,10vw,140px) var(--gutter);}
+.section.tight{padding-top:clamp(50px,6vw,80px);}
+.section.cream{background:var(--cream);}
+.section.paper{background:var(--paper);}
+.section-head{display:flex;align-items:baseline;gap:26px;margin-bottom:clamp(38px,5vw,60px);}
+.section-head .h2{flex:1;}
+
+/* drifting values band */
+.band{border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;padding:26px 0;background:var(--bg);}
+.band .track{display:flex;gap:56px;width:max-content;animation:slide 44s linear infinite;}
+.band span{
+  font-size:12.5px;font-weight:400;letter-spacing:.3em;text-transform:uppercase;
+  display:flex;align-items:center;gap:56px;white-space:nowrap;
+}
+.band span::after{content:"";width:5px;height:5px;background:var(--ink);opacity:.35;transform:rotate(45deg);}
+@keyframes slide{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+/* frames + archive marks */
+.frame{overflow:hidden;background:var(--cream);position:relative;}
+.frame img{transition:transform 1.4s cubic-bezier(.2,.7,.3,1);}
+.frame:hover img{transform:scale(1.045);}
+.marked{position:relative;}
+.marked::before,.marked::after{
+  content:"";position:absolute;width:16px;height:16px;pointer-events:none;z-index:2;
+  border:1px solid var(--ink);opacity:.4;
+}
+.marked::before{top:-8px;left:-8px;border-right:0;border-bottom:0;}
+.marked::after{bottom:-8px;right:-8px;border-left:0;border-top:0;}
+
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,2.4vw,34px);}
+.trio .frame{aspect-ratio:3/4;}
+.trio .frame:nth-child(1){margin-top:60px;}
+.trio .frame:nth-child(3){margin-top:110px;}
+.cap{margin-top:12px;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(34px,6vw,100px);align-items:center;}
+.split.reverse .media{order:2;}
+.split .media{aspect-ratio:4/5;}
+.split .copy{max-width:520px;}
+.split .copy .h2{margin-bottom:22px;}
+.split .copy .link{margin-top:26px;}
+
+/* categories */
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);align-items:center;}
+.cats .stage{aspect-ratio:3/4;overflow:hidden;background:var(--cream);position:relative;}
+.cats .stage img{position:absolute;inset:0;opacity:0;transition:opacity .7s ease;}
+.cats .stage img.on{opacity:1;}
+.cat-list{list-style:none;margin:0;padding:0;}
+.cat-list li{border-bottom:1px solid var(--line);}
+.cat-list li:first-child{border-top:1px solid var(--line);}
+.cat-list button{
+  width:100%;text-align:left;padding:20px 0;display:flex;align-items:baseline;gap:20px;
+  font-family:var(--display);font-weight:300;font-size:clamp(26px,3.6vw,44px);letter-spacing:.03em;
+  transition:padding-left .4s ease,opacity .3s ease;
+}
+.cat-list button .n{font-family:var(--sans);font-size:10px;letter-spacing:.24em;color:var(--muted);}
+.cat-list button:hover,.cat-list button.on{padding-left:20px;}
+.cat-list button:not(.on):hover{opacity:.6;}
+
+/* banner */
+.banner{position:relative;height:min(72vh,640px);overflow:hidden;background:var(--cream);}
+.banner::after{content:"";position:absolute;inset:0;background:rgba(23,22,20,.3);}
+.banner .over{
+  position:absolute;inset:0;z-index:2;color:var(--white);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;gap:20px;padding:0 var(--gutter);
+}
+.banner .display{font-size:clamp(34px,5.4vw,74px);}
+.banner .display em{font-style:italic;text-transform:none;}
+.banner p{color:rgba(255,255,255,.86);max-width:46ch;}
+
+/* page head */
+.page-head{text-align:center;padding:0 var(--gutter) clamp(46px,6vw,72px);}
+.page-head .index{margin-bottom:22px;}
+.page-head .index::before{display:none;}
+.page-head .display{font-size:clamp(34px,5.6vw,74px);}
+.page-head .display em{font-style:italic;text-transform:none;}
+.page-head .script{font-size:20px;margin-top:16px;color:var(--muted);}
+
+/* portfolio — offset archive grid */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,34px) clamp(14px,2vw,26px);}
+.shot{position:relative;}
+.shot .frame{aspect-ratio:3/4;}
+.shot.wide{grid-column:span 2;}
+.shot.wide .frame{aspect-ratio:3/2;}
+.shot:nth-child(3n+2){margin-top:clamp(20px,4vw,64px);}
+.shot:nth-child(3n){margin-top:clamp(10px,2vw,30px);}
+.shot .meta{
+  display:flex;justify-content:space-between;gap:14px;margin-top:11px;
+  font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);
+  opacity:0;transform:translateY(-5px);transition:.45s ease;
+}
+.shot:hover .meta{opacity:1;transform:none;}
+.filters{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;margin-bottom:52px;}
+.filters button{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);padding-bottom:5px;border-bottom:1px solid transparent;transition:.3s;}
+.filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
+
+/* pricing */
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,34px);align-items:stretch;}
+.tier{background:var(--paper);border:1px solid var(--line);padding:clamp(30px,3.4vw,48px) clamp(24px,2.6vw,38px);display:flex;flex-direction:column;position:relative;}
+.tier.feature{background:var(--cream);border-color:var(--ink);}
+.tier .num{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);}
+.tier h3{font-family:var(--display);font-weight:300;font-size:clamp(26px,2.8vw,36px);margin:14px 0 0;letter-spacing:.02em;}
+.tier .price{font-family:var(--display);font-weight:300;font-size:clamp(34px,4vw,50px);margin:20px 0 4px;}
+.tier .price small{font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);display:block;margin-top:8px;}
+.tier ul{list-style:none;margin:28px 0 0;padding:26px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:13px;}
+.tier li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.65;}
+.tier li::before{content:"";position:absolute;left:0;top:11px;width:7px;height:1px;background:var(--ink);opacity:.5;}
+.tier .link{margin-top:34px;align-self:flex-start;}
+
+.addons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(40px,6vw,90px);}
+.addon{display:flex;justify-content:space-between;gap:24px;align-items:baseline;padding:18px 0;border-bottom:1px solid var(--line);}
+.addon span:first-child{font-size:13.5px;}
+.addon span:last-child{font-family:var(--display);font-size:21px;white-space:nowrap;}
+
+/* the process — a real sequence, so it is numbered */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(22px,3vw,48px);}
+.step{border-top:1px solid var(--line);padding-top:22px;}
+.step .n{font-family:var(--display);font-size:34px;line-height:1;color:var(--muted);}
+.step h4{font-family:var(--display);font-weight:400;font-size:22px;margin:14px 0 10px;}
+.step p{font-size:13.5px;line-height:1.75;}
+
+.faq{max-width:820px;margin:0 auto;}
+.faq details{border-bottom:1px solid var(--line);padding:22px 0;}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:20px;align-items:center;font-family:var(--display);font-size:clamp(19px,2.1vw,25px);font-weight:400;}
+.faq summary::-webkit-details-marker{display:none;}
+.faq summary::after{content:"+";font-family:var(--sans);font-weight:300;font-size:19px;color:var(--muted);transition:transform .3s;}
+.faq details[open] summary::after{transform:rotate(45deg);}
+.faq p{margin-top:14px;max-width:none;}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:50px;padding-top:34px;border-top:1px solid var(--line);}
+.stats .n{font-family:var(--display);font-size:clamp(30px,3.4vw,44px);line-height:1;}
+.stats .l{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:10px;}
+
+.quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(26px,4vw,60px);}
+.quote{border-top:1px solid var(--line);padding-top:26px;}
+.quote .script{font-size:22px;color:var(--ink);margin-bottom:18px;}
+.quote .who{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);}
+
+/* contact */
+.contact-wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:clamp(36px,6vw,90px);align-items:start;}
+.field{margin-bottom:26px;}
+.field label{display:block;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;}
+.field input,.field select,.field textarea{
+  width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);padding:9px 0;
+  font-family:var(--sans);font-size:14px;font-weight:300;color:var(--ink);border-radius:0;transition:border-color .3s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--ink);}
+.field textarea{resize:vertical;min-height:110px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:26px;}
+.submit{margin-top:12px;background:var(--ink);color:var(--bg);padding:16px 44px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;transition:opacity .3s;}
+.submit:hover{opacity:.82;}
+.sent{margin-top:20px;font-size:13px;color:var(--ink);display:none;}
+.sent.show{display:block;}
+.detail{margin-bottom:30px;}
+.detail .k{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+.detail .v{font-family:var(--display);font-size:22px;}
+
+/* footer */
+.footer{background:var(--cream);padding:clamp(56px,7vw,90px) var(--gutter) 40px;text-align:center;}
+.footer .mark{margin:0 auto 22px;display:block;width:64px;height:64px;}
+.footer .wordmark{font-size:34px;}
+.footer nav{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin:34px 0 30px;}
+.footer nav a{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);transition:color .3s;}
+.footer nav a:hover{color:var(--ink);}
+.footer .fine{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:34px;padding-top:26px;border-top:1px solid var(--line);}
+
+:focus-visible{outline:1px solid var(--ink);outline-offset:4px;}
+.nav :focus-visible{outline-color:currentColor;}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition-duration:.001ms !important;}
+  html{scroll-behavior:auto;}
+  .curtain{display:none;}
+  .band .track{animation:none;}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:1000px){
+  .nav ul{display:none;}
+  .burger{display:block;justify-self:start;font-size:11px;letter-spacing:.2em;text-transform:uppercase;}
+  .mobile{
+    position:fixed;inset:0;z-index:70;background:var(--bg);color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+    transform:translateY(-100%);transition:transform .55s cubic-bezier(.6,0,.2,1);
+  }
+  .mobile.open{transform:translateY(0);}
+  .mobile a{font-family:var(--display);font-size:30px;letter-spacing:.04em;text-transform:uppercase;font-weight:300;}
+  .split,.cats,.contact-wrap,.quotes,.tiers,.addons,.stats{grid-template-columns:1fr;}
+  .steps{grid-template-columns:1fr 1fr;}
+  .split.reverse .media{order:0;}
+  .grid{grid-template-columns:1fr 1fr;}
+  .shot:nth-child(3n+2),.shot:nth-child(3n){margin-top:0;}
+  .shot:nth-child(even){margin-top:clamp(18px,4vw,44px);}
+  .hero-bar{grid-template-columns:1fr;gap:14px;}
+  .hero-bar .script{grid-column:1;}
+  .strip{grid-column:1;justify-self:center;}
+  .status{display:none;}
+}
+@media (max-width:620px){
+  :root{--gutter:22px;}
+  .trio{grid-template-columns:1fr;}
+  .trio .frame{margin-top:0 !important;}
+  .row,.grid,.steps{grid-template-columns:1fr;}
+  .shot.wide{grid-column:span 1;}
+  .shot.wide .frame{aspect-ratio:3/4;}
+  .marked::before,.marked::after{display:none;}
+  .section-head{flex-direction:column;gap:14px;}
+}
+</style>
+</head>
+<body>
+
+<div class="curtain" id="curtain">
+  <svg class="mark" viewBox="0 0 80 80" aria-hidden="true">
+    <circle cx="40" cy="40" r="33"/>
+    <text x="40" y="49" text-anchor="middle">Ki</text>
+  </svg>
+</div>
+
+<!-- ================= NAV ================= -->
+<header class="nav" id="nav">
+  <button class="burger" id="burger" aria-label="Open menu">Menu</button>
+  <ul class="left">
+    <li><a href="#" data-go="home">Home</a></li>
+    <li><a href="#" data-go="about">About</a></li>
+    <li class="has-drop">
+      <a href="#" class="drop-toggle" data-go="portfolio">Portfolio +</a>
+      <div class="drop">
+        <a href="#" data-go="portfolio" data-filter="weddings">Weddings</a>
+        <a href="#" data-go="portfolio" data-filter="portraits">Portraits</a>
+        <a href="#" data-go="portfolio" data-filter="elopements">Elopements</a>
+      </div>
+    </li>
+  </ul>
+
+  <a href="#" class="brand" data-go="home">
+    <span class="wordmark">CaptureWithKi</span>
+    <span class="sub">Khiara Netherly</span>
+  </a>
+
+  <ul class="right">
+    <li><a href="#" data-go="journal">Journal</a></li>
+    <li class="has-drop">
+      <a href="#" class="drop-toggle" data-go="pricing">Info +</a>
+      <div class="drop">
+        <a href="#" data-go="pricing">Pricing</a>
+        <a href="#" data-go="pricing" data-anchor="process">The process</a>
+        <a href="#" data-go="pricing" data-anchor="kind-words">Kind words</a>
+      </div>
+    </li>
+    <li><a href="#" data-go="contact">Contact</a></li>
+  </ul>
+</header>
+
+<div class="mobile" id="mobile">
+  <a href="#" data-go="home">Home</a>
+  <a href="#" data-go="about">About</a>
+  <a href="#" data-go="portfolio">Portfolio</a>
+  <a href="#" data-go="pricing">Pricing</a>
+  <a href="#" data-go="journal">Journal</a>
+  <a href="#" data-go="contact">Contact</a>
+</div>
+
+<main>
+
+<!-- ================= HOME ================= -->
+<section class="page active" id="home">
+
+  <div class="hero">
+    <div class="slide on"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/horizontal_1_lg.jpg?v=1767692926000" alt="Bride in soft light"></div>
+    <div class="slide"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/banner_2_lg.jpg?v=1764152563000" alt="Couple at golden hour"></div>
+    <div class="slide"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt="Bridal portrait"></div>
+
+    <div class="hero-copy">
+      <h1 class="display rise d1">Wedding<br><em>photography</em></h1>
+      <p class="script rise d2">kept the way you&#8217;ll want to remember it</p>
+    </div>
+
+    <div class="status rise d3"><i></i> Now booking 2027</div>
+
+    <div class="hero-bar">
+      <p class="script">Based in Honolulu, Hawai&#699;i<br>available worldwide</p>
+      <div class="strip">
+        <button class="arrow prev" id="prev" aria-label="Previous frame"></button>
+        <div class="frames" id="frames"></div>
+        <span class="no" id="counter">Frame 01</span>
+        <button class="arrow next" id="next" aria-label="Next frame"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="track">
+      <span>Timeless</span><span>Personal &amp; intimate</span><span>Luxurious</span><span>Unhurried</span>
+      <span>Timeless</span><span>Personal &amp; intimate</span><span>Luxurious</span><span>Unhurried</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="index">Selects &mdash; 2026</span>
+      <h2 class="h2" style="flex:0;">&nbsp;</h2>
+    </div>
+    <div class="trio">
+      <div>
+        <div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt=""></div>
+        <div class="cap">01 &mdash; Getting ready, Kailua</div>
+      </div>
+      <div>
+        <div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt=""></div>
+        <div class="cap">02 &mdash; First look, North Shore</div>
+      </div>
+      <div>
+        <div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt=""></div>
+        <div class="cap">03 &mdash; Last light, Waim&#257;nalo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="split">
+      <div class="media frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt=""></div>
+      <div class="copy">
+        <span class="index">The work</span>
+        <h2 class="h2" style="margin-top:20px;">Photographs you&#8217;ll love for decades</h2>
+        <p>Your day, your story, your images &mdash; made with intention and a light hand. Nothing over-directed, nothing rushed. Just the way the morning light hit the room, and the way your people looked at you.</p>
+        <p>Browse the portfolio to see how those moments come to life.</p>
+        <a href="#" class="link" data-go="portfolio">View portfolio</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section cream">
+    <div class="split reverse">
+      <div class="media frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt=""></div>
+      <div class="copy">
+        <span class="index">Hi, I am Khiara</span>
+        <h2 class="h2" style="margin-top:20px;">Wedding photographer in Hawai&#699;i and beyond</h2>
+        <p>I photograph weddings as living, breathing stories &mdash; not staged perfection, but composed moments shaped by light, emotion, and attention. My work leans editorial and warm at once: fashion-inspired framing, real feeling underneath.</p>
+        <p>I love modern celebrations, thoughtful details, and couples who care about how the day looks as much as how it felt.</p>
+        <a href="#" class="link" data-go="about">Learn more</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="index">Browse my work</span>
+    </div>
+    <div class="cats">
+      <div class="stage marked" id="catStage">
+        <img class="on" data-cat="weddings" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt="">
+        <img data-cat="portraits" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt="">
+        <img data-cat="elopements" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt="">
+        <img data-cat="couples" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt="">
+      </div>
+      <ul class="cat-list" id="catList">
+        <li><button class="on" data-cat="weddings"><span class="n">A</span> Weddings</button></li>
+        <li><button data-cat="portraits"><span class="n">B</span> Portraits</button></li>
+        <li><button data-cat="elopements"><span class="n">C</span> Elopements</button></li>
+        <li><button data-cat="couples"><span class="n">D</span> Couples</button></li>
+      </ul>
+    </div>
+    <div style="text-align:center;margin-top:56px;">
+      <a href="#" class="link" data-go="portfolio">View portfolio</a>
+    </div>
+  </div>
+
+  <div class="banner">
+    <img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/banner_2_lg.jpg?v=1764152563000" alt="">
+    <div class="over">
+      <h2 class="display">Let&#8217;s <em>connect</em></h2>
+      <p>If the work resonates, tell me about your plans. Share the details of your celebration and we&#8217;ll figure out what to build together.</p>
+      <a href="#" class="link on-dark" data-go="contact">Contact me</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABOUT ================= -->
+<section class="page" id="about">
+  <div class="inner-top page-head">
+    <span class="index">Behind the camera</span>
+    <h1 class="display">About <em>Ki</em></h1>
+    <p class="script">nine years of watching light</p>
+  </div>
+
+  <div class="section tight">
+    <div class="split">
+      <div class="media frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt="Khiara Netherly"></div>
+      <div class="copy">
+        <span class="index">Khiara Netherly</span>
+        <h2 class="h2" style="margin-top:20px;">I shoot for the ten-years-from-now version of you</h2>
+        <p>Trends age. The way your grandmother held your hand before the ceremony does not. I photograph with that in mind &mdash; editorial in composition, quiet in approach, so the day stays yours while I work around the edges of it.</p>
+        <p>Most of my couples tell me the same thing afterward: they forgot I was there. That&#8217;s the goal. I direct when direction helps, and otherwise I stay out of the way and pay attention.</p>
+        <p>Based in Honolulu, and happiest on a plane to somewhere new. Travel is welcome and often my favorite part of the job.</p>
+        <a href="#" class="link" data-go="contact">Start a conversation</a>
+        <div class="stats">
+          <div><div class="n">120+</div><div class="l">Weddings photographed</div></div>
+          <div><div class="n">9</div><div class="l">Years behind the lens</div></div>
+          <div><div class="n">14</div><div class="l">Countries traveled</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section cream">
+    <div class="section-head"><span class="index">From the archive</span></div>
+    <div class="trio">
+      <div><div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt=""></div><div class="cap">Studio, Honolulu</div></div>
+      <div><div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt=""></div><div class="cap">Ceremony, Lanikai</div></div>
+      <div><div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt=""></div><div class="cap">Reception, Kāhala</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PORTFOLIO ================= -->
+<section class="page" id="portfolio">
+  <div class="inner-top page-head">
+    <span class="index">The archive</span>
+    <h1 class="display">Port<em>folio</em></h1>
+    <p class="script">a few favorites from recent seasons</p>
+  </div>
+
+  <div class="section tight">
+    <div class="filters" id="filters">
+      <button class="on" data-filter="all">All</button>
+      <button data-filter="weddings">Weddings</button>
+      <button data-filter="portraits">Portraits</button>
+      <button data-filter="elopements">Elopements</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="banner">
+    <img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/horizontal_1_lg.jpg?v=1767692926000" alt="">
+    <div class="over">
+      <h2 class="display">Your day, <em>next</em></h2>
+      <p>Dates book roughly nine to twelve months out. If yours is close, reach out early.</p>
+      <a href="#" class="link on-dark" data-go="contact">Check your date</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRICING ================= -->
+<!-- PLACEHOLDER PRICING — replace every figure below before launch. -->
+<section class="page" id="pricing">
+  <div class="inner-top page-head">
+    <span class="index">Collections</span>
+    <h1 class="display">Invest<em>ment</em></h1>
+    <p class="script">clear numbers, no guessing</p>
+  </div>
+
+  <div class="section tight">
+    <div style="text-align:center;max-width:60ch;margin:0 auto clamp(50px,6vw,74px);">
+      <p style="max-width:none;">Every collection includes a planning call, a timeline built together, an online gallery with high-resolution downloads, and a print release. Travel within O&#699;ahu is included.</p>
+    </div>
+
+    <div class="tiers">
+      <div class="tier">
+        <span class="num">Collection A</span>
+        <h3>The Essentials</h3>
+        <div class="price">$2,800<small>starting</small></div>
+        <ul>
+          <li>6 hours of coverage</li>
+          <li>Solo photographer</li>
+          <li>400+ edited images</li>
+          <li>Online gallery for 12 months</li>
+          <li>Print release</li>
+        </ul>
+        <a href="#" class="link" data-go="contact">Inquire</a>
+      </div>
+
+      <div class="tier feature">
+        <span class="num">Collection B &mdash; most booked</span>
+        <h3>The Signature</h3>
+        <div class="price">$4,200<small>starting</small></div>
+        <ul>
+          <li>9 hours of coverage</li>
+          <li>Second photographer</li>
+          <li>Engagement session</li>
+          <li>700+ edited images</li>
+          <li>Online gallery for 24 months</li>
+          <li>Sneak peeks within 72 hours</li>
+        </ul>
+        <a href="#" class="link" data-go="contact">Inquire</a>
+      </div>
+
+      <div class="tier">
+        <span class="num">Collection C</span>
+        <h3>The Heirloom</h3>
+        <div class="price">$6,500<small>starting</small></div>
+        <ul>
+          <li>12 hours of coverage</li>
+          <li>Second photographer</li>
+          <li>Engagement &amp; rehearsal coverage</li>
+          <li>1,000+ edited images</li>
+          <li>10&times;10 fine art album</li>
+          <li>Gallery hosted indefinitely</li>
+        </ul>
+        <a href="#" class="link" data-go="contact">Inquire</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section cream">
+    <div class="section-head"><span class="index">Add to any collection</span></div>
+    <div class="addons">
+      <div class="addon"><span>Additional hour of coverage</span><span>$350</span></div>
+      <div class="addon"><span>Second photographer</span><span>$650</span></div>
+      <div class="addon"><span>Engagement session</span><span>$750</span></div>
+      <div class="addon"><span>Rehearsal dinner coverage</span><span>$600</span></div>
+      <div class="addon"><span>Fine art album, 10&times;10</span><span>from $900</span></div>
+      <div class="addon"><span>Parent album duplicate</span><span>$450</span></div>
+      <div class="addon"><span>Elopement collection, 3 hours</span><span>from $1,500</span></div>
+      <div class="addon"><span>Portrait session, 90 minutes</span><span>from $450</span></div>
+    </div>
+  </div>
+
+  <div class="section" id="process">
+    <div class="section-head"><span class="index">The process</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div>
+        <h4>Inquire</h4>
+        <p>Send your date, location, and a little about the day. I reply within 48 hours with availability.</p>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <h4>Meet</h4>
+        <p>A call to talk through the day, the look you want, and which collection actually fits.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <h4>Hold the date</h4>
+        <p>A signed agreement and a 30% retainer lock it in. The balance can be split monthly.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <h4>Deliver</h4>
+        <p>Sneak peeks in 72 hours, the full gallery in 6&ndash;8 weeks, albums after your selects.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section paper">
+    <div class="section-head"><span class="index">Good to know</span></div>
+    <div class="faq">
+      <details open>
+        <summary>Do you travel?</summary>
+        <p>Often. Travel within O&#699;ahu is included. Neighbor islands and mainland weddings are quoted per trip &mdash; usually flights, one to two nights of lodging, and ground transit at cost.</p>
+      </details>
+      <details>
+        <summary>Can we split payments?</summary>
+        <p>Yes. After the retainer, the balance can be spread across monthly payments up to two weeks before the date.</p>
+      </details>
+      <details>
+        <summary>What if we&#8217;re awkward in front of a camera?</summary>
+        <p>Nearly everyone says this. I direct enough to keep you comfortable and then let you be, which is where the photos you actually want come from.</p>
+      </details>
+      <details>
+        <summary>How many images do we get?</summary>
+        <p>Roughly 60&ndash;80 edited images per hour of coverage. Every one is color-corrected by hand &mdash; no batch presets, no AI edits.</p>
+      </details>
+    </div>
+  </div>
+
+  <div class="section" id="kind-words">
+    <div class="section-head"><span class="index">Kind words</span></div>
+    <div class="quotes">
+      <div class="quote">
+        <p class="script">She caught the ten seconds I was most afraid I&#8217;d forget.</p>
+        <div class="who">Mailani &amp; Josh &mdash; Kailua</div>
+      </div>
+      <div class="quote">
+        <p class="script">Calm the whole day. Our families still talk about how easy she made it.</p>
+        <div class="who">Renée &amp; Tomás &mdash; North Shore</div>
+      </div>
+      <div class="quote">
+        <p class="script">We booked for the portfolio and stayed for the person.</p>
+        <div class="who">Ava &amp; Sam &mdash; Big Island</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner">
+    <img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/banner_2_lg.jpg?v=1764152563000" alt="">
+    <div class="over">
+      <h2 class="display">Ready when <em>you are</em></h2>
+      <p>Tell me the date, the place, and what you&#8217;re picturing. I&#8217;ll come back with availability and a full pricing guide.</p>
+      <a href="#" class="link on-dark" data-go="contact">Inquire now</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= JOURNAL ================= -->
+<section class="page" id="journal">
+  <div class="inner-top page-head">
+    <span class="index">Notes &amp; stories</span>
+    <h1 class="display">Jour<em>nal</em></h1>
+    <p class="script">recent weddings and planning notes</p>
+  </div>
+  <div class="section tight">
+    <div class="trio">
+      <div>
+        <a href="#" class="frame marked" style="display:block;aspect-ratio:3/4;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt=""></a>
+        <div class="cap">Real weddings &mdash; March</div>
+        <h3 class="h3" style="margin-top:8px;">A garden ceremony in Kailua</h3>
+      </div>
+      <div>
+        <a href="#" class="frame marked" style="display:block;aspect-ratio:3/4;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt=""></a>
+        <div class="cap">Planning &mdash; February</div>
+        <h3 class="h3" style="margin-top:8px;">Building a timeline around golden hour</h3>
+      </div>
+      <div>
+        <a href="#" class="frame marked" style="display:block;aspect-ratio:3/4;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt=""></a>
+        <div class="cap">Elopements &mdash; January</div>
+        <h3 class="h3" style="margin-top:8px;">Two people, one cliff, no audience</h3>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONTACT ================= -->
+<section class="page" id="contact">
+  <div class="inner-top page-head">
+    <span class="index">Inquiries</span>
+    <h1 class="display">Say <em>hello</em></h1>
+    <p class="script">tell me about your day</p>
+  </div>
+
+  <div class="section tight">
+    <div class="contact-wrap">
+      <div>
+        <div class="detail"><div class="k">Email</div><div class="v">hello@capturewithki.com</div></div>
+        <div class="detail"><div class="k">Based in</div><div class="v">Honolulu, Hawai&#699;i</div></div>
+        <div class="detail"><div class="k">Instagram</div><div class="v">@capturewithki</div></div>
+        <div class="detail"><div class="k">Response time</div><div class="v">Within 48 hours</div></div>
+        <div class="frame marked" style="aspect-ratio:4/5;margin-top:38px;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt=""></div>
+      </div>
+
+      <div>
+        <div class="row">
+          <div class="field"><label for="n1">Your name</label><input id="n1" type="text" placeholder="First and last"></div>
+          <div class="field"><label for="n2">Partner&#8217;s name</label><input id="n2" type="text" placeholder="Optional"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="em">Email</label><input id="em" type="email" placeholder="you@email.com"></div>
+          <div class="field"><label for="ph">Phone</label><input id="ph" type="tel" placeholder="Optional"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="dt">Wedding date</label><input id="dt" type="date"></div>
+          <div class="field"><label for="lc">Location or venue</label><input id="lc" type="text" placeholder="Where are you celebrating?"></div>
+        </div>
+        <div class="field">
+          <label for="cl">Collection you&#8217;re considering</label>
+          <select id="cl">
+            <option>Not sure yet</option>
+            <option>The Essentials &mdash; $2,800</option>
+            <option>The Signature &mdash; $4,200</option>
+            <option>The Heirloom &mdash; $6,500</option>
+            <option>Elopement or portraits</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ms">Tell me about your day</label>
+          <textarea id="ms" placeholder="How you met, what you're planning, what matters most to you in your photos."></textarea>
+        </div>
+        <button class="submit" id="send">Send inquiry</button>
+        <p class="sent" id="sent"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer">
+  <svg class="mark" viewBox="0 0 80 80" aria-hidden="true">
+    <circle cx="40" cy="40" r="33"/>
+    <text x="40" y="49" text-anchor="middle">Ki</text>
+  </svg>
+  <a href="#" class="wordmark" data-go="home">CaptureWithKi</a>
+  <nav>
+    <a href="#" data-go="home">Home</a>
+    <a href="#" data-go="about">About</a>
+    <a href="#" data-go="portfolio">Portfolio</a>
+    <a href="#" data-go="pricing">Pricing</a>
+    <a href="#" data-go="journal">Journal</a>
+    <a href="#" data-go="contact">Contact</a>
+  </nav>
+  <p class="script" style="font-size:19px;">Photographing weddings in Hawai&#699;i &amp; worldwide</p>
+  <div class="fine">&copy; 2026 CaptureWithKi &mdash; Khiara Netherly</div>
+</footer>
+
+<script>
+(function(){
+  var B = 'https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/';
+
+  /* ---------- curtain ---------- */
+  var curtain = document.getElementById('curtain');
+  setTimeout(function(){ if(curtain) curtain.remove(); }, 1700);
+
+  /* ---------- routing ---------- */
+  var pages = document.querySelectorAll('.page');
+  var nav = document.getElementById('nav');
+  var mobile = document.getElementById('mobile');
+
+  function go(id, opts){
+    opts = opts || {};
+    pages.forEach(function(p){ p.classList.toggle('active', p.id === id); });
+    window.scrollTo({top:0});
+    if(opts.filter) setFilter(opts.filter);
+    if(opts.anchor){
+      var el = document.getElementById(opts.anchor);
+      if(el) setTimeout(function(){ el.scrollIntoView({behavior:'smooth'}); }, 70);
+    }
+    mobile.classList.remove('open');
+    updateNav();
+  }
+
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('[data-go]');
+    if(!a) return;
+    e.preventDefault();
+    go(a.getAttribute('data-go'), {
+      anchor: a.getAttribute('data-anchor'),
+      filter: a.getAttribute('data-filter')
+    });
+  });
+
+  document.getElementById('burger').addEventListener('click', function(){
+    mobile.classList.toggle('open');
+  });
+
+  function updateNav(){
+    var onHome = document.getElementById('home').classList.contains('active');
+    var past = window.scrollY > (window.innerHeight - 120);
+    nav.classList.toggle('solid', !onHome || past);
+  }
+  window.addEventListener('scroll', updateNav, {passive:true});
+  updateNav();
+
+  /* ---------- hero: filmstrip scrubber ---------- */
+  var slides = document.querySelectorAll('.hero .slide');
+  var framesEl = document.getElementById('frames');
+  var counter = document.getElementById('counter');
+  var i = 0, timer;
+
+  slides.forEach(function(s, k){
+    var b = document.createElement('button');
+    b.setAttribute('aria-label', 'Frame ' + (k+1));
+    b.innerHTML = '<img alt="" src="' + s.querySelector('img').getAttribute('src') + '">';
+    b.addEventListener('click', function(){ show(k); auto(); });
+    framesEl.appendChild(b);
+  });
+  var thumbs = framesEl.querySelectorAll('button');
+
+  function show(n){
+    i = (n + slides.length) % slides.length;
+    slides.forEach(function(s,k){ s.classList.toggle('on', k === i); });
+    thumbs.forEach(function(t,k){ t.classList.toggle('on', k === i); });
+    counter.textContent = 'Frame ' + String(i+1).padStart(2,'0');
+  }
+  function auto(){ clearInterval(timer); timer = setInterval(function(){ show(i+1); }, 6800); }
+  document.getElementById('next').addEventListener('click', function(){ show(i+1); auto(); });
+  document.getElementById('prev').addEventListener('click', function(){ show(i-1); auto(); });
+  show(0); auto();
+
+  /* ---------- category hover ---------- */
+  var stage = document.getElementById('catStage');
+  document.getElementById('catList').addEventListener('mouseover', function(e){
+    var b = e.target.closest('button[data-cat]');
+    if(!b) return;
+    var cat = b.getAttribute('data-cat');
+    this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x === b); });
+    stage.querySelectorAll('img').forEach(function(img){
+      img.classList.toggle('on', img.getAttribute('data-cat') === cat);
+    });
+  });
+
+  /* ---------- portfolio archive ---------- */
+  var shots = [
+    {src:'portrait_4_lg.jpg?v=1767694627000', cat:'weddings',   place:'Kailua, O\u02BBahu'},
+    {src:'horizontal_1_lg.jpg?v=1767692926000', cat:'weddings', place:'K\u0101hala', wide:true},
+    {src:'portrait_3_lg.jpg?v=1764152603000', cat:'portraits',  place:'Studio, Honolulu'},
+    {src:'vertical_3_lg.jpg?v=1767693742000', cat:'elopements', place:'Waim\u0101nalo'},
+    {src:'portrait_1_lg.jpg?v=1764152589000', cat:'portraits',  place:'Lanikai'},
+    {src:'banner_2_lg.jpg?v=1764152563000', cat:'elopements',   place:'Na Pali Coast', wide:true},
+    {src:'portrait_4_lg.jpg?v=1767694627000', cat:'elopements', place:'Maui'},
+    {src:'vertical_3_lg.jpg?v=1767693742000', cat:'weddings',   place:'North Shore'},
+    {src:'portrait_3_lg.jpg?v=1764152603000', cat:'weddings',   place:'Diamond Head'},
+    {src:'portrait_1_lg.jpg?v=1764152589000', cat:'weddings',   place:'Ko Olina'},
+    {src:'horizontal_1_lg.jpg?v=1767692926000', cat:'portraits',place:'Manoa', wide:true},
+    {src:'portrait_4_lg.jpg?v=1767694627000', cat:'portraits',  place:'Waikiki'}
+  ];
+  var grid = document.getElementById('grid');
+
+  function setFilter(f){
+    document.querySelectorAll('#filters button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-filter') === f);
+    });
+    grid.innerHTML = '';
+    shots.filter(function(s){ return f === 'all' || s.cat === f; })
+         .forEach(function(s, n){
+      var d = document.createElement('div');
+      d.className = 'shot' + (s.wide ? ' wide' : '');
+      d.innerHTML =
+        '<div class="frame marked"><img loading="lazy" alt="" src="' + B + s.src + '"></div>' +
+        '<div class="meta"><span>' + String(n+1).padStart(2,'0') + ' &mdash; ' + s.cat + '</span><span>' + s.place + '</span></div>';
+      grid.appendChild(d);
+    });
+  }
+  document.getElementById('filters').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-filter]');
+    if(b) setFilter(b.getAttribute('data-filter'));
+  });
+  setFilter('all');
+
+  /* ---------- inquiry ---------- */
+  document.getElementById('send').addEventListener('click', function(){
+    var name = document.getElementById('n1').value.trim();
+    var mail = document.getElementById('em').value.trim();
+    var note = document.getElementById('sent');
+    if(!name || !mail){
+      note.textContent = 'Add your name and email so Khiara can reply.';
+    } else {
+      note.textContent = 'Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.';
+    }
+    note.classList.add('show');
+  });
+})();
+</script>
+</body>
+</html>
