@@ -886,7 +886,7 @@ p:last-child{margin-bottom:0;}
   function go(id, opts){
     opts = opts || {};
     pages.forEach(function(p){ p.classList.toggle('active', p.id === id); });
-    window.scrollTo({top:0});
+    window.scrollTo({top:0, behavior:'instant'});
     if(opts.filter) setFilter(opts.filter);
     if(opts.anchor){
       var el = document.getElementById(opts.anchor);
