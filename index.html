@@ -108,7 +108,8 @@ p:last-child{margin-bottom:0;}
 }
 .nav a:hover::after,.nav li:hover>.drop-toggle::after{width:100%;}
 .nav ul li>a{
-  border:1px solid currentColor;padding:8px 16px;background:rgba(255,255,255,.14);
+  display:inline-block;line-height:1;box-sizing:border-box;
+  border:1px solid currentColor;padding:10px 18px;background:rgba(255,255,255,.14);
   transition:background .3s ease;
 }
 .nav ul li>a::after{display:none;}
@@ -282,22 +283,15 @@ p:last-child{margin-bottom:0;}
 .filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
 
 /* pricing */
-.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,34px);align-items:stretch;}
-.tier{background:var(--paper);border:1px solid var(--line);padding:clamp(30px,3.4vw,48px) clamp(24px,2.6vw,38px);display:flex;flex-direction:column;position:relative;}
-.tier.feature{background:var(--cream);border-color:var(--ink);}
-.tier .num{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);}
-.tier h3{font-family:var(--display);font-weight:300;font-size:clamp(26px,2.8vw,36px);margin:14px 0 0;letter-spacing:.02em;}
-.tier .price{font-family:var(--display);font-weight:300;font-size:clamp(34px,4vw,50px);margin:20px 0 4px;}
-.tier .price small{font-family:var(--sans);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);display:block;margin-top:8px;}
-.tier ul{list-style:none;margin:28px 0 0;padding:26px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:13px;}
-.tier li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.65;}
-.tier li::before{content:"";position:absolute;left:0;top:11px;width:7px;height:1px;background:var(--ink);opacity:.5;}
-.tier .link{margin-top:34px;align-self:flex-start;}
-
-.addons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(40px,6vw,90px);}
-.addon{display:flex;justify-content:space-between;gap:24px;align-items:baseline;padding:18px 0;border-bottom:1px solid var(--line);}
-.addon span:first-child{font-size:13.5px;}
-.addon span:last-child{font-family:var(--display);font-size:21px;white-space:nowrap;}
+.pkg-group{max-width:920px;margin:0 auto;}
+.pkg-row{display:grid;grid-template-columns:minmax(180px,1fr) 1.6fr;gap:clamp(24px,4vw,60px);padding:clamp(26px,3vw,36px) 0;border-bottom:1px solid var(--line);align-items:start;}
+.pkg-row:first-child{border-top:1px solid var(--line);}
+.pkg-name h3{font-family:var(--display);font-weight:300;font-size:clamp(24px,2.4vw,30px);letter-spacing:.02em;margin:0;}
+.pkg-name .price{font-family:var(--display);font-weight:300;font-size:clamp(19px,2vw,23px);color:var(--muted);margin-top:6px;}
+.pkg-feats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+.pkg-feats li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.55;}
+.pkg-feats li::before{content:"";position:absolute;left:0;top:9px;width:7px;height:1px;background:var(--ink);opacity:.5;}
+.pkg-note{text-align:center;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:clamp(30px,4vw,44px);}
 
 /* the process — a real sequence, so it is numbered */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(22px,3vw,48px);}
@@ -314,9 +308,6 @@ p:last-child{margin-bottom:0;}
 .faq details[open] summary::after{transform:rotate(45deg);}
 .faq p{margin-top:14px;max-width:none;}
 
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:50px;padding-top:34px;border-top:1px solid var(--line);}
-.stats .n{font-family:var(--display);font-size:clamp(30px,3.4vw,44px);line-height:1;}
-.stats .l{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:10px;}
 
 .quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(26px,4vw,60px);}
 .quote{border-top:1px solid var(--line);padding-top:26px;}
@@ -378,7 +369,8 @@ p:last-child{margin-bottom:0;}
   }
   .mobile.open{transform:translateY(0);}
   .mobile a{font-family:var(--display);font-size:30px;letter-spacing:.04em;text-transform:uppercase;font-weight:300;}
-  .split,.cats,.contact-wrap,.quotes,.tiers,.addons,.stats{grid-template-columns:1fr;}
+  .split,.cats,.contact-wrap,.quotes{grid-template-columns:1fr;}
+  .pkg-row{grid-template-columns:1fr;gap:14px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
   .grid{grid-template-columns:1fr 1fr;}
@@ -419,9 +411,9 @@ p:last-child{margin-bottom:0;}
     <li class="has-drop">
       <a href="#" class="drop-toggle" data-go="portfolio">Portfolio +</a>
       <div class="drop">
-        <a href="#" data-go="portfolio" data-filter="weddings">Weddings</a>
         <a href="#" data-go="portfolio" data-filter="portraits">Portraits</a>
         <a href="#" data-go="portfolio" data-filter="elopements">Elopements</a>
+        <a href="#" data-go="portfolio" data-filter="weddings">Weddings</a>
       </div>
     </li>
   </ul>
@@ -435,7 +427,6 @@ p:last-child{margin-bottom:0;}
   </a>
 
   <ul class="right">
-    <li><a href="#" data-go="journal">Journal</a></li>
     <li class="has-drop">
       <a href="#" class="drop-toggle" data-go="pricing">Info +</a>
       <div class="drop">
@@ -453,7 +444,6 @@ p:last-child{margin-bottom:0;}
   <a href="#" data-go="about">About</a>
   <a href="#" data-go="portfolio">Portfolio</a>
   <a href="#" data-go="pricing">Pricing</a>
-  <a href="#" data-go="journal">Journal</a>
   <a href="#" data-go="contact">Contact</a>
 </div>
 
@@ -577,7 +567,6 @@ p:last-child{margin-bottom:0;}
   <div class="inner-top page-head">
     <span class="index">Behind the camera</span>
     <h1 class="display">About Ki</h1>
-    <p class="script">nine years of watching light</p>
   </div>
 
   <div class="section tight">
@@ -586,15 +575,10 @@ p:last-child{margin-bottom:0;}
       <div class="copy">
         <span class="index">Khiara Salvani</span>
         <h2 class="h2" style="margin-top:20px;">I shoot for the ten-years-from-now version of you</h2>
-        <p>Trends age. The way your grandmother held your hand before the ceremony does not. I photograph with that in mind &mdash; editorial in composition, quiet in approach, so the day stays yours while I work around the edges of it.</p>
-        <p>Most of my couples tell me the same thing afterward: they forgot I was there. That&#8217;s the goal. I direct when direction helps, and otherwise I stay out of the way and pay attention.</p>
-        <p>Based in Honolulu, and happiest on a plane to somewhere new. Travel is welcome and often my favorite part of the job.</p>
+        <p>I love this job. Every session is a new group of people who trust me with a day that matters to them, and I don&#8217;t take that lightly &mdash; or too seriously, either. My favorite moments are the ones nobody planned: the laugh before the vows, the little kid stealing the spotlight, the look between two people who forgot anyone else was watching.</p>
+        <p>My couples usually tell me the same thing afterward: they had way more fun than they expected, and somehow forgot I was even there. That&#8217;s exactly what I&#8217;m going for. I direct when it helps, and otherwise I hang back, stay ready, and let the good stuff happen.</p>
+        <p>Based in Honolulu, and always up for a trip somewhere new. Travel is welcome and one of my favorite parts of the job.</p>
         <a href="#" class="link" data-go="contact">Start a conversation</a>
-        <div class="stats">
-          <div><div class="n">120+</div><div class="l">Weddings photographed</div></div>
-          <div><div class="n">9</div><div class="l">Years behind the lens</div></div>
-          <div><div class="n">14</div><div class="l">Countries traveled</div></div>
-        </div>
       </div>
     </div>
   </div>
@@ -620,9 +604,9 @@ p:last-child{margin-bottom:0;}
   <div class="section tight">
     <div class="filters" id="filters">
       <button class="on" data-filter="all">All</button>
-      <button data-filter="weddings">Weddings</button>
       <button data-filter="portraits">Portraits</button>
       <button data-filter="elopements">Elopements</button>
+      <button data-filter="weddings">Weddings</button>
     </div>
     <div class="grid" id="grid"></div>
   </div>
@@ -647,54 +631,106 @@ p:last-child{margin-bottom:0;}
   </div>
 
   <div class="section tight">
-    <div class="section-head"><span class="index">Weddings</span></div>
-    <div class="tiers">
-      <div class="tier">
-        <span class="num">Coverage</span>
-        <h3>4 Hours</h3>
-        <div class="price">$800</div>
-        <p>200+ edited images</p>
-        <a href="#" class="link" data-go="contact">Inquire</a>
+    <div class="section-head"><span class="index">Portraits</span></div>
+    <div class="pkg-group">
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>Couples</h3><div class="price">$125</div></div>
+        <ul class="pkg-feats">
+          <li>60 min. session</li>
+          <li>30&ndash;50 edited images</li>
+          <li>Private online gallery</li>
+          <li>1&ndash;2 week turnaround</li>
+          <li>72 hr sneak peek</li>
+          <li>1 location</li>
+          <li>1 outfit change</li>
+        </ul>
       </div>
-
-      <div class="tier">
-        <span class="num">Coverage</span>
-        <h3>6 Hours</h3>
-        <div class="price">$1,200</div>
-        <p>300+ edited images</p>
-        <a href="#" class="link" data-go="contact">Inquire</a>
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>Engagement</h3><div class="price">$175</div></div>
+        <ul class="pkg-feats">
+          <li>60 min. session</li>
+          <li>75+ edited images</li>
+          <li>Private online gallery</li>
+          <li>1&ndash;2 week turnaround</li>
+          <li>72 hr sneak peek</li>
+          <li>1 location</li>
+          <li>2 outfit changes</li>
+        </ul>
       </div>
-
-      <div class="tier">
-        <span class="num">Coverage</span>
-        <h3>8 Hours</h3>
-        <div class="price">$1,500</div>
-        <p>400+ edited images</p>
-        <a href="#" class="link" data-go="contact">Inquire</a>
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>Family &amp; Maternity</h3><div class="price">$150</div></div>
+        <ul class="pkg-feats">
+          <li>60 min. session</li>
+          <li>50+ edited images</li>
+          <li>Private online gallery</li>
+          <li>1&ndash;2 week turnaround</li>
+          <li>72 hr sneak peek</li>
+          <li>1 location</li>
+          <li>1 outfit change</li>
+        </ul>
+      </div>
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>Senior</h3><div class="price">$100</div></div>
+        <ul class="pkg-feats">
+          <li>30&ndash;45 min. session</li>
+          <li>25+ edited images</li>
+          <li>Private online gallery</li>
+          <li>1&ndash;2 week turnaround</li>
+          <li>1 location</li>
+          <li>2 outfit changes</li>
+          <li>Add a friend: +$25, +15 min</li>
+        </ul>
       </div>
     </div>
   </div>
 
   <div class="section cream tight">
-    <div class="section-head"><span class="index">Portraits</span></div>
-    <div class="addons">
-      <div class="addon"><span>Couples</span><span>$175 <small style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);">25+ images</small></span></div>
-      <div class="addon"><span>Maternity</span><span>$200 <small style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);">35+ images</small></span></div>
-      <div class="addon"><span>Engagement</span><span>$250 <small style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);">50+ images</small></span></div>
-      <div class="addon"><span>Seniors</span><span>$175 <small style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);">25+ images</small></span></div>
-      <div class="addon"><span>Family</span><span>$200 <small style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);">50+ images</small></span></div>
+    <div class="section-head"><span class="index">Elopements</span></div>
+    <div class="pkg-group">
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>Elopement</h3><div class="price">$300</div></div>
+        <ul class="pkg-feats">
+          <li>Up to 2 hours of coverage</li>
+          <li>150+ edited images</li>
+          <li>Private online gallery</li>
+          <li>1&ndash;2 week turnaround</li>
+          <li>48&ndash;72 hr sneak peek</li>
+          <li>1 location</li>
+          <li>Timeline assistance</li>
+        </ul>
+      </div>
     </div>
   </div>
 
   <div class="section tight">
-    <div class="section-head"><span class="index">Elopements</span></div>
-    <div class="tier" style="max-width:340px;margin:0 auto;">
-      <span class="num">Coverage</span>
-      <h3>2 Hours</h3>
-      <div class="price">$500</div>
-      <p>100+ edited images</p>
-      <a href="#" class="link" data-go="contact">Inquire</a>
+    <div class="section-head"><span class="index">Weddings</span></div>
+    <div class="pkg-group">
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>The Intimate</h3><div class="price">4 Hours &mdash; $800</div></div>
+        <ul class="pkg-feats">
+          <li>4 hours of coverage</li>
+          <li>200+ edited images</li>
+          <li>Private online gallery</li>
+        </ul>
+      </div>
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>The Classic</h3><div class="price">6 Hours &mdash; $1,200</div></div>
+        <ul class="pkg-feats">
+          <li>6 hours of coverage</li>
+          <li>300+ edited images</li>
+          <li>Private online gallery</li>
+        </ul>
+      </div>
+      <div class="pkg-row">
+        <div class="pkg-name"><h3>The Grand</h3><div class="price">8 Hours &mdash; $1,500</div></div>
+        <ul class="pkg-feats">
+          <li>8 hours of coverage</li>
+          <li>400+ edited images</li>
+          <li>Private online gallery</li>
+        </ul>
+      </div>
     </div>
+    <p class="pkg-note">Inquire for full pricing and availability &mdash; travel fees may apply.</p>
   </div>
 
   <div class="section" id="process">
@@ -773,34 +809,6 @@ p:last-child{margin-bottom:0;}
   </div>
 </section>
 
-<!-- ================= JOURNAL ================= -->
-<section class="page" id="journal">
-  <div class="inner-top page-head">
-    <span class="index">Notes &amp; stories</span>
-    <h1 class="display">Journal</h1>
-    <p class="script">recent weddings and planning notes</p>
-  </div>
-  <div class="section tight">
-    <div class="trio">
-      <div>
-        <a href="#" class="frame marked" style="display:block;aspect-ratio:3/4;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt=""></a>
-        <div class="cap">Real weddings &mdash; March</div>
-        <h3 class="h3" style="margin-top:8px;">A garden ceremony in Kailua</h3>
-      </div>
-      <div>
-        <a href="#" class="frame marked" style="display:block;aspect-ratio:3/4;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt=""></a>
-        <div class="cap">Planning &mdash; February</div>
-        <h3 class="h3" style="margin-top:8px;">Building a timeline around golden hour</h3>
-      </div>
-      <div>
-        <a href="#" class="frame marked" style="display:block;aspect-ratio:3/4;"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt=""></a>
-        <div class="cap">Elopements &mdash; January</div>
-        <h3 class="h3" style="margin-top:8px;">Two people, one cliff, no audience</h3>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ================= CONTACT ================= -->
 <section class="page" id="contact">
   <div class="inner-top page-head">
@@ -836,11 +844,14 @@ p:last-child{margin-bottom:0;}
           <label for="cl">Session you&#8217;re considering</label>
           <select id="cl">
             <option>Not sure yet</option>
-            <option>Wedding &mdash; 4 hours ($800)</option>
-            <option>Wedding &mdash; 6 hours ($1,200)</option>
-            <option>Wedding &mdash; 8 hours ($1,500)</option>
-            <option>Elopement &mdash; 2 hours ($500)</option>
-            <option>Portrait session</option>
+            <option>Couples &mdash; $125</option>
+            <option>Engagement &mdash; $175</option>
+            <option>Family &amp; Maternity &mdash; $150</option>
+            <option>Senior &mdash; $100</option>
+            <option>Elopement &mdash; $300</option>
+            <option>Wedding, The Intimate &mdash; 4 hrs ($800)</option>
+            <option>Wedding, The Classic &mdash; 6 hrs ($1,200)</option>
+            <option>Wedding, The Grand &mdash; 8 hrs ($1,500)</option>
           </select>
         </div>
         <div class="field">
@@ -868,7 +879,6 @@ p:last-child{margin-bottom:0;}
     <a href="#" data-go="about">About</a>
     <a href="#" data-go="portfolio">Portfolio</a>
     <a href="#" data-go="pricing">Pricing</a>
-    <a href="#" data-go="journal">Journal</a>
     <a href="#" data-go="contact">Contact</a>
   </nav>
   <p class="script" style="font-size:19px;">Photographing weddings in Hawai&#699;i &amp; worldwide</p>
