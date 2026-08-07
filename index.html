@@ -126,16 +126,6 @@ p:last-child{margin-bottom:0;}
 .slide.on img{animation:drift 16s ease-out both;}
 @keyframes drift{from{transform:scale(1.07);}to{transform:scale(1);}}
 .slide::after{content:"";position:absolute;inset:0;background:rgba(23,22,20,.14);}
-.hero .slide img{object-position:var(--pos,50% 50%);}
-/* portrait hero photos: full-bleed crop on narrow (phone-like) screens,
-   full uncropped photo letterboxed on wide desktop screens instead of
-   cropping most of the height away. Centered rather than using each
-   slide's crop-bias --pos, since that bias only makes sense when
-   cropping - under contain it would just push the whole photo
-   off-center within the empty space. */
-@media (min-width:1000px){
-  .hero .slide img{object-fit:contain;object-position:50% 50%;}
-}
 .rise{animation:rise 1.1s cubic-bezier(.2,.7,.3,1) both;}
 .rise.d3{animation-delay:1.45s;}
 @keyframes rise{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:none;}}
@@ -385,10 +375,10 @@ p:last-child{margin-bottom:0;}
 <section class="page active" id="home">
 
   <div class="hero">
-    <div class="slide on"><img src="images/kiss-windy.jpg" alt="Couple kissing in the wind" style="--pos:50% 30%;"></div>
-    <div class="slide"><img src="images/maternity-beach.jpg" alt="Couple walking on the beach" style="--pos:50% 65%;"></div>
-    <div class="slide"><img src="images/wedding-carry.jpg" alt="Groom carrying bride while kissing in the water" style="--pos:50% 38%;"></div>
-    <div class="slide"><img src="images/couple-park.jpg" alt="Couple embracing under bare trees" style="--pos:50% 40%;"></div>
+    <div class="slide on"><img src="images/kiss-windy.jpg" alt="Couple kissing in the wind" style="object-position:50% 30%;"></div>
+    <div class="slide"><img src="images/maternity-beach.jpg" alt="Couple walking on the beach" style="object-position:50% 65%;"></div>
+    <div class="slide"><img src="images/wedding-carry.jpg" alt="Groom carrying bride while kissing in the water" style="object-position:50% 38%;"></div>
+    <div class="slide"><img src="images/couple-park.jpg" alt="Couple embracing under bare trees" style="object-position:50% 40%;"></div>
 
     <div class="hero-cta">
       <a href="#" class="hero-link rise d3" data-go="portfolio">Portfolio</a>
