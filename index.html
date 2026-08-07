@@ -128,16 +128,7 @@ p:last-child{margin-bottom:0;}
 .slide.on img{animation:drift 16s ease-out both;}
 @keyframes drift{from{transform:scale(1.07);}to{transform:scale(1);}}
 .slide::after{content:"";position:absolute;inset:0;background:rgba(23,22,20,.14);}
-.hero-copy{
-  position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;text-align:center;color:var(--white);padding:0 var(--gutter);
-}
-.hero-copy .display{font-size:clamp(42px,7vw,102px);text-shadow:0 2px 30px rgba(0,0,0,.18);}
-.hero-copy .display em{font-style:italic;text-transform:none;letter-spacing:.01em;font-weight:300;}
-.hero-copy .script{font-size:clamp(19px,2vw,27px);margin-top:18px;text-shadow:0 2px 24px rgba(0,0,0,.2);}
 .rise{animation:rise 1.1s cubic-bezier(.2,.7,.3,1) both;}
-.rise.d1{animation-delay:1.05s;}
-.rise.d2{animation-delay:1.25s;}
 .rise.d3{animation-delay:1.45s;}
 @keyframes rise{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:none;}}
 
@@ -401,10 +392,6 @@ p:last-child{margin-bottom:0;}
     <div class="slide on"><img src="images/mountain-run.jpg" alt="Couple holding hands walking toward mountains"></div>
     <div class="slide"><img src="images/sunset-embrace.jpg" alt="Couple embracing at sunset"></div>
     <div class="slide"><img src="images/beach-walk.jpg" alt="Couple walking along the beach"></div>
-
-    <div class="hero-copy">
-      <h1 class="display rise d1">CaptureWithKi</h1>
-    </div>
 
     <div class="status rise d3"><i></i> Now booking 2027</div>
 
