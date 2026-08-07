@@ -132,13 +132,14 @@ p:last-child{margin-bottom:0;}
 .rise.d3{animation-delay:1.45s;}
 @keyframes rise{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:none;}}
 
-/* status line */
-.status{
-  position:absolute;left:var(--gutter);bottom:150px;z-index:4;color:var(--white);
-  font-size:10px;letter-spacing:.3em;text-transform:uppercase;display:flex;align-items:center;gap:10px;
+/* hero CTA */
+.hero-cta{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;}
+.hero-link{
+  display:inline-block;color:var(--white);font-size:12px;letter-spacing:.28em;text-transform:uppercase;
+  border:1px solid rgba(255,255,255,.85);padding:18px 46px;background:rgba(255,255,255,.12);
+  transition:background .3s ease;
 }
-.status i{width:5px;height:5px;border-radius:50%;background:#fff;animation:pulse 2.6s ease-in-out infinite;}
-@keyframes pulse{0%,100%{opacity:.35;}50%{opacity:1;}}
+.hero-link:hover{background:rgba(255,255,255,.24);}
 
 /* hero bar with filmstrip */
 .hero-bar{
@@ -166,16 +167,6 @@ p:last-child{margin-bottom:0;}
 .section.paper{background:var(--paper);}
 .section-head{display:flex;align-items:baseline;gap:26px;margin-bottom:clamp(38px,5vw,60px);}
 .section-head .h2{flex:1;}
-
-/* drifting values band */
-.band{border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;padding:26px 0;background:var(--bg);}
-.band .track{display:flex;gap:56px;width:max-content;animation:slide 44s linear infinite;}
-.band span{
-  font-size:12.5px;font-weight:400;letter-spacing:.3em;text-transform:uppercase;
-  display:flex;align-items:center;gap:56px;white-space:nowrap;
-}
-.band span::after{content:"";width:5px;height:5px;background:var(--ink);opacity:.35;transform:rotate(45deg);}
-@keyframes slide{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 
 /* frames + archive marks */
 .frame{overflow:hidden;background:var(--cream);position:relative;}
@@ -327,7 +318,6 @@ p:last-child{margin-bottom:0;}
   *{animation:none !important;transition-duration:.001ms !important;}
   html{scroll-behavior:auto;}
   .curtain{display:none;}
-  .band .track{animation:none;}
 }
 
 /* ---------- responsive ---------- */
@@ -343,7 +333,6 @@ p:last-child{margin-bottom:0;}
   .hero-bar{grid-template-columns:1fr;gap:14px;}
   .hero-bar .script{grid-column:1;}
   .strip{grid-column:1;justify-self:center;}
-  .status{display:none;}
 }
 @media (max-width:620px){
   :root{--gutter:22px;}
@@ -393,7 +382,9 @@ p:last-child{margin-bottom:0;}
     <div class="slide"><img src="images/sunset-embrace.jpg" alt="Couple embracing at sunset"></div>
     <div class="slide"><img src="images/beach-walk.jpg" alt="Couple walking along the beach"></div>
 
-    <div class="status rise d3"><i></i> Now booking 2027</div>
+    <div class="hero-cta">
+      <a href="#" class="hero-link rise d3" data-go="portfolio">Portfolio</a>
+    </div>
 
     <div class="hero-bar">
       <p class="script">Based in Honolulu, Hawai&#699;i<br>available worldwide</p>
@@ -403,13 +394,6 @@ p:last-child{margin-bottom:0;}
         <span class="no" id="counter">Frame 01</span>
         <button class="arrow next" id="next" aria-label="Next frame"></button>
       </div>
-    </div>
-  </div>
-
-  <div class="band">
-    <div class="track">
-      <span>Timeless</span><span>Personal &amp; intimate</span><span>Luxurious</span><span>Unhurried</span>
-      <span>Timeless</span><span>Personal &amp; intimate</span><span>Luxurious</span><span>Unhurried</span>
     </div>
   </div>
 
