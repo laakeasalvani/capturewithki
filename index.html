@@ -190,12 +190,11 @@ p:last-child{margin-bottom:0;}
 .split .copy .h2{margin-bottom:22px;}
 .split .copy .link{margin-top:26px;}
 
-/* feature quote — a client's voice, standing on its own, no photo */
-.feature-quote{max-width:760px;margin:0 auto;text-align:center;}
-.fq-mark{display:block;font-family:var(--display);font-style:italic;font-size:clamp(70px,9vw,120px);line-height:1;color:var(--line);}
-.fq-text{font-size:clamp(24px,3vw,38px);line-height:1.4;color:var(--ink);margin-top:-.2em;}
-.fq-who{margin-top:22px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);}
-.feature-quote .link{margin-top:34px;}
+/* mini gallery — one big photo, two smaller stacked beside it */
+.mini-gallery{display:grid;grid-template-columns:1.15fr 1fr;gap:clamp(14px,2vw,26px);}
+.mg-big{aspect-ratio:4/5;}
+.mg-stack{display:flex;flex-direction:column;gap:clamp(14px,2vw,26px);}
+.mg-small{flex:1;}
 
 /* categories */
 .cats{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);align-items:center;}
@@ -327,6 +326,8 @@ p:last-child{margin-bottom:0;}
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
   .split,.cats,.contact-wrap,.quotes{grid-template-columns:1fr;}
+  .mini-gallery{grid-template-columns:1fr;}
+  .mg-big{aspect-ratio:4/3;}
   .svc-grid{grid-template-columns:1fr;gap:56px;}
   .inv-card{margin-top:-90px;}
   .steps{grid-template-columns:1fr 1fr;}
@@ -416,11 +417,13 @@ p:last-child{margin-bottom:0;}
   </div>
 
   <div class="section cream">
-    <div class="feature-quote">
-      <span class="fq-mark" aria-hidden="true">&#8220;</span>
-      <p class="script fq-text">We booked for the portfolio and stayed for the person.</p>
-      <div class="fq-who">Ava &amp; Sam &mdash; Big Island</div>
-      <a href="#" class="link" data-go="testimonials">Read more kind words</a>
+    <span class="index" style="justify-content:center;display:flex;margin-bottom:30px;">Selects</span>
+    <div class="mini-gallery">
+      <div class="frame marked mg-big"><img src="images/mountain-run.jpg" alt="Couple holding hands walking toward mountains"></div>
+      <div class="mg-stack">
+        <div class="frame marked mg-small"><img src="images/sunset-embrace.jpg" alt="Couple embracing at sunset"></div>
+        <div class="frame marked mg-small"><img src="images/wedding-carry.jpg" alt="Groom carrying bride while kissing in the water"></div>
+      </div>
     </div>
   </div>
 
