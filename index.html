@@ -283,15 +283,20 @@ p:last-child{margin-bottom:0;}
 .filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
 
 /* pricing */
-.pkg-group{max-width:920px;margin:0 auto;}
-.pkg-row{display:grid;grid-template-columns:minmax(180px,1fr) 1.6fr;gap:clamp(24px,4vw,60px);padding:clamp(26px,3vw,36px) 0;border-bottom:1px solid var(--line);align-items:start;}
-.pkg-row:first-child{border-top:1px solid var(--line);}
-.pkg-name h3{font-family:var(--display);font-weight:300;font-size:clamp(24px,2.4vw,30px);letter-spacing:.02em;margin:0;}
-.pkg-name .price{font-family:var(--display);font-weight:300;font-size:clamp(19px,2vw,23px);color:var(--muted);margin-top:6px;}
-.pkg-feats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
-.pkg-feats li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.55;}
-.pkg-feats li::before{content:"";position:absolute;left:0;top:9px;width:7px;height:1px;background:var(--ink);opacity:.5;}
-.pkg-note{text-align:center;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:clamp(30px,4vw,44px);}
+.inv-hero{position:relative;height:78vh;min-height:520px;overflow:hidden;background:var(--cream);}
+.inv-hero img{width:100%;height:100%;object-fit:cover;}
+.inv-card{position:relative;z-index:2;background:var(--bg);margin:-140px auto 0;max-width:720px;text-align:center;padding:clamp(40px,6vw,64px) clamp(24px,6vw,80px) clamp(50px,7vw,74px);}
+.inv-card p{max-width:56ch;margin:22px auto 0;color:var(--muted);}
+
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(34px,5vw,70px);}
+.svc-card{text-align:center;}
+.svc-media{aspect-ratio:4/3;margin-bottom:28px;}
+.svc-title{font-family:var(--display);font-weight:300;font-size:clamp(28px,3vw,38px);letter-spacing:.03em;margin:0 0 16px;}
+.svc-card p{max-width:44ch;margin:0 auto 24px;}
+.svc-price{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:22px;}
+.svc-sub{margin-top:20px;font-size:11px;letter-spacing:.05em;color:var(--muted);}
+
+.wed-list{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 26px;margin:16px 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);}
 
 /* the process — a real sequence, so it is numbered */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(22px,3vw,48px);}
@@ -325,7 +330,7 @@ p:last-child{margin-bottom:0;}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--ink);}
 .field textarea{resize:vertical;min-height:110px;}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:26px;}
-.submit{margin-top:12px;background:var(--ink);color:var(--bg);padding:16px 44px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;transition:opacity .3s;}
+.submit{display:inline-block;margin-top:12px;background:var(--ink);color:var(--bg);padding:16px 44px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;transition:opacity .3s;}
 .submit:hover{opacity:.82;}
 .sent{margin-top:20px;font-size:13px;color:var(--ink);display:none;}
 .sent.show{display:block;}
@@ -370,7 +375,8 @@ p:last-child{margin-bottom:0;}
   .mobile.open{transform:translateY(0);}
   .mobile a{font-family:var(--display);font-size:30px;letter-spacing:.04em;text-transform:uppercase;font-weight:300;}
   .split,.cats,.contact-wrap,.quotes{grid-template-columns:1fr;}
-  .pkg-row{grid-template-columns:1fr;gap:14px;}
+  .svc-grid{grid-template-columns:1fr;gap:56px;}
+  .inv-card{margin-top:-90px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
   .grid{grid-template-columns:1fr 1fr;}
@@ -390,6 +396,8 @@ p:last-child{margin-bottom:0;}
   .shot.wide .frame{aspect-ratio:3/4;}
   .marked::before,.marked::after{display:none;}
   .section-head{flex-direction:column;gap:14px;}
+  .inv-hero{height:56vh;min-height:360px;}
+  .inv-card{margin-top:-60px;}
 }
 </style>
 </head>
@@ -624,113 +632,50 @@ p:last-child{margin-bottom:0;}
 <!-- ================= PRICING ================= -->
 <!-- PLACEHOLDER PRICING — replace every figure below before launch. -->
 <section class="page" id="pricing">
-  <div class="inner-top page-head">
-    <span class="index">Collections</span>
-    <h1 class="display">Investment</h1>
-    <p class="script">clear numbers, no guessing</p>
+
+  <div class="inv-hero">
+    <img src="images/mountain-run.jpg" alt="Couple holding hands walking toward mountains">
+  </div>
+  <div class="inv-card">
+    <span class="index">Pricing</span>
+    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
+    <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
   </div>
 
-  <div class="section tight">
-    <div class="section-head"><span class="index">Portraits</span></div>
-    <div class="pkg-group">
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>Couples</h3><div class="price">$125</div></div>
-        <ul class="pkg-feats">
-          <li>60 min. session</li>
-          <li>30&ndash;50 edited images</li>
-          <li>Private online gallery</li>
-          <li>1&ndash;2 week turnaround</li>
-          <li>72 hr sneak peek</li>
-          <li>1 location</li>
-          <li>1 outfit change</li>
-        </ul>
+  <div class="section">
+    <div class="svc-grid">
+      <div class="svc-card">
+        <div class="svc-media frame"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt="Portrait session"></div>
+        <h2 class="svc-title">Portraits</h2>
+        <p>Couples, engagements, maternity, family, seniors &mdash; whatever the occasion, sessions are relaxed and low-key, built around real connection instead of stiff posing.</p>
+        <div class="svc-price">From $100</div>
+        <a href="#" class="submit" data-go="contact">Inquire</a>
+        <p class="svc-sub">Couples $125 &middot; Engagement $175 &middot; Family &amp; Maternity $150 &middot; Senior $100</p>
       </div>
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>Engagement</h3><div class="price">$175</div></div>
-        <ul class="pkg-feats">
-          <li>60 min. session</li>
-          <li>75+ edited images</li>
-          <li>Private online gallery</li>
-          <li>1&ndash;2 week turnaround</li>
-          <li>72 hr sneak peek</li>
-          <li>1 location</li>
-          <li>2 outfit changes</li>
-        </ul>
-      </div>
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>Family &amp; Maternity</h3><div class="price">$150</div></div>
-        <ul class="pkg-feats">
-          <li>60 min. session</li>
-          <li>50+ edited images</li>
-          <li>Private online gallery</li>
-          <li>1&ndash;2 week turnaround</li>
-          <li>72 hr sneak peek</li>
-          <li>1 location</li>
-          <li>1 outfit change</li>
-        </ul>
-      </div>
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>Senior</h3><div class="price">$100</div></div>
-        <ul class="pkg-feats">
-          <li>30&ndash;45 min. session</li>
-          <li>25+ edited images</li>
-          <li>Private online gallery</li>
-          <li>1&ndash;2 week turnaround</li>
-          <li>1 location</li>
-          <li>2 outfit changes</li>
-          <li>Add a friend: +$25, +15 min</li>
-        </ul>
+      <div class="svc-card">
+        <div class="svc-media frame"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt="Elopement session"></div>
+        <h2 class="svc-title">Elopements</h2>
+        <p>No guest list, no timeline stress &mdash; just the two of you, somewhere beautiful. I&#8217;ll help with the details and stay close enough to catch everything without ever getting in the way.</p>
+        <div class="svc-price">From $300</div>
+        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
     </div>
   </div>
 
-  <div class="section cream tight">
-    <div class="section-head"><span class="index">Elopements</span></div>
-    <div class="pkg-group">
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>Elopement</h3><div class="price">$300</div></div>
-        <ul class="pkg-feats">
-          <li>Up to 2 hours of coverage</li>
-          <li>150+ edited images</li>
-          <li>Private online gallery</li>
-          <li>1&ndash;2 week turnaround</li>
-          <li>48&ndash;72 hr sneak peek</li>
-          <li>1 location</li>
-          <li>Timeline assistance</li>
-        </ul>
+  <div class="banner" style="height:min(78vh,680px);">
+    <img src="images/sunset-embrace.jpg" alt="Couple embracing at sunset">
+    <div class="over">
+      <span class="index" style="color:rgba(255,255,255,.8);">Weddings</span>
+      <h2 class="display">From $800</h2>
+      <p>Your wedding day moves fast &mdash; I&#8217;m there for all of it, camera ready, staying out of the way until the moment needs me. Every collection includes a private online gallery and a hand-edited set of images you&#8217;ll actually want to look at for the next fifty years.</p>
+      <div class="wed-list">
+        <span>The Intimate &mdash; 4 hrs &mdash; $800</span>
+        <span>The Classic &mdash; 6 hrs &mdash; $1,200</span>
+        <span>The Grand &mdash; 8 hrs &mdash; $1,500</span>
       </div>
+      <a href="#" class="link on-dark" data-go="contact">Inquire</a>
     </div>
-  </div>
-
-  <div class="section tight">
-    <div class="section-head"><span class="index">Weddings</span></div>
-    <div class="pkg-group">
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>The Intimate</h3><div class="price">4 Hours &mdash; $800</div></div>
-        <ul class="pkg-feats">
-          <li>4 hours of coverage</li>
-          <li>200+ edited images</li>
-          <li>Private online gallery</li>
-        </ul>
-      </div>
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>The Classic</h3><div class="price">6 Hours &mdash; $1,200</div></div>
-        <ul class="pkg-feats">
-          <li>6 hours of coverage</li>
-          <li>300+ edited images</li>
-          <li>Private online gallery</li>
-        </ul>
-      </div>
-      <div class="pkg-row">
-        <div class="pkg-name"><h3>The Grand</h3><div class="price">8 Hours &mdash; $1,500</div></div>
-        <ul class="pkg-feats">
-          <li>8 hours of coverage</li>
-          <li>400+ edited images</li>
-          <li>Private online gallery</li>
-        </ul>
-      </div>
-    </div>
-    <p class="pkg-note">Inquire for full pricing and availability &mdash; travel fees may apply.</p>
   </div>
 
   <div class="section" id="process">
@@ -927,8 +872,10 @@ p:last-child{margin-bottom:0;}
 
   function updateNav(){
     var onHome = document.getElementById('home').classList.contains('active');
-    var past = window.scrollY > (window.innerHeight - 120);
-    nav.classList.toggle('solid', !onHome || past);
+    var onPricing = document.getElementById('pricing').classList.contains('active');
+    var threshold = onPricing ? (window.innerHeight * .78 - 120) : (window.innerHeight - 120);
+    var past = window.scrollY > threshold;
+    nav.classList.toggle('solid', !(onHome || onPricing) || past);
   }
   window.addEventListener('scroll', updateNav, {passive:true});
   updateNav();
