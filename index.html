@@ -107,6 +107,14 @@ p:last-child{margin-bottom:0;}
   content:"";position:absolute;left:0;bottom:0;height:1px;width:0;background:currentColor;transition:width .35s ease;
 }
 .nav a:hover::after,.nav li:hover>.drop-toggle::after{width:100%;}
+.nav ul li>a{
+  border:1px solid currentColor;padding:8px 16px;background:rgba(255,255,255,.14);
+  transition:background .3s ease;
+}
+.nav ul li>a::after{display:none;}
+.nav ul li>a:hover{background:rgba(255,255,255,.26);}
+.nav.solid ul li>a{background:rgba(23,22,20,.06);}
+.nav.solid ul li>a:hover{background:rgba(23,22,20,.12);}
 .brand{display:flex;flex-direction:column;align-items:center;line-height:1;}
 .brand .mark{width:40px;height:40px;}
 .wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:27px;letter-spacing:.02em;white-space:nowrap;}
@@ -460,7 +468,7 @@ p:last-child{margin-bottom:0;}
     <div class="slide"><img src="images/beach-walk.jpg" alt="Couple walking along the beach"></div>
 
     <div class="hero-copy">
-      <h1 class="display rise d1">Capture<br><em>WithKi</em></h1>
+      <h1 class="display rise d1">CaptureWithKi</h1>
       <p class="script rise d2">kept the way you&#8217;ll want to remember it</p>
     </div>
 
@@ -568,7 +576,7 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="about">
   <div class="inner-top page-head">
     <span class="index">Behind the camera</span>
-    <h1 class="display">About <em>Ki</em></h1>
+    <h1 class="display">About Ki</h1>
     <p class="script">nine years of watching light</p>
   </div>
 
@@ -605,7 +613,7 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="portfolio">
   <div class="inner-top page-head">
     <span class="index">The archive</span>
-    <h1 class="display">Port<em>folio</em></h1>
+    <h1 class="display">Portfolio</h1>
     <p class="script">a few favorites from recent seasons</p>
   </div>
 
@@ -634,7 +642,7 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="pricing">
   <div class="inner-top page-head">
     <span class="index">Collections</span>
-    <h1 class="display">Invest<em>ment</em></h1>
+    <h1 class="display">Investment</h1>
     <p class="script">clear numbers, no guessing</p>
   </div>
 
@@ -769,7 +777,7 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="journal">
   <div class="inner-top page-head">
     <span class="index">Notes &amp; stories</span>
-    <h1 class="display">Jour<em>nal</em></h1>
+    <h1 class="display">Journal</h1>
     <p class="script">recent weddings and planning notes</p>
   </div>
   <div class="section tight">
@@ -797,7 +805,7 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="contact">
   <div class="inner-top page-head">
     <span class="index">Inquiries</span>
-    <h1 class="display">Say <em>hello</em></h1>
+    <h1 class="display">Say hello</h1>
     <p class="script">tell me about your day</p>
   </div>
 
