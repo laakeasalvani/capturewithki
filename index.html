@@ -107,15 +107,15 @@ p:last-child{margin-bottom:0;}
   content:"";position:absolute;left:0;bottom:0;height:1px;width:0;background:currentColor;transition:width .35s ease;
 }
 .nav a:hover::after,.nav li:hover>.drop-toggle::after{width:100%;}
-.nav ul li>a{
+.nav ul li>a,.nav .drop-toggle{
   display:inline-block;line-height:1;box-sizing:border-box;
   border:1px solid currentColor;padding:10px 18px;background:rgba(255,255,255,.14);
   transition:background .3s ease;
 }
-.nav ul li>a::after{display:none;}
-.nav ul li>a:hover{background:rgba(255,255,255,.26);}
-.nav.solid ul li>a{background:rgba(23,22,20,.06);}
-.nav.solid ul li>a:hover{background:rgba(23,22,20,.12);}
+.nav ul li>a::after,.nav .drop-toggle::after{display:none;}
+.nav ul li>a:hover,.nav .drop-toggle:hover{background:rgba(255,255,255,.26);}
+.nav.solid ul li>a,.nav.solid .drop-toggle{background:rgba(23,22,20,.06);}
+.nav.solid ul li>a:hover,.nav.solid .drop-toggle:hover{background:rgba(23,22,20,.12);}
 .brand{display:flex;flex-direction:column;align-items:center;line-height:1;}
 .brand .mark{width:40px;height:40px;}
 .wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:27px;letter-spacing:.02em;white-space:nowrap;}
