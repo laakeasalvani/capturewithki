@@ -86,8 +86,8 @@ p:last-child{margin-bottom:0;}
 @keyframes markIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:none;}}
 
 /* Ki monogram */
-.mark circle{fill:none;stroke:var(--ink);stroke-width:.8;opacity:.55;}
-.mark text{font-family:var(--display);font-style:italic;font-size:26px;fill:var(--ink);}
+.mark circle{fill:none;stroke:currentColor;stroke-width:.8;opacity:.55;}
+.mark text{font-family:var(--display);font-style:italic;font-size:26px;fill:currentColor;}
 
 /* ---------- nav ---------- */
 .nav{
@@ -108,6 +108,7 @@ p:last-child{margin-bottom:0;}
 }
 .nav a:hover::after,.nav li:hover>.drop-toggle::after{width:100%;}
 .brand{display:flex;flex-direction:column;align-items:center;line-height:1;}
+.brand .mark{width:40px;height:40px;}
 .wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:27px;letter-spacing:.02em;white-space:nowrap;}
 .brand .sub{font-size:8.5px;letter-spacing:.42em;text-transform:uppercase;margin-top:6px;opacity:.7;}
 .has-drop{position:relative;}
@@ -354,7 +355,14 @@ p:last-child{margin-bottom:0;}
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
   .nav ul{display:none;}
-  .burger{display:block;justify-self:start;font-size:11px;letter-spacing:.2em;text-transform:uppercase;}
+  .burger{
+    display:block;justify-self:start;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    border:1px solid currentColor;padding:8px 16px;background:rgba(255,255,255,.14);
+    transition:background .3s ease;
+  }
+  .burger:hover{background:rgba(255,255,255,.26);}
+  .nav.solid .burger{background:rgba(23,22,20,.06);}
+  .nav.solid .burger:hover{background:rgba(23,22,20,.12);}
   .mobile{
     position:fixed;inset:0;z-index:70;background:var(--bg);color:var(--ink);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
@@ -410,8 +418,11 @@ p:last-child{margin-bottom:0;}
     </li>
   </ul>
 
-  <a href="#" class="brand" data-go="home">
-    <span class="wordmark">CaptureWithKi</span>
+  <a href="#" class="brand" data-go="home" aria-label="CaptureWithKi &mdash; home">
+    <svg class="mark" viewBox="0 0 80 80" aria-hidden="true">
+      <circle cx="40" cy="40" r="33"/>
+      <text x="40" y="49" text-anchor="middle">Ki</text>
+    </svg>
     <span class="sub">Khiara Salvani</span>
   </a>
 
@@ -449,7 +460,7 @@ p:last-child{margin-bottom:0;}
     <div class="slide"><img src="images/beach-walk.jpg" alt="Couple walking along the beach"></div>
 
     <div class="hero-copy">
-      <h1 class="display rise d1">Wedding<br><em>photography</em></h1>
+      <h1 class="display rise d1">Capture<br><em>WithKi</em></h1>
       <p class="script rise d2">kept the way you&#8217;ll want to remember it</p>
     </div>
 
