@@ -25,6 +25,7 @@
   --muted:  #6B6560;
   --line:   #D9D2C7;
   --white:  #FFFFFF;
+  --khaki:  #6B5D4A;
 
   --display: "Cormorant Garamond", "Times New Roman", serif;
   --sans:    "Jost", "Futura", "Helvetica Neue", Arial, sans-serif;
@@ -101,7 +102,7 @@ p:last-child{margin-bottom:0;}
 .burger{
   display:inline-block;line-height:1;box-sizing:border-box;
   font-size:11px;letter-spacing:.2em;text-transform:uppercase;
-  background:var(--ink);color:var(--bg);padding:10px 18px;
+  background:var(--khaki);color:var(--bg);padding:10px 18px;
   transition:opacity .3s ease;
 }
 .burger:hover{opacity:.82;}
@@ -133,7 +134,7 @@ p:last-child{margin-bottom:0;}
 /* hero CTA */
 .hero-cta{position:absolute;inset:0;z-index:3;display:flex;align-items:flex-end;justify-content:center;padding-bottom:clamp(150px,22vh,210px);}
 .hero-link{
-  display:inline-block;background:var(--ink);color:var(--bg);font-size:12px;letter-spacing:.28em;text-transform:uppercase;
+  display:inline-block;background:var(--khaki);color:var(--bg);font-size:12px;letter-spacing:.28em;text-transform:uppercase;
   padding:18px 46px;transition:opacity .3s ease;
 }
 .hero-link:hover{opacity:.82;}
@@ -185,13 +186,12 @@ p:last-child{margin-bottom:0;}
 .split .copy .h2{margin-bottom:22px;}
 .split .copy .link{margin-top:26px;}
 
-/* mini gallery — two staggered horizontal rows, 9 photos, alternating heights */
-.mini-gallery{display:flex;flex-direction:column;gap:clamp(10px,1.4vw,18px);}
-.gallery-row{display:grid;gap:clamp(8px,1.2vw,16px);align-items:start;}
-.gallery-row.row-5{grid-template-columns:repeat(5,1fr);}
-.gallery-row.row-4{grid-template-columns:repeat(4,1fr);}
-.gallery-row .g-a{aspect-ratio:4/3;}
-.gallery-row .g-b{aspect-ratio:3/4;margin-top:clamp(16px,2.4vw,30px);}
+/* filmstrip — full-bleed, continuously auto-scrolling photo strip */
+.filmstrip{overflow:hidden;background:var(--cream);padding-bottom:clamp(50px,6vw,80px);}
+.filmstrip-track{display:flex;gap:clamp(10px,1.4vw,18px);width:max-content;animation:filmstrip-scroll 50s linear infinite;}
+.filmstrip-track:hover{animation-play-state:paused;}
+.filmstrip .frame{width:min(60vw,340px);aspect-ratio:4/5;flex-shrink:0;}
+@keyframes filmstrip-scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 
 
 /* banner */
@@ -263,10 +263,20 @@ p:last-child{margin-bottom:0;}
 .faq p{margin-top:14px;max-width:none;}
 
 
-.quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(26px,4vw,60px);}
-.quote{border-top:1px solid var(--line);padding-top:26px;}
-.quote .script{font-size:22px;color:var(--ink);margin-bottom:18px;}
-.quote .who{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);}
+/* testimonials — spotlight + auto-scrolling ticker of clickable snippets */
+.t-spotlight{max-width:760px;margin:0 auto;text-align:center;}
+.t-mark{display:block;font-family:var(--display);font-style:italic;font-size:clamp(60px,8vw,100px);line-height:1;color:var(--line);}
+.t-spotlight-text{font-size:clamp(22px,2.8vw,34px);line-height:1.4;color:var(--ink);margin-top:-.15em;transition:opacity .2s ease;}
+.t-spotlight-who{margin-top:20px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);transition:opacity .2s ease;}
+.t-ticker{overflow:hidden;padding:34px 0;border-top:1px solid var(--line);margin-top:clamp(40px,6vw,64px);}
+.t-ticker-track{display:flex;gap:16px;width:max-content;animation:filmstrip-scroll 38s linear infinite;}
+.t-ticker:hover .t-ticker-track{animation-play-state:paused;}
+.t-chip{
+  white-space:nowrap;font-family:var(--display);font-style:italic;font-size:16px;flex-shrink:0;
+  padding:14px 26px;border:1px solid var(--line);background:var(--paper);color:var(--muted);
+  transition:.25s ease;
+}
+.t-chip.on,.t-chip:hover{border-color:var(--khaki);color:var(--ink);background:var(--cream);}
 
 /* contact */
 .contact-wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:clamp(36px,6vw,90px);align-items:start;}
@@ -279,7 +289,7 @@ p:last-child{margin-bottom:0;}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--ink);}
 .field textarea{resize:vertical;min-height:110px;}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:26px;}
-.submit{display:inline-block;margin-top:12px;background:var(--ink);color:var(--bg);padding:16px 44px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;transition:opacity .3s;}
+.submit{display:inline-block;margin-top:12px;background:var(--khaki);color:var(--bg);padding:16px 44px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;transition:opacity .3s;}
 .submit:hover{opacity:.82;}
 .sent{margin-top:20px;font-size:13px;color:var(--ink);display:none;}
 .sent.show{display:block;}
@@ -306,8 +316,7 @@ p:last-child{margin-bottom:0;}
 
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
-  .split,.contact-wrap,.quotes{grid-template-columns:1fr;}
-  .gallery-row.row-5,.gallery-row.row-4{grid-template-columns:repeat(3,1fr);}
+  .split,.contact-wrap{grid-template-columns:1fr;}
   .svc-grid{grid-template-columns:1fr;gap:56px;}
   .inv-card{margin-top:-90px;}
   .steps{grid-template-columns:1fr 1fr;}
@@ -322,7 +331,6 @@ p:last-child{margin-bottom:0;}
 @media (max-width:620px){
   :root{--gutter:22px;}
   .row,.grid,.steps{grid-template-columns:1fr;}
-  .gallery-row.row-5,.gallery-row.row-4{grid-template-columns:repeat(2,1fr);}
   .shot.wide{grid-column:span 1;}
   .shot.wide .frame{aspect-ratio:3/4;}
   .marked::before,.marked::after{display:none;}
@@ -384,7 +392,7 @@ p:last-child{margin-bottom:0;}
 
   <div class="section">
     <div class="split reverse">
-      <div class="media frame marked"><img src="images/about-bio-2.jpg" alt="Khiara Salvani"></div>
+      <div class="media frame marked"><img src="images/about-bio-2.jpg" alt="A couple photographed by CaptureWithKi"></div>
       <div class="copy">
         <span class="index">Hi, I am Khiara</span>
         <h2 class="h2" style="margin-top:20px;">Wedding photographer in Hawai&#699;i and beyond</h2>
@@ -395,22 +403,29 @@ p:last-child{margin-bottom:0;}
     </div>
   </div>
 
-  <div class="section cream tight">
-    <span class="index" style="justify-content:center;display:flex;margin-bottom:18px;">Selects</span>
-    <div class="mini-gallery">
-      <div class="gallery-row row-5">
-        <div class="frame marked g-a"><img src="images/gallery-a.jpg" alt=""></div>
-        <div class="frame marked g-b"><img src="images/gallery-b.jpg" alt=""></div>
-        <div class="frame marked g-a"><img src="images/gallery-c.jpg" alt=""></div>
-        <div class="frame marked g-b"><img src="images/gallery-d.jpg" alt=""></div>
-        <div class="frame marked g-a"><img src="images/gallery-e.jpg" alt=""></div>
-      </div>
-      <div class="gallery-row row-4">
-        <div class="frame marked g-b"><img src="images/gallery-f.jpg" alt=""></div>
-        <div class="frame marked g-a"><img src="images/gallery-g.jpg" alt=""></div>
-        <div class="frame marked g-b"><img src="images/gallery-h.jpg" alt=""></div>
-        <div class="frame marked g-a"><img src="images/gallery-i.jpg" alt=""></div>
-      </div>
+  <div class="section cream tight" style="padding-bottom:24px;">
+    <span class="index" style="justify-content:center;display:flex;">Selects</span>
+  </div>
+  <div class="filmstrip">
+    <div class="filmstrip-track">
+      <div class="frame marked"><img src="images/gallery-a.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-b.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-c.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-d.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-e.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-f.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-g.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-h.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-i.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-a.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-b.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-c.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-d.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-e.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-f.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-g.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-h.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-i.jpg" alt=""></div>
     </div>
   </div>
 
@@ -432,7 +447,7 @@ p:last-child{margin-bottom:0;}
 
   <div class="section tight">
     <div class="split">
-      <div class="media frame marked"><img src="images/about-bio.jpg" alt="Khiara Salvani"></div>
+      <div class="media frame marked"><img src="images/about-bio.jpg" alt="A couple photographed by CaptureWithKi"></div>
       <div class="copy">
         <span class="index">Khiara Salvani</span>
         <h2 class="h2" style="margin-top:20px;">A bit about me</h2>
@@ -457,8 +472,8 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="portfolio">
   <div class="inner-top page-head">
     <span class="index">The archive</span>
-    <h1 class="display">Portfolio</h1>
-    <p class="script">a few favorites from recent seasons</p>
+    <h1 class="display">Some of My Favorites</h1>
+    <p class="script">the full gallery, start to finish</p>
   </div>
 
   <div class="section tight">
@@ -506,7 +521,7 @@ p:last-child{margin-bottom:0;}
         <p class="svc-sub">Couples $125 &middot; Engagement $175 &middot; Family &amp; Maternity $150 &middot; Senior $100</p>
       </div>
       <div class="svc-card">
-        <div class="svc-media frame"><img src="images/pricing-elopements.jpg" alt="Elopement session"></div>
+        <div class="svc-media frame"><img src="images/contact-photo.jpg" alt="Elopement session"></div>
         <h2 class="svc-title">Elopements</h2>
         <p>No guest list, no timeline stress &mdash; just the two of you, somewhere beautiful. I&#8217;ll help with the details and stay close enough to catch everything without ever getting in the way.</p>
         <div class="svc-price">From $300</div>
@@ -597,19 +612,27 @@ p:last-child{margin-bottom:0;}
   </div>
 
   <div class="section tight">
-    <div class="quotes">
-      <div class="quote">
-        <p class="script">She caught the ten seconds I was most afraid I&#8217;d forget.</p>
-        <div class="who">Mailani &amp; Josh &mdash; Kailua</div>
-      </div>
-      <div class="quote">
-        <p class="script">Calm the whole day. Our families still talk about how easy she made it.</p>
-        <div class="who">Renée &amp; Tomás &mdash; North Shore</div>
-      </div>
-      <div class="quote">
-        <p class="script">We booked for the portfolio and stayed for the person.</p>
-        <div class="who">Ava &amp; Sam &mdash; Big Island</div>
-      </div>
+    <div class="t-spotlight">
+      <span class="t-mark" aria-hidden="true">&#8220;</span>
+      <p class="script t-spotlight-text" id="tText">She caught the ten seconds I was most afraid I&#8217;d forget.</p>
+      <div class="t-spotlight-who" id="tWho">Mailani &amp; Josh &mdash; Kailua</div>
+    </div>
+  </div>
+
+  <div class="t-ticker" id="tTicker">
+    <div class="t-ticker-track">
+      <button class="t-chip on" data-quote="She caught the ten seconds I was most afraid I&#8217;d forget." data-who="Mailani &amp; Josh &mdash; Kailua">She caught the ten seconds&hellip;</button>
+      <button class="t-chip" data-quote="Calm the whole day. Our families still talk about how easy she made it." data-who="Renée &amp; Tomás &mdash; North Shore">Calm the whole day&hellip;</button>
+      <button class="t-chip" data-quote="We booked for the portfolio and stayed for the person." data-who="Ava &amp; Sam &mdash; Big Island">We booked for the portfolio&hellip;</button>
+      <button class="t-chip" data-quote="It felt like hanging out with a friend who happened to have a camera." data-who="Noa &amp; Leilani &mdash; Lanikai">It felt like hanging out&hellip;</button>
+      <button class="t-chip" data-quote="Every photo looks like a memory, not a pose." data-who="Sarah &amp; Michael &mdash; Diamond Head">Every photo looks like a memory&hellip;</button>
+      <button class="t-chip" data-quote="She made my anxious, awkward-in-photos self feel completely at ease." data-who="Jenna &amp; Chris &mdash; Waimānalo">She made my anxious self&hellip;</button>
+      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="She caught the ten seconds I was most afraid I&#8217;d forget." data-who="Mailani &amp; Josh &mdash; Kailua">She caught the ten seconds&hellip;</button>
+      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="Calm the whole day. Our families still talk about how easy she made it." data-who="Renée &amp; Tomás &mdash; North Shore">Calm the whole day&hellip;</button>
+      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="We booked for the portfolio and stayed for the person." data-who="Ava &amp; Sam &mdash; Big Island">We booked for the portfolio&hellip;</button>
+      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="It felt like hanging out with a friend who happened to have a camera." data-who="Noa &amp; Leilani &mdash; Lanikai">It felt like hanging out&hellip;</button>
+      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="Every photo looks like a memory, not a pose." data-who="Sarah &amp; Michael &mdash; Diamond Head">Every photo looks like a memory&hellip;</button>
+      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="She made my anxious, awkward-in-photos self feel completely at ease." data-who="Jenna &amp; Chris &mdash; Waimānalo">She made my anxious self&hellip;</button>
     </div>
   </div>
 </section>
@@ -768,18 +791,42 @@ p:last-child{margin-bottom:0;}
 
   /* ---------- portfolio archive ---------- */
   var shots = [
-    {src:'grid-01.jpg', cat:'weddings',   place:'Kailua, O\u02BBahu'},
-    {src:'grid-02-wide.jpg', cat:'weddings', place:'K\u0101hala', wide:true},
-    {src:'grid-03.jpg', cat:'portraits',  place:'Studio, Honolulu'},
-    {src:'grid-04.jpg', cat:'elopements', place:'Waim\u0101nalo'},
-    {src:'grid-05.jpg', cat:'portraits',  place:'Lanikai'},
-    {src:'grid-06-wide.jpg', cat:'elopements',   place:'Na Pali Coast', wide:true},
-    {src:'grid-07.jpg', cat:'elopements', place:'Maui'},
-    {src:'grid-08.jpg', cat:'weddings',   place:'North Shore'},
-    {src:'grid-09.jpg', cat:'weddings',   place:'Diamond Head'},
-    {src:'grid-10.jpg', cat:'weddings',   place:'Ko Olina'},
-    {src:'grid-11.jpg', cat:'portraits',place:'Manoa', wide:true},
-    {src:'grid-12.jpg', cat:'portraits',  place:'Waikiki'}
+    {src:'kiss-windy.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
+    {src:'maternity-beach.jpg', cat:'portraits', place:'Waim\u0101nalo'},
+    {src:'wedding-carry.jpg', cat:'weddings', place:'Kualoa Ranch'},
+    {src:'couple-park.jpg', cat:'portraits', place:'Pacific Northwest'},
+    {src:'gallery-a.jpg', cat:'portraits', place:'North Shore'},
+    {src:'gallery-b.jpg', cat:'portraits', place:'Waim\u0101nalo'},
+    {src:'gallery-c.jpg', cat:'portraits', place:'Lanikai'},
+    {src:'gallery-d.jpg', cat:'portraits', place:'K\u0101hala'},
+    {src:'gallery-e.jpg', cat:'portraits', place:'North Shore'},
+    {src:'gallery-f.jpg', cat:'portraits', place:'Waim\u0101nalo'},
+    {src:'gallery-g.jpg', cat:'portraits', place:'Waim\u0101nalo'},
+    {src:'gallery-h.jpg', cat:'portraits', place:'Lanikai'},
+    {src:'gallery-i.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
+    {src:'grid-01.jpg', cat:'portraits', place:'K\u0101hala'},
+    {src:'grid-02-wide.jpg', cat:'portraits', place:'K\u0101hala', wide:true},
+    {src:'grid-03.jpg', cat:'portraits', place:'North Shore'},
+    {src:'grid-04.jpg', cat:'portraits', place:'North Shore'},
+    {src:'grid-05.jpg', cat:'portraits', place:'North Shore'},
+    {src:'grid-06-wide.jpg', cat:'portraits', place:'Pacific Northwest', wide:true},
+    {src:'grid-07.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
+    {src:'grid-08.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
+    {src:'grid-09.jpg', cat:'weddings', place:'Kualoa Ranch'},
+    {src:'grid-10.jpg', cat:'portraits', place:'K\u0101hala'},
+    {src:'grid-11.jpg', cat:'portraits', place:'Waim\u0101nalo', wide:true},
+    {src:'grid-12.jpg', cat:'portraits', place:'Pacific Northwest'},
+    {src:'about-bio.jpg', cat:'portraits', place:'North Shore'},
+    {src:'about-bio-2.jpg', cat:'portraits', place:'Pacific Northwest'},
+    {src:'about-banner.jpg', cat:'portraits', place:'Pacific Northwest'},
+    {src:'contact-photo.jpg', cat:'elopements', place:'Kualoa Ranch'},
+    {src:'home-banner.jpg', cat:'portraits', place:'Pacific Northwest'},
+    {src:'portfolio-banner.jpg', cat:'elopements', place:'Kualoa Ranch', wide:true},
+    {src:'pricing-hero.jpg', cat:'portraits', place:'Waim\u0101nalo'},
+    {src:'pricing-portraits.jpg', cat:'portraits', place:'Kualoa Ranch'},
+    {src:'pricing-elopements.jpg', cat:'portraits', place:'K\u0101hala'},
+    {src:'pricing-weddings-banner.jpg', cat:'weddings', place:'Kualoa Ranch', wide:true},
+    {src:'pricing-final-banner.jpg', cat:'portraits', place:'Pacific Northwest'}
   ];
   var grid = document.getElementById('grid');
 
@@ -803,6 +850,24 @@ p:last-child{margin-bottom:0;}
     if(b) setFilter(b.getAttribute('data-filter'));
   });
   setFilter('all');
+
+  /* ---------- testimonials ticker ---------- */
+  var tTicker = document.getElementById('tTicker');
+  var tText = document.getElementById('tText');
+  var tWho = document.getElementById('tWho');
+  tTicker.addEventListener('click', function(e){
+    var b = e.target.closest('.t-chip');
+    if(!b) return;
+    tTicker.querySelectorAll('.t-chip').forEach(function(x){ x.classList.toggle('on', x === b); });
+    tText.style.opacity = 0;
+    tWho.style.opacity = 0;
+    setTimeout(function(){
+      tText.textContent = b.getAttribute('data-quote');
+      tWho.textContent = b.getAttribute('data-who');
+      tText.style.opacity = 1;
+      tWho.style.opacity = 1;
+    }, 200);
+  });
 
   /* ---------- inquiry ---------- */
   document.getElementById('send').addEventListener('click', function(){
