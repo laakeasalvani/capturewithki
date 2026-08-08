@@ -177,11 +177,6 @@ p:last-child{margin-bottom:0;}
 .marked::before{top:-8px;left:-8px;border-right:0;border-bottom:0;}
 .marked::after{bottom:-8px;right:-8px;border-left:0;border-top:0;}
 
-.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,2.4vw,34px);}
-.trio .frame{aspect-ratio:3/4;}
-.trio .frame:nth-child(1){margin-top:60px;}
-.trio .frame:nth-child(3){margin-top:110px;}
-.cap{margin-top:12px;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);}
 
 .split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(34px,6vw,100px);align-items:center;}
 .split.reverse .media{order:2;}
@@ -196,22 +191,6 @@ p:last-child{margin-bottom:0;}
 .mg-stack{display:flex;flex-direction:column;gap:clamp(14px,2vw,26px);}
 .mg-small{flex:1;}
 
-/* categories */
-.cats{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);align-items:center;}
-.cats .stage{aspect-ratio:3/4;overflow:hidden;background:var(--cream);position:relative;}
-.cats .stage img{position:absolute;inset:0;opacity:0;transition:opacity .7s ease;}
-.cats .stage img.on{opacity:1;}
-.cat-list{list-style:none;margin:0;padding:0;}
-.cat-list li{border-bottom:1px solid var(--line);}
-.cat-list li:first-child{border-top:1px solid var(--line);}
-.cat-list button{
-  width:100%;text-align:left;padding:20px 0;display:flex;align-items:baseline;gap:20px;
-  font-family:var(--display);font-weight:300;font-size:clamp(26px,3.6vw,44px);letter-spacing:.03em;
-  transition:padding-left .4s ease,opacity .3s ease;
-}
-.cat-list button .n{font-family:var(--sans);font-size:10px;letter-spacing:.24em;color:var(--muted);}
-.cat-list button:hover,.cat-list button.on{padding-left:20px;}
-.cat-list button:not(.on):hover{opacity:.6;}
 
 /* banner */
 .banner{position:relative;height:min(72vh,640px);overflow:hidden;background:var(--cream);}
@@ -325,7 +304,7 @@ p:last-child{margin-bottom:0;}
 
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
-  .split,.cats,.contact-wrap,.quotes{grid-template-columns:1fr;}
+  .split,.contact-wrap,.quotes{grid-template-columns:1fr;}
   .mini-gallery{grid-template-columns:1fr;}
   .mg-big{aspect-ratio:4/3;}
   .svc-grid{grid-template-columns:1fr;gap:56px;}
@@ -341,8 +320,6 @@ p:last-child{margin-bottom:0;}
 }
 @media (max-width:620px){
   :root{--gutter:22px;}
-  .trio{grid-template-columns:1fr;}
-  .trio .frame{margin-top:0 !important;}
   .row,.grid,.steps{grid-template-columns:1fr;}
   .shot.wide{grid-column:span 1;}
   .shot.wide .frame{aspect-ratio:3/4;}
@@ -423,30 +400,8 @@ p:last-child{margin-bottom:0;}
       <div class="mg-stack">
         <div class="frame marked mg-small"><img src="images/sunset-embrace.jpg" alt="Couple embracing at sunset"></div>
         <div class="frame marked mg-small"><img src="images/wedding-carry.jpg" alt="Groom carrying bride while kissing in the water"></div>
+        <div class="frame marked mg-small"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt=""></div>
       </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-head">
-      <span class="index">Browse my work</span>
-    </div>
-    <div class="cats">
-      <div class="stage marked" id="catStage">
-        <img class="on" data-cat="weddings" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt="">
-        <img data-cat="portraits" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt="">
-        <img data-cat="elopements" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt="">
-        <img data-cat="couples" src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt="">
-      </div>
-      <ul class="cat-list" id="catList">
-        <li><button class="on" data-cat="weddings"><span class="n">A</span> Weddings</button></li>
-        <li><button data-cat="portraits"><span class="n">B</span> Portraits</button></li>
-        <li><button data-cat="elopements"><span class="n">C</span> Elopements</button></li>
-        <li><button data-cat="couples"><span class="n">D</span> Couples</button></li>
-      </ul>
-    </div>
-    <div style="text-align:center;margin-top:56px;">
-      <a href="#" class="link" data-go="portfolio">View portfolio</a>
     </div>
   </div>
 
@@ -463,7 +418,7 @@ p:last-child{margin-bottom:0;}
 <section class="page" id="about">
   <div class="inner-top page-head">
     <span class="index">Behind the camera</span>
-    <h1 class="display">About Ki</h1>
+    <h1 class="display">Hi, I&#8217;m Khiara!</h1>
   </div>
 
   <div class="section tight">
@@ -471,21 +426,20 @@ p:last-child{margin-bottom:0;}
       <div class="media frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_1_lg.jpg?v=1764152589000" alt="Khiara Salvani"></div>
       <div class="copy">
         <span class="index">Khiara Salvani</span>
-        <h2 class="h2" style="margin-top:20px;">I shoot for the ten-years-from-now version of you</h2>
-        <p>I love this job. Every session is a new group of people who trust me with a day that matters to them, and I don&#8217;t take that lightly &mdash; or too seriously, either. My favorite moments are the ones nobody planned: the laugh before the vows, the little kid stealing the spotlight, the look between two people who forgot anyone else was watching.</p>
-        <p>My couples usually tell me the same thing afterward: they had way more fun than they expected, and somehow forgot I was even there. That&#8217;s exactly what I&#8217;m going for. I direct when it helps, and otherwise I hang back, stay ready, and let the good stuff happen.</p>
-        <p>Based in Honolulu, and always up for a trip somewhere new. Travel is welcome and one of my favorite parts of the job.</p>
+        <h2 class="h2" style="margin-top:20px;">A bit about me</h2>
+        <p>I grew up in Beaverton, Oregon, where I fell in love with capturing amazing shots and life&#8217;s greatest moments &mdash; a sunset over the backyard, a friend&#8217;s genuine laugh, the five seconds right after a joke lands. That love turned into a camera in my hand more often than not, and eventually into a career telling other people&#8217;s stories.</p>
+        <p>These days I&#8217;m based in Honolulu, photographing weddings, elopements, and portraits across Hawai&#8217;i and beyond. My style is warm, a little editorial, and always focused on the moments that actually matter &mdash; not the posed ones, but the real ones. The laugh before the vows. The look between two people who forgot anyone else was watching.</p>
+        <p>If you&#8217;re looking for someone who&#8217;ll treat your day like it matters just as much to me as it does to you, that&#8217;s exactly what you&#8217;ll get.</p>
         <a href="#" class="link" data-go="contact">Start a conversation</a>
       </div>
     </div>
   </div>
 
-  <div class="section cream">
-    <div class="section-head"><span class="index">From the archive</span></div>
-    <div class="trio">
-      <div><div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_4_lg.jpg?v=1767694627000" alt=""></div><div class="cap">Studio, Honolulu</div></div>
-      <div><div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/vertical_3_lg.jpg?v=1767693742000" alt=""></div><div class="cap">Ceremony, Lanikai</div></div>
-      <div><div class="frame marked"><img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/portrait_3_lg.jpg?v=1764152603000" alt=""></div><div class="cap">Reception, Kāhala</div></div>
+  <div class="banner">
+    <img src="https://assets-pw.pixieset.com/flex/flex-themes/theme-images/odette/banner_2_lg.jpg?v=1764152563000" alt="">
+    <div class="over">
+      <h2 class="display">Let&#8217;s connect</h2>
+      <a href="#" class="submit" data-go="contact">Contact me</a>
     </div>
   </div>
 </section>
@@ -802,18 +756,6 @@ p:last-child{margin-bottom:0;}
   document.getElementById('next').addEventListener('click', function(){ show(i+1); auto(); });
   document.getElementById('prev').addEventListener('click', function(){ show(i-1); auto(); });
   show(0); auto();
-
-  /* ---------- category hover ---------- */
-  var stage = document.getElementById('catStage');
-  document.getElementById('catList').addEventListener('mouseover', function(e){
-    var b = e.target.closest('button[data-cat]');
-    if(!b) return;
-    var cat = b.getAttribute('data-cat');
-    this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x === b); });
-    stage.querySelectorAll('img').forEach(function(img){
-      img.classList.toggle('on', img.getAttribute('data-cat') === cat);
-    });
-  });
 
   /* ---------- portfolio archive ---------- */
   var shots = [
