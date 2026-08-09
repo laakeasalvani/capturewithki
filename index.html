@@ -232,9 +232,6 @@ p:last-child{margin-bottom:0;}
   opacity:0;transform:translateY(-5px);transition:.45s ease;
 }
 .shot:hover .meta{opacity:1;transform:none;}
-.filters{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;margin-bottom:52px;}
-.filters button{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);padding-bottom:5px;border-bottom:1px solid transparent;transition:.3s;}
-.filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
 
 /* pricing */
 .inv-hero{position:relative;height:78vh;min-height:520px;overflow:hidden;background:var(--cream);}
@@ -478,18 +475,10 @@ p:last-child{margin-bottom:0;}
 <!-- ================= PORTFOLIO ================= -->
 <section class="page" id="portfolio">
   <div class="inner-top page-head">
-    <span class="index">The archive</span>
     <h1 class="display">Some of My Favorites</h1>
-    <p class="script">the full gallery, start to finish</p>
   </div>
 
   <div class="section tight">
-    <div class="filters" id="filters">
-      <button class="on" data-filter="all">All</button>
-      <button data-filter="portraits">Portraits</button>
-      <button data-filter="elopements">Elopements</button>
-      <button data-filter="weddings">Weddings</button>
-    </div>
     <div class="grid" id="grid"></div>
   </div>
 
@@ -511,8 +500,7 @@ p:last-child{margin-bottom:0;}
     <img src="images/gallery-c.jpg" alt="">
   </div>
   <div class="inv-card">
-    <span class="index">Pricing</span>
-    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <h1 class="display">Investment</h1>
     <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
     <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
   </div>
@@ -531,7 +519,7 @@ p:last-child{margin-bottom:0;}
 
   <div class="section tight" style="border-top:1px solid var(--line);">
     <div class="split">
-      <div class="media frame marked"><img src="images/pricing-portraits.jpg" alt="Couples session"></div>
+      <div class="media frame marked"><img src="images/gallery-a.jpg" alt="Couples session"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);">Couples</h2>
         <div class="svc-price">$125</div>
@@ -688,8 +676,7 @@ p:last-child{margin-bottom:0;}
     <img src="images/portfolio-banner.jpg" alt="">
   </div>
   <div class="inv-card">
-    <span class="index">Pricing</span>
-    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <h1 class="display">Investment</h1>
     <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
     <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
   </div>
@@ -778,8 +765,7 @@ p:last-child{margin-bottom:0;}
     <img src="images/contact-photo.jpg" alt="">
   </div>
   <div class="inv-card">
-    <span class="index">Pricing</span>
-    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <h1 class="display">Investment</h1>
     <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
     <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
   </div>
@@ -1028,7 +1014,6 @@ p:last-child{margin-bottom:0;}
     opts = opts || {};
     pages.forEach(function(p){ p.classList.toggle('active', p.id === id); });
     window.scrollTo({top:0, behavior:'instant'});
-    if(opts.filter) setFilter(opts.filter);
     if(opts.anchor){
       var el = document.getElementById(opts.anchor);
       if(el) setTimeout(function(){ el.scrollIntoView({behavior:'smooth'}); }, 70);
@@ -1042,8 +1027,7 @@ p:last-child{margin-bottom:0;}
     if(!a) return;
     e.preventDefault();
     go(a.getAttribute('data-go'), {
-      anchor: a.getAttribute('data-anchor'),
-      filter: a.getAttribute('data-filter')
+      anchor: a.getAttribute('data-anchor')
     });
   });
 
@@ -1133,13 +1117,9 @@ p:last-child{margin-bottom:0;}
   ];
   var grid = document.getElementById('grid');
 
-  function setFilter(f){
-    document.querySelectorAll('#filters button').forEach(function(b){
-      b.classList.toggle('on', b.getAttribute('data-filter') === f);
-    });
+  function renderGrid(){
     grid.innerHTML = '';
-    shots.filter(function(s){ return f === 'all' || s.cat === f; })
-         .forEach(function(s, n){
+    shots.forEach(function(s, n){
       var d = document.createElement('div');
       d.className = 'shot' + (s.wide ? ' wide' : '');
       d.innerHTML =
@@ -1148,11 +1128,7 @@ p:last-child{margin-bottom:0;}
       grid.appendChild(d);
     });
   }
-  document.getElementById('filters').addEventListener('click', function(e){
-    var b = e.target.closest('button[data-filter]');
-    if(b) setFilter(b.getAttribute('data-filter'));
-  });
-  setFilter('all');
+  renderGrid();
 
   /* ---------- testimonials ticker ---------- */
   var tTicker = document.getElementById('tTicker');
