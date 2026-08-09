@@ -237,17 +237,11 @@ p:last-child{margin-bottom:0;}
 .filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
 
 /* pricing */
-.pkg-photo{aspect-ratio:4/3;width:100%;margin-bottom:20px;}
-
 .svc-price{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:22px;}
 
-.svc-list{list-style:none;margin:0 0 24px;padding:0;text-align:left;max-width:270px;margin-left:auto;margin-right:auto;}
+.svc-list{list-style:none;margin:20px 0 0;padding:0;text-align:left;}
 .svc-list li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.65;margin-bottom:10px;}
 .svc-list li::before{content:"";position:absolute;left:0;top:10px;width:7px;height:1px;background:var(--ink);opacity:.5;}
-
-.pkg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:clamp(20px,3vw,40px);}
-.pkg-card{background:var(--paper);border:1px solid var(--line);padding:clamp(28px,3vw,40px) clamp(22px,2.4vw,32px);text-align:center;display:flex;flex-direction:column;align-items:center;}
-.pkg-card h3{font-family:var(--display);font-weight:300;font-size:clamp(24px,2.6vw,30px);margin:0 0 8px;}
 
 /* the process — a real sequence, so it is numbered */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(22px,3vw,48px);}
@@ -516,11 +510,11 @@ p:last-child{margin-bottom:0;}
     </div>
   </div>
 
-  <div class="section tight">
-    <div class="pkg-grid">
-      <div class="pkg-card">
-        <div class="frame marked pkg-photo"><img src="images/pricing-portraits.jpg" alt="Couples session"></div>
-        <h3>Couples</h3>
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split">
+      <div class="media frame marked"><img src="images/pricing-portraits.jpg" alt="Couples session"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">Couples</h2>
         <div class="svc-price">$125</div>
         <ul class="svc-list">
           <li>60 min. session</li>
@@ -532,9 +526,14 @@ p:last-child{margin-bottom:0;}
           <li>1 outfit change</li>
         </ul>
       </div>
-      <div class="pkg-card">
-        <div class="frame marked pkg-photo"><img src="images/gallery-h.jpg" alt="Engagement session"></div>
-        <h3>Engagement</h3>
+    </div>
+  </div>
+
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split reverse">
+      <div class="media frame marked"><img src="images/gallery-h.jpg" alt="Engagement session"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">Engagement</h2>
         <div class="svc-price">$175</div>
         <ul class="svc-list">
           <li>60 min. session</li>
@@ -546,9 +545,14 @@ p:last-child{margin-bottom:0;}
           <li>2 outfit changes</li>
         </ul>
       </div>
-      <div class="pkg-card">
-        <div class="frame marked pkg-photo"><img src="images/about-banner.jpg" alt="Family session"></div>
-        <h3>Family</h3>
+    </div>
+  </div>
+
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split">
+      <div class="media frame marked"><img src="images/about-banner.jpg" alt="Family session"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">Family</h2>
         <div class="svc-price">$150</div>
         <ul class="svc-list">
           <li>60 min. session</li>
@@ -559,9 +563,14 @@ p:last-child{margin-bottom:0;}
           <li>1 location</li>
         </ul>
       </div>
-      <div class="pkg-card">
-        <div class="frame marked pkg-photo"><img src="images/gallery-b.jpg" alt="Maternity session"></div>
-        <h3>Maternity</h3>
+    </div>
+  </div>
+
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split reverse">
+      <div class="media frame marked"><img src="images/gallery-b.jpg" alt="Maternity session"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">Maternity</h2>
         <div class="svc-price">$150</div>
         <ul class="svc-list">
           <li>60 min. session</li>
@@ -573,9 +582,14 @@ p:last-child{margin-bottom:0;}
           <li>1 outfit change</li>
         </ul>
       </div>
-      <div class="pkg-card">
-        <div class="frame marked pkg-photo"><img src="images/grid-01.jpg" alt="Senior session"></div>
-        <h3>Senior</h3>
+    </div>
+  </div>
+
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split">
+      <div class="media frame marked"><img src="images/grid-01.jpg" alt="Senior session"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">Senior</h2>
         <div class="svc-price">$100</div>
         <ul class="svc-list">
           <li>30&ndash;45 min. session</li>
@@ -655,18 +669,6 @@ p:last-child{margin-bottom:0;}
       <div class="media frame marked"><img src="images/contact-photo.jpg" alt="Elopement session"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);">Elopements</h2>
-        <span class="index" style="margin-top:14px;">Just the two of you</span>
-        <p style="margin-top:22px;">No guest list, no timeline stress &mdash; just the two of you, somewhere beautiful. I&#8217;ll help with the details and stay close enough to catch everything without ever getting in the way.</p>
-        <p>Starting at $300.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="section tight">
-    <div class="pkg-grid" style="max-width:340px;margin:0 auto;">
-      <div class="pkg-card">
-        <div class="frame marked pkg-photo"><img src="images/contact-photo.jpg" alt="Elopement session"></div>
-        <h3>Elopement</h3>
         <div class="svc-price">$300</div>
         <ul class="svc-list">
           <li>Up to 2 hours of coverage</li>
@@ -753,10 +755,11 @@ p:last-child{margin-bottom:0;}
     </div>
   </div>
 
-  <div class="section">
-    <div class="pkg-grid">
-      <div class="pkg-card">
-        <h3>The Intimate</h3>
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split">
+      <div class="media frame marked"><img src="images/wedding-carry.jpg" alt="The Intimate wedding package"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">The Intimate</h2>
         <div class="svc-price">4 Hours &mdash; $800</div>
         <ul class="svc-list">
           <li>4 hours of coverage</li>
@@ -764,8 +767,14 @@ p:last-child{margin-bottom:0;}
           <li>Private online gallery</li>
         </ul>
       </div>
-      <div class="pkg-card">
-        <h3>The Classic</h3>
+    </div>
+  </div>
+
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split reverse">
+      <div class="media frame marked"><img src="images/portfolio-banner.jpg" alt="The Classic wedding package"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">The Classic</h2>
         <div class="svc-price">6 Hours &mdash; $1,200</div>
         <ul class="svc-list">
           <li>6 hours of coverage</li>
@@ -773,8 +782,14 @@ p:last-child{margin-bottom:0;}
           <li>Private online gallery</li>
         </ul>
       </div>
-      <div class="pkg-card">
-        <h3>The Grand</h3>
+    </div>
+  </div>
+
+  <div class="section tight" style="border-top:1px solid var(--line);">
+    <div class="split">
+      <div class="media frame marked"><img src="images/grid-09.jpg" alt="The Grand wedding package"></div>
+      <div class="copy">
+        <h2 class="h2" style="color:var(--khaki);">The Grand</h2>
         <div class="svc-price">8 Hours &mdash; $1,500</div>
         <ul class="svc-list">
           <li>8 hours of coverage</li>
