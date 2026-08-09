@@ -237,10 +237,7 @@ p:last-child{margin-bottom:0;}
 .filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
 
 /* pricing */
-.inv-hero{position:relative;height:78vh;min-height:520px;overflow:hidden;background:var(--cream);}
-.inv-hero img{width:100%;height:100%;object-fit:cover;}
-.inv-card{position:relative;z-index:2;background:var(--bg);margin:-140px auto 0;max-width:720px;text-align:center;padding:clamp(40px,6vw,64px) clamp(24px,6vw,80px) clamp(50px,7vw,74px);}
-.inv-card p{max-width:56ch;margin:22px auto 0;color:var(--muted);}
+.pkg-photo{aspect-ratio:4/3;width:100%;margin-bottom:20px;}
 
 .svc-price{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:22px;}
 
@@ -322,7 +319,6 @@ p:last-child{margin-bottom:0;}
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
   .split,.contact-wrap{grid-template-columns:1fr;}
-  .inv-card{margin-top:-90px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
   .grid{grid-template-columns:1fr 1fr;}
@@ -339,8 +335,6 @@ p:last-child{margin-bottom:0;}
   .shot.wide .frame{aspect-ratio:3/4;}
   .marked::before,.marked::after{display:none;}
   .section-head{flex-direction:column;gap:14px;}
-  .inv-hero{height:56vh;min-height:360px;}
-  .inv-card{margin-top:-60px;}
 }
 </style>
 </head>
@@ -366,9 +360,9 @@ p:last-child{margin-bottom:0;}
   <div class="mob-drop">
     <button class="mob-drop-toggle" id="invToggle" type="button">Investments</button>
     <div class="mob-drop-menu" id="invMenu">
-      <a href="#" data-go="pricing" data-anchor="portraits">Portraits</a>
-      <a href="#" data-go="pricing" data-anchor="elopements">Elopements</a>
-      <a href="#" data-go="pricing" data-anchor="weddings">Weddings</a>
+      <a href="#" data-go="portraits">Portraits</a>
+      <a href="#" data-go="elopements">Elopements</a>
+      <a href="#" data-go="weddings">Weddings</a>
     </div>
   </div>
   <a href="#" data-go="testimonials">Testimonials</a>
@@ -509,29 +503,17 @@ p:last-child{margin-bottom:0;}
 
 <!-- ================= PRICING ================= -->
 <!-- PLACEHOLDER PRICING — replace every figure below before launch. -->
-<section class="page" id="pricing">
-
-  <div class="inv-hero">
-    <img src="images/pricing-hero.jpg" alt="">
-  </div>
-  <div class="inv-card">
+<section class="page" id="portraits">
+  <div class="inner-top page-head">
     <span class="index">Pricing</span>
-    <h1 class="display" style="margin-top:18px;">Investment</h1>
-    <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
-    <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
+    <h1 class="display">Portraits</h1>
+    <p class="script">clear numbers, no guessing</p>
   </div>
 
-  <div class="banner" id="portraits" style="height:min(50vh,420px);">
-    <img src="images/pricing-portraits.jpg" alt="">
-    <div class="over">
-      <span class="index" style="color:rgba(255,255,255,.8);">Portraits</span>
-      <h2 class="display">From $100</h2>
-    </div>
-  </div>
-
-  <div class="section">
+  <div class="section tight">
     <div class="pkg-grid">
       <div class="pkg-card">
+        <div class="frame marked pkg-photo"><img src="images/pricing-portraits.jpg" alt="Couples session"></div>
         <h3>Couples</h3>
         <div class="svc-price">$125</div>
         <ul class="svc-list">
@@ -543,9 +525,9 @@ p:last-child{margin-bottom:0;}
           <li>1 location</li>
           <li>1 outfit change</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
       <div class="pkg-card">
+        <div class="frame marked pkg-photo"><img src="images/gallery-h.jpg" alt="Engagement session"></div>
         <h3>Engagement</h3>
         <div class="svc-price">$175</div>
         <ul class="svc-list">
@@ -557,9 +539,9 @@ p:last-child{margin-bottom:0;}
           <li>1 location</li>
           <li>2 outfit changes</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
       <div class="pkg-card">
+        <div class="frame marked pkg-photo"><img src="images/about-banner.jpg" alt="Family session"></div>
         <h3>Family</h3>
         <div class="svc-price">$150</div>
         <ul class="svc-list">
@@ -570,9 +552,9 @@ p:last-child{margin-bottom:0;}
           <li>72 hr sneak peek</li>
           <li>1 location</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
       <div class="pkg-card">
+        <div class="frame marked pkg-photo"><img src="images/gallery-b.jpg" alt="Maternity session"></div>
         <h3>Maternity</h3>
         <div class="svc-price">$150</div>
         <ul class="svc-list">
@@ -584,9 +566,9 @@ p:last-child{margin-bottom:0;}
           <li>1 location</li>
           <li>1 outfit change</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
       <div class="pkg-card">
+        <div class="frame marked pkg-photo"><img src="images/grid-01.jpg" alt="Senior session"></div>
         <h3>Senior</h3>
         <div class="svc-price">$100</div>
         <ul class="svc-list">
@@ -598,22 +580,80 @@ p:last-child{margin-bottom:0;}
           <li>2 outfit changes</li>
           <li>Add a friend: +$25, +15 min</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
     </div>
   </div>
 
-  <div class="banner" id="elopements" style="height:min(50vh,420px);">
-    <img src="images/contact-photo.jpg" alt="">
-    <div class="over">
-      <span class="index" style="color:rgba(255,255,255,.8);">Elopements</span>
-      <h2 class="display">From $300</h2>
+  <div class="section" id="process">
+    <div class="section-head"><span class="index">The process</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div>
+        <h4>Inquire</h4>
+        <p>Send your date, location, and a little about the session. I reply within 48 hours with availability.</p>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <h4>Meet</h4>
+        <p>A call to talk through the day, the look you want, and which package actually fits.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <h4>Hold the date</h4>
+        <p>A signed agreement and a 30% retainer lock it in. The balance can be split monthly.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <h4>Deliver</h4>
+        <p>Sneak peeks in 72 hours, the full gallery in 1&ndash;2 weeks, albums after your selects.</p>
+      </div>
     </div>
   </div>
 
-  <div class="section">
+  <div class="section paper">
+    <div class="section-head"><span class="index">Good to know</span></div>
+    <div class="faq">
+      <details open>
+        <summary>Do you travel?</summary>
+        <p>Often. Travel within O&#699;ahu is included. Neighbor islands and mainland trips are quoted per trip &mdash; usually flights, one to two nights of lodging, and ground transit at cost.</p>
+      </details>
+      <details>
+        <summary>Can we split payments?</summary>
+        <p>Yes. After the retainer, the balance can be spread across monthly payments up to two weeks before the date.</p>
+      </details>
+      <details>
+        <summary>What if we&#8217;re awkward in front of a camera?</summary>
+        <p>Nearly everyone says this. I direct enough to keep you comfortable and then let you be, which is where the photos you actually want come from.</p>
+      </details>
+      <details>
+        <summary>How many images do we get?</summary>
+        <p>Delivery counts are listed with each package above &mdash; every image is color-corrected by hand, no batch presets, no AI edits.</p>
+      </details>
+    </div>
+  </div>
+
+  <div class="banner">
+    <img src="images/pricing-final-banner.jpg" alt="">
+    <div class="over">
+      <h2 class="display">Ready when <em>you are</em></h2>
+      <p>Tell me the date, the place, and what you&#8217;re picturing. I&#8217;ll come back with availability and a full pricing guide.</p>
+      <a href="#" class="link on-dark" data-go="contact">Let&#8217;s connect</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ELOPEMENTS ================= -->
+<section class="page" id="elopements">
+  <div class="inner-top page-head">
+    <span class="index">Pricing</span>
+    <h1 class="display">Elopements</h1>
+    <p class="script">clear numbers, no guessing</p>
+  </div>
+
+  <div class="section tight">
     <div class="pkg-grid" style="max-width:340px;margin:0 auto;">
       <div class="pkg-card">
+        <div class="frame marked pkg-photo"><img src="images/contact-photo.jpg" alt="Elopement session"></div>
         <h3>Elopement</h3>
         <div class="svc-price">$300</div>
         <ul class="svc-list">
@@ -625,12 +665,77 @@ p:last-child{margin-bottom:0;}
           <li>1 location</li>
           <li>Timeline assistance</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
     </div>
   </div>
 
-  <div class="banner" id="weddings" style="height:min(50vh,420px);">
+  <div class="section">
+    <div class="section-head"><span class="index">The process</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div>
+        <h4>Inquire</h4>
+        <p>Send your date, location, and a little about your plans. I reply within 48 hours with availability.</p>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <h4>Meet</h4>
+        <p>A call to talk through the day, the look you want, and how the timeline should flow.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <h4>Hold the date</h4>
+        <p>A signed agreement and a 30% retainer lock it in. The balance can be split monthly.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <h4>Deliver</h4>
+        <p>Sneak peeks in 48&ndash;72 hours, the full gallery in 1&ndash;2 weeks.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section paper">
+    <div class="section-head"><span class="index">Good to know</span></div>
+    <div class="faq">
+      <details open>
+        <summary>Do you travel?</summary>
+        <p>Often. Travel within O&#699;ahu is included. Neighbor islands and mainland trips are quoted per trip &mdash; usually flights, one to two nights of lodging, and ground transit at cost.</p>
+      </details>
+      <details>
+        <summary>Can we split payments?</summary>
+        <p>Yes. After the retainer, the balance can be spread across monthly payments up to two weeks before the date.</p>
+      </details>
+      <details>
+        <summary>What if we&#8217;re awkward in front of a camera?</summary>
+        <p>Nearly everyone says this. I direct enough to keep you comfortable and then let you be, which is where the photos you actually want come from.</p>
+      </details>
+      <details>
+        <summary>How many images do we get?</summary>
+        <p>Delivery counts are listed with the package above &mdash; every image is color-corrected by hand, no batch presets, no AI edits.</p>
+      </details>
+    </div>
+  </div>
+
+  <div class="banner">
+    <img src="images/pricing-final-banner.jpg" alt="">
+    <div class="over">
+      <h2 class="display">Ready when <em>you are</em></h2>
+      <p>Tell me the date, the place, and what you&#8217;re picturing. I&#8217;ll come back with availability and a full pricing guide.</p>
+      <a href="#" class="link on-dark" data-go="contact">Let&#8217;s connect</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WEDDINGS ================= -->
+<section class="page" id="weddings">
+  <div class="inner-top page-head">
+    <span class="index">Pricing</span>
+    <h1 class="display">Weddings</h1>
+    <p class="script">clear numbers, no guessing</p>
+  </div>
+
+  <div class="banner" style="height:min(50vh,420px);">
     <img src="images/pricing-weddings-banner.jpg" alt="">
     <div class="over">
       <span class="index" style="color:rgba(255,255,255,.8);">Weddings</span>
@@ -648,7 +753,6 @@ p:last-child{margin-bottom:0;}
           <li>200+ edited images</li>
           <li>Private online gallery</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
       <div class="pkg-card">
         <h3>The Classic</h3>
@@ -658,7 +762,6 @@ p:last-child{margin-bottom:0;}
           <li>300+ edited images</li>
           <li>Private online gallery</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
       <div class="pkg-card">
         <h3>The Grand</h3>
@@ -668,7 +771,6 @@ p:last-child{margin-bottom:0;}
           <li>400+ edited images</li>
           <li>Private online gallery</li>
         </ul>
-        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
     </div>
   </div>
@@ -726,7 +828,7 @@ p:last-child{margin-bottom:0;}
     <div class="over">
       <h2 class="display">Ready when <em>you are</em></h2>
       <p>Tell me the date, the place, and what you&#8217;re picturing. I&#8217;ll come back with availability and a full pricing guide.</p>
-      <a href="#" class="link on-dark" data-go="contact">Inquire now</a>
+      <a href="#" class="link on-dark" data-go="contact">Let&#8217;s connect</a>
     </div>
   </div>
 </section>
@@ -834,7 +936,9 @@ p:last-child{margin-bottom:0;}
     <a href="#" data-go="home">Home</a>
     <a href="#" data-go="about">About</a>
     <a href="#" data-go="portfolio">Portfolio</a>
-    <a href="#" data-go="pricing">Investments</a>
+    <a href="#" data-go="portraits">Portraits</a>
+    <a href="#" data-go="elopements">Elopements</a>
+    <a href="#" data-go="weddings">Weddings</a>
     <a href="#" data-go="testimonials">Testimonials</a>
     <a href="#" data-go="contact">Contact</a>
   </nav>
@@ -887,10 +991,8 @@ p:last-child{margin-bottom:0;}
 
   function updateNav(){
     var onHome = document.getElementById('home').classList.contains('active');
-    var onPricing = document.getElementById('pricing').classList.contains('active');
-    var threshold = onPricing ? (window.innerHeight * .78 - 120) : (window.innerHeight - 120);
-    var past = window.scrollY > threshold;
-    nav.classList.toggle('solid', !(onHome || onPricing) || past);
+    var past = window.scrollY > (window.innerHeight - 120);
+    nav.classList.toggle('solid', !onHome || past);
   }
   window.addEventListener('scroll', updateNav, {passive:true});
   updateNav();
