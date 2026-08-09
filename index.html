@@ -261,20 +261,20 @@ p:last-child{margin-bottom:0;}
 .faq p{margin-top:14px;max-width:none;}
 
 
-/* testimonials — spotlight + auto-scrolling ticker of clickable snippets */
-.t-spotlight{max-width:760px;margin:0 auto;text-align:center;}
-.t-mark{display:block;font-family:var(--display);font-style:italic;font-size:clamp(60px,8vw,100px);line-height:1;color:var(--line);}
-.t-spotlight-text{font-size:clamp(22px,2.8vw,34px);line-height:1.4;color:var(--ink);margin-top:-.15em;transition:opacity .2s ease;}
-.t-spotlight-who{margin-top:20px;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);transition:opacity .2s ease;}
-.t-ticker{overflow:hidden;padding:34px 0;border-top:1px solid var(--line);margin-top:clamp(40px,6vw,64px);}
-.t-ticker-track{display:flex;gap:16px;width:max-content;animation:filmstrip-scroll 38s linear infinite;}
-.t-ticker:hover .t-ticker-track{animation-play-state:paused;}
-.t-chip{
-  white-space:nowrap;font-family:var(--display);font-style:italic;font-size:16px;flex-shrink:0;
-  padding:14px 26px;border:1px solid var(--line);background:var(--paper);color:var(--muted);
-  transition:.25s ease;
-}
-.t-chip.on,.t-chip:hover{border-color:var(--khaki);color:var(--ink);background:var(--cream);}
+/* testimonials — Love Letters carousel */
+.love-letters{display:grid;grid-template-columns:1fr 1fr;min-height:80vh;}
+.ll-media{position:relative;overflow:hidden;background:var(--cream);}
+.ll-media img{width:100%;height:100%;object-fit:cover;transition:opacity .2s ease;}
+.ll-panel{background:var(--cream);display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(50px,6vw,90px) clamp(30px,5vw,70px);}
+.ll-title{font-family:var(--display);font-weight:300;font-size:clamp(28px,3vw,40px);display:flex;align-items:center;gap:12px;color:var(--khaki);margin:0;}
+.ll-heart{font-size:.65em;}
+.ll-body{margin:auto 0;max-width:44ch;}
+.ll-body .script{font-size:clamp(15px,1.5vw,18px);line-height:1.9;color:var(--muted);transition:opacity .25s ease;}
+.ll-who{margin-top:28px;font-size:clamp(16px,1.6vw,20px);letter-spacing:.18em;text-transform:uppercase;font-family:var(--sans);font-weight:400;color:var(--ink);transition:opacity .25s ease;}
+.ll-nav{width:100%;display:flex;align-items:center;justify-content:space-between;}
+.ll-arrow{font-size:19px;color:var(--muted);background:none;border:0;cursor:pointer;line-height:1;transition:color .3s;}
+.ll-arrow:hover{color:var(--khaki);}
+.ll-count{font-size:11px;letter-spacing:.14em;color:var(--muted);}
 
 /* contact */
 .contact-wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:clamp(36px,6vw,90px);align-items:start;}
@@ -316,6 +316,9 @@ p:last-child{margin-bottom:0;}
 @media (max-width:1000px){
   .split,.contact-wrap{grid-template-columns:1fr;}
   .inv-card{margin-top:-90px;}
+  .love-letters{grid-template-columns:1fr;min-height:auto;}
+  .ll-media{height:50vh;}
+  .ll-panel{padding-top:56px;padding-bottom:56px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
   .grid{grid-template-columns:1fr 1fr;}
@@ -887,34 +890,21 @@ p:last-child{margin-bottom:0;}
 
 <!-- ================= TESTIMONIALS ================= -->
 <section class="page" id="testimonials">
-  <div class="inner-top page-head">
-    <span class="index">Kind words</span>
-    <h1 class="display">Testimonials</h1>
-    <p class="script">from the couples I&#8217;ve worked with</p>
-  </div>
-
-  <div class="section tight">
-    <div class="t-spotlight">
-      <span class="t-mark" aria-hidden="true">&#8220;</span>
-      <p class="script t-spotlight-text" id="tText">She caught the ten seconds I was most afraid I&#8217;d forget.</p>
-      <div class="t-spotlight-who" id="tWho">Mailani &amp; Josh &mdash; Kailua</div>
+  <div class="love-letters inner-top">
+    <div class="ll-media">
+      <img id="llImg" src="images/gallery-a.jpg" alt="">
     </div>
-  </div>
-
-  <div class="t-ticker" id="tTicker">
-    <div class="t-ticker-track">
-      <button class="t-chip on" data-quote="She caught the ten seconds I was most afraid I&#8217;d forget." data-who="Mailani &amp; Josh &mdash; Kailua">She caught the ten seconds&hellip;</button>
-      <button class="t-chip" data-quote="Calm the whole day. Our families still talk about how easy she made it." data-who="Renée &amp; Tomás &mdash; North Shore">Calm the whole day&hellip;</button>
-      <button class="t-chip" data-quote="We booked for the portfolio and stayed for the person." data-who="Ava &amp; Sam &mdash; Big Island">We booked for the portfolio&hellip;</button>
-      <button class="t-chip" data-quote="It felt like hanging out with a friend who happened to have a camera." data-who="Noa &amp; Leilani &mdash; Lanikai">It felt like hanging out&hellip;</button>
-      <button class="t-chip" data-quote="Every photo looks like a memory, not a pose." data-who="Sarah &amp; Michael &mdash; Diamond Head">Every photo looks like a memory&hellip;</button>
-      <button class="t-chip" data-quote="She made my anxious, awkward-in-photos self feel completely at ease." data-who="Jenna &amp; Chris &mdash; Waimānalo">She made my anxious self&hellip;</button>
-      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="She caught the ten seconds I was most afraid I&#8217;d forget." data-who="Mailani &amp; Josh &mdash; Kailua">She caught the ten seconds&hellip;</button>
-      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="Calm the whole day. Our families still talk about how easy she made it." data-who="Renée &amp; Tomás &mdash; North Shore">Calm the whole day&hellip;</button>
-      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="We booked for the portfolio and stayed for the person." data-who="Ava &amp; Sam &mdash; Big Island">We booked for the portfolio&hellip;</button>
-      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="It felt like hanging out with a friend who happened to have a camera." data-who="Noa &amp; Leilani &mdash; Lanikai">It felt like hanging out&hellip;</button>
-      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="Every photo looks like a memory, not a pose." data-who="Sarah &amp; Michael &mdash; Diamond Head">Every photo looks like a memory&hellip;</button>
-      <button class="t-chip" tabindex="-1" aria-hidden="true" data-quote="She made my anxious, awkward-in-photos self feel completely at ease." data-who="Jenna &amp; Chris &mdash; Waimānalo">She made my anxious self&hellip;</button>
+    <div class="ll-panel">
+      <h1 class="ll-title">Love Letters <span class="ll-heart" aria-hidden="true">&#9825;</span></h1>
+      <div class="ll-body">
+        <p class="script" id="llQuote">She caught the ten seconds I was most afraid I&#8217;d forget.</p>
+        <div class="ll-who" id="llWho">Mailani &amp; Josh</div>
+      </div>
+      <div class="ll-nav">
+        <button class="ll-arrow" id="llPrev" aria-label="Previous">&#8592;</button>
+        <span class="ll-count" id="llCount">1 / 6</span>
+        <button class="ll-arrow" id="llNext" aria-label="Next">&#8594;</button>
+      </div>
     </div>
   </div>
 </section>
@@ -1130,22 +1120,42 @@ p:last-child{margin-bottom:0;}
   }
   renderGrid();
 
-  /* ---------- testimonials ticker ---------- */
-  var tTicker = document.getElementById('tTicker');
-  var tText = document.getElementById('tText');
-  var tWho = document.getElementById('tWho');
-  tTicker.addEventListener('click', function(e){
-    var b = e.target.closest('.t-chip');
-    if(!b) return;
-    tTicker.querySelectorAll('.t-chip').forEach(function(x){ x.classList.toggle('on', x === b); });
-    tText.style.opacity = 0;
-    tWho.style.opacity = 0;
+  /* ---------- love letters carousel ---------- */
+  var llData = [
+    {img:'images/gallery-a.jpg', quote:'She caught the ten seconds I was most afraid I’d forget.', who:'Mailani & Josh'},
+    {img:'images/grid-03.jpg', quote:'Calm the whole day. Our families still talk about how easy she made it.', who:'Renée & Tomás'},
+    {img:'images/gallery-h.jpg', quote:'We booked for the portfolio and stayed for the person.', who:'Ava & Sam'},
+    {img:'images/grid-04.jpg', quote:'It felt like hanging out with a friend who happened to have a camera.', who:'Noa & Leilani'},
+    {img:'images/grid-07.jpg', quote:'Every photo looks like a memory, not a pose.', who:'Sarah & Michael'},
+    {img:'images/grid-12.jpg', quote:'She made my anxious, awkward-in-photos self feel completely at ease.', who:'Jenna & Chris'}
+  ];
+  var llIndex = 0;
+  var llImg = document.getElementById('llImg');
+  var llQuote = document.getElementById('llQuote');
+  var llWho = document.getElementById('llWho');
+  var llCount = document.getElementById('llCount');
+  function renderLL(){
+    var d = llData[llIndex];
+    llImg.style.opacity = 0;
+    llQuote.style.opacity = 0;
+    llWho.style.opacity = 0;
     setTimeout(function(){
-      tText.textContent = b.getAttribute('data-quote');
-      tWho.textContent = b.getAttribute('data-who');
-      tText.style.opacity = 1;
-      tWho.style.opacity = 1;
+      llImg.src = d.img;
+      llQuote.textContent = d.quote;
+      llWho.textContent = d.who.toUpperCase();
+      llCount.textContent = (llIndex + 1) + ' / ' + llData.length;
+      llImg.style.opacity = 1;
+      llQuote.style.opacity = 1;
+      llWho.style.opacity = 1;
     }, 200);
+  }
+  document.getElementById('llPrev').addEventListener('click', function(){
+    llIndex = (llIndex - 1 + llData.length) % llData.length;
+    renderLL();
+  });
+  document.getElementById('llNext').addEventListener('click', function(){
+    llIndex = (llIndex + 1) % llData.length;
+    renderLL();
   });
 
   /* ---------- inquiry ---------- */
