@@ -98,7 +98,9 @@ p:last-child{margin-bottom:0;}
   transition:background .45s ease,color .45s ease,box-shadow .45s ease;
 }
 .nav.solid{background:var(--bg);color:var(--ink);box-shadow:0 1px 0 rgba(23,22,20,.07);}
-.wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:36px;letter-spacing:.02em;white-space:nowrap;color:var(--khaki);}
+.wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:36px;letter-spacing:.02em;white-space:nowrap;color:var(--khaki);transition:color .45s ease;}
+.nav.home .wordmark{color:var(--white);}
+.nav.home.solid .wordmark{color:var(--khaki);}
 .burger{
   display:inline-block;line-height:1;box-sizing:border-box;
   font-size:11px;letter-spacing:.2em;text-transform:uppercase;
@@ -297,7 +299,6 @@ p:last-child{margin-bottom:0;}
 
 /* footer */
 .footer{background:var(--cream);padding:clamp(56px,7vw,90px) var(--gutter) 40px;text-align:center;}
-.footer .mark{margin:0 auto 22px;display:block;width:64px;height:64px;}
 .footer .wordmark{font-size:46px;}
 .footer nav{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin:34px 0 30px;}
 .footer nav a{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);transition:color .3s;}
@@ -969,10 +970,6 @@ p:last-child{margin-bottom:0;}
 
 <!-- ================= FOOTER ================= -->
 <footer class="footer">
-  <svg class="mark" viewBox="0 0 80 80" aria-hidden="true">
-    <circle cx="40" cy="40" r="33"/>
-    <text x="40" y="49" text-anchor="middle">Ki</text>
-  </svg>
   <a href="#" class="wordmark" data-go="home">CaptureWithKi</a>
   <nav>
     <a href="#" data-go="home">Home</a>
@@ -1036,6 +1033,7 @@ p:last-child{margin-bottom:0;}
     var threshold = onHome ? (window.innerHeight - 120) : (window.innerHeight * .78 - 120);
     var past = window.scrollY > threshold;
     nav.classList.toggle('solid', !(onHome || onHeroPage) || past);
+    nav.classList.toggle('home', onHome);
   }
   window.addEventListener('scroll', updateNav, {passive:true});
   updateNav();
