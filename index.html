@@ -237,6 +237,11 @@ p:last-child{margin-bottom:0;}
 .filters button.on,.filters button:hover{color:var(--ink);border-color:var(--ink);}
 
 /* pricing */
+.inv-hero{position:relative;height:78vh;min-height:520px;overflow:hidden;background:var(--cream);}
+.inv-hero img{width:100%;height:100%;object-fit:cover;}
+.inv-card{position:relative;z-index:2;background:var(--bg);margin:-140px auto 0;max-width:720px;text-align:center;padding:clamp(40px,6vw,64px) clamp(24px,6vw,80px) clamp(50px,7vw,74px);}
+.inv-card p{max-width:56ch;margin:22px auto 0;color:var(--muted);}
+
 .svc-price{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:22px;}
 
 .svc-list{list-style:none;margin:20px 0 0;padding:0;text-align:left;}
@@ -313,6 +318,7 @@ p:last-child{margin-bottom:0;}
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
   .split,.contact-wrap{grid-template-columns:1fr;}
+  .inv-card{margin-top:-90px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
   .grid{grid-template-columns:1fr 1fr;}
@@ -329,6 +335,8 @@ p:last-child{margin-bottom:0;}
   .shot.wide .frame{aspect-ratio:3/4;}
   .marked::before,.marked::after{display:none;}
   .section-head{flex-direction:column;gap:14px;}
+  .inv-hero{height:56vh;min-height:360px;}
+  .inv-card{margin-top:-60px;}
 }
 </style>
 </head>
@@ -498,7 +506,18 @@ p:last-child{margin-bottom:0;}
 <!-- ================= PRICING ================= -->
 <!-- PLACEHOLDER PRICING — replace every figure below before launch. -->
 <section class="page" id="portraits">
-  <div class="section tight" style="padding-top:calc(var(--nav-h) + 70px);">
+
+  <div class="inv-hero">
+    <img src="images/gallery-c.jpg" alt="">
+  </div>
+  <div class="inv-card">
+    <span class="index">Pricing</span>
+    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
+    <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
+  </div>
+
+  <div class="section tight">
     <div class="split">
       <div class="media frame marked"><img src="images/pricing-portraits.jpg" alt="Portrait session"></div>
       <div class="copy">
@@ -664,7 +683,18 @@ p:last-child{margin-bottom:0;}
 
 <!-- ================= ELOPEMENTS ================= -->
 <section class="page" id="elopements">
-  <div class="section tight" style="padding-top:calc(var(--nav-h) + 70px);">
+
+  <div class="inv-hero">
+    <img src="images/portfolio-banner.jpg" alt="">
+  </div>
+  <div class="inv-card">
+    <span class="index">Pricing</span>
+    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
+    <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
+  </div>
+
+  <div class="section tight">
     <div class="split reverse">
       <div class="media frame marked"><img src="images/contact-photo.jpg" alt="Elopement session"></div>
       <div class="copy">
@@ -743,7 +773,18 @@ p:last-child{margin-bottom:0;}
 
 <!-- ================= WEDDINGS ================= -->
 <section class="page" id="weddings">
-  <div class="section tight" style="padding-top:calc(var(--nav-h) + 70px);">
+
+  <div class="inv-hero">
+    <img src="images/contact-photo.jpg" alt="">
+  </div>
+  <div class="inv-card">
+    <span class="index">Pricing</span>
+    <h1 class="display" style="margin-top:18px;">Investment</h1>
+    <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
+    <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
+  </div>
+
+  <div class="section tight">
     <div class="split">
       <div class="media frame marked"><img src="images/pricing-weddings-banner.jpg" alt="Wedding day"></div>
       <div class="copy">
@@ -1016,8 +1057,11 @@ p:last-child{margin-bottom:0;}
 
   function updateNav(){
     var onHome = document.getElementById('home').classList.contains('active');
-    var past = window.scrollY > (window.innerHeight - 120);
-    nav.classList.toggle('solid', !onHome || past);
+    var heroIds = ['portraits','elopements','weddings'];
+    var onHeroPage = heroIds.some(function(id){ return document.getElementById(id).classList.contains('active'); });
+    var threshold = onHome ? (window.innerHeight - 120) : (window.innerHeight * .78 - 120);
+    var past = window.scrollY > threshold;
+    nav.classList.toggle('solid', !(onHome || onHeroPage) || past);
   }
   window.addEventListener('scroll', updateNav, {passive:true});
   updateNav();
