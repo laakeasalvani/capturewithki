@@ -6,7 +6,7 @@
 <title>CaptureWithKi — Khiara Salvani</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Dancing+Script:wght@500;700&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    CaptureWithKi — Khiara Salvani
@@ -98,7 +98,7 @@ p:last-child{margin-bottom:0;}
   transition:background .45s ease,color .45s ease,box-shadow .45s ease;
 }
 .nav.solid{background:var(--bg);color:var(--ink);box-shadow:0 1px 0 rgba(23,22,20,.07);}
-.wordmark{font-family:'Dancing Script',cursive;font-weight:700;font-size:38px;letter-spacing:.01em;white-space:nowrap;}
+.wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:27px;letter-spacing:.02em;white-space:nowrap;}
 .burger{
   display:inline-block;line-height:1;box-sizing:border-box;
   font-size:11px;letter-spacing:.2em;text-transform:uppercase;
@@ -245,7 +245,13 @@ p:last-child{margin-bottom:0;}
 .svc-price{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:22px;}
 .svc-sub{margin-top:20px;font-size:11px;letter-spacing:.05em;color:var(--muted);}
 
-.wed-list{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 26px;margin:16px 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);}
+.svc-list{list-style:none;margin:0 0 24px;padding:0;text-align:left;max-width:270px;margin-left:auto;margin-right:auto;}
+.svc-list li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.65;margin-bottom:10px;}
+.svc-list li::before{content:"";position:absolute;left:0;top:10px;width:7px;height:1px;background:var(--ink);opacity:.5;}
+
+.wed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,3vw,40px);}
+.wed-pkg{background:var(--paper);border:1px solid var(--line);padding:clamp(28px,3vw,40px) clamp(22px,2.4vw,32px);text-align:center;display:flex;flex-direction:column;align-items:center;}
+.wed-pkg h3{font-family:var(--display);font-weight:300;font-size:clamp(24px,2.6vw,30px);margin:0 0 8px;}
 
 /* the process — a real sequence, so it is numbered */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(22px,3vw,48px);}
@@ -300,7 +306,7 @@ p:last-child{margin-bottom:0;}
 /* footer */
 .footer{background:var(--cream);padding:clamp(56px,7vw,90px) var(--gutter) 40px;text-align:center;}
 .footer .mark{margin:0 auto 22px;display:block;width:64px;height:64px;}
-.footer .wordmark{font-size:50px;}
+.footer .wordmark{font-size:34px;}
 .footer nav{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin:34px 0 30px;}
 .footer nav a{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);transition:color .3s;}
 .footer nav a:hover{color:var(--ink);}
@@ -318,6 +324,7 @@ p:last-child{margin-bottom:0;}
 @media (max-width:1000px){
   .split,.contact-wrap{grid-template-columns:1fr;}
   .svc-grid{grid-template-columns:1fr;gap:56px;}
+  .wed-grid{grid-template-columns:1fr;gap:32px;}
   .inv-card{margin-top:-90px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
@@ -515,33 +522,73 @@ p:last-child{margin-bottom:0;}
       <div class="svc-card">
         <div class="svc-media frame"><img src="images/pricing-portraits.jpg" alt="Portrait session"></div>
         <h2 class="svc-title">Portraits</h2>
-        <p>Couples, engagements, maternity, family, seniors &mdash; whatever the occasion, sessions are relaxed and low-key, built around real connection instead of stiff posing.</p>
         <div class="svc-price">From $100</div>
+        <ul class="svc-list">
+          <li>Private online gallery</li>
+          <li>Hand-edited images, no presets</li>
+          <li>72-hour sneak peek</li>
+          <li>1&ndash;2 week turnaround</li>
+        </ul>
         <a href="#" class="submit" data-go="contact">Inquire</a>
         <p class="svc-sub">Couples $125 &middot; Engagement $175 &middot; Family &amp; Maternity $150 &middot; Senior $100</p>
       </div>
       <div class="svc-card">
         <div class="svc-media frame"><img src="images/contact-photo.jpg" alt="Elopement session"></div>
         <h2 class="svc-title">Elopements</h2>
-        <p>No guest list, no timeline stress &mdash; just the two of you, somewhere beautiful. I&#8217;ll help with the details and stay close enough to catch everything without ever getting in the way.</p>
         <div class="svc-price">From $300</div>
+        <ul class="svc-list">
+          <li>Up to 2 hours of coverage</li>
+          <li>150+ edited images</li>
+          <li>Private online gallery</li>
+          <li>48&ndash;72 hour sneak peek</li>
+          <li>1&ndash;2 week turnaround</li>
+          <li>Timeline assistance</li>
+        </ul>
         <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
     </div>
   </div>
 
-  <div class="banner" style="height:min(78vh,680px);">
+  <div class="banner" style="height:min(50vh,420px);">
     <img src="images/pricing-weddings-banner.jpg" alt="">
     <div class="over">
       <span class="index" style="color:rgba(255,255,255,.8);">Weddings</span>
       <h2 class="display">From $800</h2>
-      <p>Your wedding day moves fast &mdash; I&#8217;m there for all of it, camera ready, staying out of the way until the moment needs me. Every collection includes a private online gallery and a hand-edited set of images you&#8217;ll actually want to look at for the next fifty years.</p>
-      <div class="wed-list">
-        <span>The Intimate &mdash; 4 hrs &mdash; $800</span>
-        <span>The Classic &mdash; 6 hrs &mdash; $1,200</span>
-        <span>The Grand &mdash; 8 hrs &mdash; $1,500</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="wed-grid">
+      <div class="wed-pkg">
+        <h3>The Intimate</h3>
+        <div class="svc-price">4 Hours &mdash; $800</div>
+        <ul class="svc-list">
+          <li>4 hours of coverage</li>
+          <li>200+ edited images</li>
+          <li>Private online gallery</li>
+        </ul>
+        <a href="#" class="submit" data-go="contact">Inquire</a>
       </div>
-      <a href="#" class="link on-dark" data-go="contact">Inquire</a>
+      <div class="wed-pkg">
+        <h3>The Classic</h3>
+        <div class="svc-price">6 Hours &mdash; $1,200</div>
+        <ul class="svc-list">
+          <li>6 hours of coverage</li>
+          <li>300+ edited images</li>
+          <li>Private online gallery</li>
+        </ul>
+        <a href="#" class="submit" data-go="contact">Inquire</a>
+      </div>
+      <div class="wed-pkg">
+        <h3>The Grand</h3>
+        <div class="svc-price">8 Hours &mdash; $1,500</div>
+        <ul class="svc-list">
+          <li>8 hours of coverage</li>
+          <li>400+ edited images</li>
+          <li>Private online gallery</li>
+        </ul>
+        <a href="#" class="submit" data-go="contact">Inquire</a>
+      </div>
     </div>
   </div>
 
