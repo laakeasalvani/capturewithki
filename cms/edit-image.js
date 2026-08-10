@@ -12,7 +12,8 @@ export async function uploadImage(file, pathPrefix) {
   if (file.size > MAX_BYTES) {
     throw new Error('That image is larger than 10MB.');
   }
-  const path = 'uploads/' + pathPrefix + '/' + Date.now() + '-' + file.name;
+  const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(-100);
+  const path = 'uploads/' + pathPrefix + '/' + Date.now() + '-' + safeName;
   const fileRef = ref(storage, path);
   await uploadBytes(fileRef, file);
   return getDownloadURL(fileRef);
