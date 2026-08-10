@@ -856,6 +856,12 @@ p:last-child{margin-bottom:0;}
         <span class="ll-count" id="llCount">1 / 6</span>
         <button class="ll-arrow" id="llNext" aria-label="Next">&#8594;</button>
       </div>
+      <div class="cms-ll-controls" id="cmsLLControls" style="display:none;">
+        <button type="button" id="cmsLLMoveLeft" aria-label="Move earlier">&#8592; Move</button>
+        <button type="button" id="cmsLLMoveRight" aria-label="Move later">Move &#8594;</button>
+        <button type="button" id="cmsLLDelete">Delete this one</button>
+        <button type="button" id="cmsLLAdd">+ Add testimonial</button>
+      </div>
     </div>
   </div>
 
@@ -1073,44 +1079,6 @@ p:last-child{margin-bottom:0;}
       requestAnimationFrame(fsStep);
     });
   }
-
-  /* ---------- love letters carousel ---------- */
-  var llData = [
-    {img:'images/gallery-a.jpg', quote:'She caught the ten seconds I was most afraid I’d forget.', who:'Mailani & Josh'},
-    {img:'images/grid-03.jpg', quote:'Calm the whole day. Our families still talk about how easy she made it.', who:'Renée & Tomás'},
-    {img:'images/gallery-h.jpg', quote:'We booked for the portfolio and stayed for the person.', who:'Ava & Sam'},
-    {img:'images/grid-04.jpg', quote:'It felt like hanging out with a friend who happened to have a camera.', who:'Noa & Leilani'},
-    {img:'images/grid-07.jpg', quote:'Every photo looks like a memory, not a pose.', who:'Sarah & Michael'},
-    {img:'images/grid-12.jpg', quote:'She made my anxious, awkward-in-photos self feel completely at ease.', who:'Jenna & Chris'}
-  ];
-  var llIndex = 0;
-  var llImg = document.getElementById('llImg');
-  var llQuote = document.getElementById('llQuote');
-  var llWho = document.getElementById('llWho');
-  var llCount = document.getElementById('llCount');
-  function renderLL(){
-    var d = llData[llIndex];
-    llImg.style.opacity = 0;
-    llQuote.style.opacity = 0;
-    llWho.style.opacity = 0;
-    setTimeout(function(){
-      llImg.src = d.img;
-      llQuote.textContent = d.quote;
-      llWho.textContent = d.who.toUpperCase();
-      llCount.textContent = (llIndex + 1) + ' / ' + llData.length;
-      llImg.style.opacity = 1;
-      llQuote.style.opacity = 1;
-      llWho.style.opacity = 1;
-    }, 200);
-  }
-  document.getElementById('llPrev').addEventListener('click', function(){
-    llIndex = (llIndex - 1 + llData.length) % llData.length;
-    renderLL();
-  });
-  document.getElementById('llNext').addEventListener('click', function(){
-    llIndex = (llIndex + 1) % llData.length;
-    renderLL();
-  });
 
   /* ---------- inquiry ---------- */
   document.getElementById('send').addEventListener('click', function(){

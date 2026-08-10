@@ -4,6 +4,7 @@ import { initTextEditing } from './edit-text.js';
 import { initImageEditing } from './edit-image.js';
 import { initHero } from './hero.js';
 import { initPortfolio } from './portfolio.js';
+import { initTestimonials } from './testimonials.js';
 
 (async function () {
   await loadSiteContent();
@@ -11,6 +12,7 @@ import { initPortfolio } from './portfolio.js';
   initImageEditing();
   await initHero();
   await initPortfolio();
+  await initTestimonials();
   initAuth();
 
   const gear = document.getElementById('cmsGear');

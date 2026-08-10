@@ -1618,22 +1618,18 @@ In the classic `<script>` block, find and delete this entire block (originally a
 
 - [ ] **Step 2: Add edit controls markup to the Testimonials section in `index.html`**
 
-Find (lines 875-880):
+Find (around line 855, inside `.ll-panel`):
 
 ```html
-      <div class="ll-nav">
         <button class="ll-arrow" id="llPrev" aria-label="Previous">&#8592;</button>
         <span class="ll-count" id="llCount">1 / 6</span>
         <button class="ll-arrow" id="llNext" aria-label="Next">&#8594;</button>
       </div>
-    </div>
-  </div>
 ```
 
-Replace with:
+That closing `</div>` ends `.ll-nav`. Insert the controls block immediately after it, as a sibling of `.ll-nav` still inside `.ll-panel`:
 
 ```html
-      <div class="ll-nav">
         <button class="ll-arrow" id="llPrev" aria-label="Previous">&#8592;</button>
         <span class="ll-count" id="llCount">1 / 6</span>
         <button class="ll-arrow" id="llNext" aria-label="Next">&#8594;</button>
@@ -1644,11 +1640,9 @@ Replace with:
         <button type="button" id="cmsLLDelete">Delete this one</button>
         <button type="button" id="cmsLLAdd">+ Add testimonial</button>
       </div>
-    </div>
-  </div>
 ```
 
-(`cmsLLControls` becomes a new sibling of `.ll-nav`, both inside `.ll-panel` — no other structure changes.)
+No other `</div>` is added or removed — the inserted block is self-closing, so the file's existing div nesting stays balanced (verified: 166 opening `<div` vs 166 closing `</div>` after the change).
 
 - [ ] **Step 3: Create `cms/testimonials.js`**
 
@@ -1678,6 +1672,8 @@ const llCount = document.getElementById('llCount');
 const controls = document.getElementById('cmsLLControls');
 
 function renderLL() {
+  if (!items.length) return;
+  if (index >= items.length) index = 0;
   const d = items[index];
   llImg.style.opacity = 0;
   llQuote.style.opacity = 0;
@@ -1693,11 +1689,22 @@ function renderLL() {
   }, 200);
 }
 
+async function refresh() {
+  const loaded = await loadCollection(COLLECTION);
+  if (loaded.length) {
+    items = loaded;
+    usingFallback = false;
+  }
+  if (index >= items.length) index = 0;
+  renderLL();
+}
+
 async function ensureSeeded() {
   if (!usingFallback) return;
   await seedCollection(COLLECTION, FALLBACK);
   items = await loadCollection(COLLECTION);
   usingFallback = false;
+  renderLL();
 }
 
 async function handleAdd() {
@@ -1711,40 +1718,56 @@ async function handleAdd() {
   input.addEventListener('change', async function () {
     const file = input.files[0];
     if (!file) return;
-    await ensureSeeded();
-    const url = await uploadImage(file, 'testimonials');
-    await addCollectionItem(COLLECTION, { img: url, quote: quote, who: who }, items.length);
-    items = await loadCollection(COLLECTION);
-    index = items.length - 1;
-    renderLL();
+    try {
+      await ensureSeeded();
+      const url = await uploadImage(file, 'testimonials');
+      items = await loadCollection(COLLECTION);
+      await addCollectionItem(COLLECTION, { img: url, quote: quote, who: who }, items.length);
+      await refresh();
+      index = items.length - 1;
+      renderLL();
+    } catch (err) {
+      alert('Could not add that testimonial: ' + (err && (err.code || err.message)));
+      await refresh();
+    }
   });
   input.click();
 }
 
 async function handleDelete() {
-  if (items.length <= 1) {
-    alert('At least one testimonial is required.');
-    return;
+  try {
+    await ensureSeeded();
+    if (items.length <= 1) {
+      alert('At least one testimonial is required.');
+      return;
+    }
+    if (!confirm('Delete this testimonial?')) return;
+    await deleteCollectionItem(COLLECTION, items[index].id);
+    index = 0;
+    await refresh();
+  } catch (err) {
+    alert('Could not delete that testimonial: ' + (err && (err.code || err.message)));
+    await refresh();
   }
-  if (!confirm('Delete this testimonial?')) return;
-  await ensureSeeded();
-  await deleteCollectionItem(COLLECTION, items[index].id);
-  items = await loadCollection(COLLECTION);
-  index = 0;
-  renderLL();
 }
 
-async function handleMove(offset) {
-  const target = index + offset;
-  if (target < 0 || target >= items.length) return;
-  await ensureSeeded();
-  const orderedIds = items.map(function (item) { return item.id; });
-  const moved = orderedIds.splice(index, 1)[0];
-  orderedIds.splice(target, 0, moved);
-  await reorderCollection(COLLECTION, orderedIds);
-  items = await loadCollection(COLLECTION);
-  index = target;
-  renderLL();
+async function move(delta) {
+  try {
+    await ensureSeeded();
+    if (items.length < 2) return;
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const ids = items.map(function (it) { return it.id; });
+    const moved = ids.splice(index, 1)[0];
+    ids.splice(target, 0, moved);
+    await reorderCollection(COLLECTION, ids);
+    items = await loadCollection(COLLECTION);
+    index = target;
+    renderLL();
+  } catch (err) {
+    alert('Could not move that testimonial: ' + (err && (err.code || err.message)));
+    await refresh();
+  }
 }
 
 export async function initTestimonials() {
@@ -1768,28 +1791,38 @@ export async function initTestimonials() {
   });
   document.getElementById('cmsLLAdd').addEventListener('click', handleAdd);
   document.getElementById('cmsLLDelete').addEventListener('click', handleDelete);
-  document.getElementById('cmsLLMoveLeft').addEventListener('click', function () { handleMove(-1); });
-  document.getElementById('cmsLLMoveRight').addEventListener('click', function () { handleMove(1); });
+  document.getElementById('cmsLLMoveLeft').addEventListener('click', function () { move(-1); });
+  document.getElementById('cmsLLMoveRight').addEventListener('click', function () { move(1); });
 
   onAdminChange(async function (active) {
-    if (active) await ensureSeeded();
+    if (active) {
+      try {
+        await ensureSeeded();
+      } catch (err) {
+        alert('Could not prepare testimonials for editing: ' + (err && (err.code || err.message)));
+      }
+    }
     controls.style.display = active ? 'flex' : 'none';
   });
 }
 ```
 
-Two notes on this module, both intentional:
-- Reordering uses "← Move" / "Move →" buttons rather than drag-and-drop. The carousel shows one testimonial at a time, so there is nothing to drag *between* — the buttons move the currently-shown testimonial one position earlier/later, which is the same capability the design spec calls for.
+Notes on this module, all intentional:
+- Reordering uses "← Move" / "Move →" buttons rather than drag-and-drop. The carousel shows one testimonial at a time, so there is nothing to drag *between* — the buttons move the currently-shown testimonial one position earlier/later, which is the same capability the design spec calls for. It does not use `collection-ui.js` (that module is drag-and-drop-only, built for the hero/portfolio grids).
 - Editing an existing testimonial's quote/names is via delete-and-re-add in this version (no inline text editing on the carousel) — acceptable for an MVP given testimonials change rarely. Flag to the user as a known limitation, not a bug.
+- Every mutation handler (`handleAdd`, `handleDelete`, `move`, and the `ensureSeeded` call inside `onAdminChange`) is wrapped in try/catch: on failure it alerts with the Firestore error code/message and re-loads from Firestore via `refresh()`, so the UI never gets stuck showing stale local state after a failed write.
+- `ensureSeeded()` runs before every mutation (not just on login) and is itself guarded by `usingFallback`, so the 6 fallback testimonials can never be seeded twice into 12. This also guarantees `items[index].id` always refers to a real Firestore document by the time `handleDelete`/`move` read it — the raw `FALLBACK` objects carry no `id`.
+- `move()` recomputes the full ordered id list locally (splicing the current index out and back in at the target position), persists it with one `reorderCollection` batch write, then re-loads from Firestore rather than trusting the local splice — consistent with how `hero.js`/`portfolio.js` always re-fetch after a mutation.
 
 - [ ] **Step 4: Append testimonials-specific styles to `cms/cms.css`**
 
 ```css
-.cms-ll-controls{gap:12px;margin-top:14px;}
+.cms-ll-controls{gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
 .cms-ll-controls button{
   background:none;border:1px solid var(--khaki);color:var(--khaki);
   border-radius:16px;padding:6px 14px;font-family:var(--sans);font-size:12px;cursor:pointer;
 }
+.cms-ll-controls button:hover{background:var(--khaki);color:#fff;}
 ```
 
 - [ ] **Step 5: Wire into `cms/main.js`**
