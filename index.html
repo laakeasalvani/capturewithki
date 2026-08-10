@@ -418,26 +418,7 @@ p:last-child{margin-bottom:0;}
   </div>
 
   <div class="filmstrip">
-    <div class="filmstrip-track">
-      <div class="frame marked"><img src="images/gallery-a.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-b.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-c.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-d.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-e.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-f.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-g.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-h.jpg" alt=""></div>
-      <div class="frame marked"><img src="images/gallery-i.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-a.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-b.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-c.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-d.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-e.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-f.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-g.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-h.jpg" alt=""></div>
-      <div class="frame marked" aria-hidden="true"><img src="images/gallery-i.jpg" alt=""></div>
-    </div>
+    <div class="filmstrip-track" id="filmstripTrack"></div>
   </div>
 
   <div class="ig-follow">
@@ -1092,58 +1073,6 @@ p:last-child{margin-bottom:0;}
       requestAnimationFrame(fsStep);
     });
   }
-
-  /* ---------- portfolio archive ---------- */
-  var shots = [
-    {src:'kiss-windy.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
-    {src:'maternity-beach.jpg', cat:'portraits', place:'Waim\u0101nalo'},
-    {src:'wedding-carry.jpg', cat:'weddings', place:'Kualoa Ranch'},
-    {src:'couple-park.jpg', cat:'portraits', place:'Pacific Northwest'},
-    {src:'gallery-a.jpg', cat:'portraits', place:'North Shore'},
-    {src:'gallery-b.jpg', cat:'portraits', place:'Waim\u0101nalo'},
-    {src:'gallery-c.jpg', cat:'portraits', place:'Lanikai'},
-    {src:'gallery-d.jpg', cat:'portraits', place:'K\u0101hala'},
-    {src:'gallery-e.jpg', cat:'portraits', place:'North Shore'},
-    {src:'gallery-f.jpg', cat:'portraits', place:'Waim\u0101nalo'},
-    {src:'gallery-g.jpg', cat:'portraits', place:'Waim\u0101nalo'},
-    {src:'gallery-h.jpg', cat:'portraits', place:'Lanikai'},
-    {src:'gallery-i.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
-    {src:'grid-01.jpg', cat:'portraits', place:'K\u0101hala'},
-    {src:'grid-02-wide.jpg', cat:'portraits', place:'K\u0101hala', wide:true},
-    {src:'grid-03.jpg', cat:'portraits', place:'North Shore'},
-    {src:'grid-04.jpg', cat:'portraits', place:'North Shore'},
-    {src:'grid-05.jpg', cat:'portraits', place:'North Shore'},
-    {src:'grid-06-wide.jpg', cat:'portraits', place:'Pacific Northwest', wide:true},
-    {src:'grid-07.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
-    {src:'grid-08.jpg', cat:'portraits', place:'Honolulu, O\u02BBahu'},
-    {src:'grid-09.jpg', cat:'weddings', place:'Kualoa Ranch'},
-    {src:'grid-10.jpg', cat:'portraits', place:'K\u0101hala'},
-    {src:'grid-11.jpg', cat:'portraits', place:'Waim\u0101nalo', wide:true},
-    {src:'grid-12.jpg', cat:'portraits', place:'Pacific Northwest'},
-    {src:'about-bio.jpg', cat:'portraits', place:'North Shore'},
-    {src:'about-bio-2.jpg', cat:'portraits', place:'Pacific Northwest'},
-    {src:'about-banner.jpg', cat:'portraits', place:'Pacific Northwest'},
-    {src:'contact-photo.jpg', cat:'elopements', place:'Kualoa Ranch'},
-    {src:'home-banner.jpg', cat:'portraits', place:'Pacific Northwest'},
-    {src:'portfolio-banner.jpg', cat:'elopements', place:'Kualoa Ranch', wide:true},
-    {src:'pricing-hero.jpg', cat:'portraits', place:'Waim\u0101nalo'},
-    {src:'pricing-portraits.jpg', cat:'portraits', place:'Kualoa Ranch'},
-    {src:'pricing-elopements.jpg', cat:'portraits', place:'K\u0101hala'},
-    {src:'pricing-weddings-banner.jpg', cat:'weddings', place:'Kualoa Ranch', wide:true},
-    {src:'pricing-final-banner.jpg', cat:'portraits', place:'Pacific Northwest'}
-  ];
-  var grid = document.getElementById('grid');
-
-  function renderGrid(){
-    grid.innerHTML = '';
-    shots.forEach(function(s){
-      var d = document.createElement('div');
-      d.className = 'shot' + (s.wide ? ' wide' : '');
-      d.innerHTML = '<div class="frame marked"><img loading="lazy" alt="" src="' + B + s.src + '"></div>';
-      grid.appendChild(d);
-    });
-  }
-  renderGrid();
 
   /* ---------- love letters carousel ---------- */
   var llData = [

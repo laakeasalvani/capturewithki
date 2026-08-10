@@ -1352,6 +1352,8 @@ Replace with:
 
 - [ ] **Step 3: Create `cms/portfolio.js`**
 
+Note: an earlier draft of this step called `makeCollectionEditable(...)` separately inside the render loop for each tile (and again for the add tile). Each call closes over its own `dragEl`, so the instance that records `dragstart` is never the instance handling `dragover` on a different tile — drag-reorder silently never fires. The shipped version below creates exactly ONE `makeCollectionEditable` instance at module scope, shared by every tile (same pattern as `cms/hero.js`).
+
 ```js
 import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection } from './collection-store.js';
 import { makeCollectionEditable } from './collection-ui.js';
@@ -1404,28 +1406,36 @@ let usingFallback = true;
 const grid = document.getElementById('grid');
 const filmstripTrack = document.getElementById('filmstripTrack');
 
+// Exactly one instance: the drag state lives in its closure and must be
+// shared by every tile, or dragover on a different tile sees a null dragEl.
+const ui = makeCollectionEditable({
+  onAdd: handleAdd,
+  onDelete: handleDelete,
+  onReorder: handleReorder
+});
+
 function renderGrid() {
   grid.innerHTML = '';
-  const ui = usingFallback ? null : makeCollectionEditable({
-    onAdd: handleAdd,
-    onDelete: handleDelete,
-    onReorder: handleReorder
-  });
-
   items.forEach(function (item) {
     const tile = document.createElement('div');
     tile.className = 'shot' + (item.wide ? ' wide' : '');
     tile.innerHTML = '<div class="frame marked"><img loading="lazy" alt="" src="' + item.src + '"></div>';
     grid.appendChild(tile);
-    if (ui) ui.attachTile(tile, item.id);
+    if (!usingFallback) ui.attachTile(tile, item.id);
   });
 
-  if (ui) grid.appendChild(ui.buildAddTile());
+  if (!usingFallback) {
+    const addTile = ui.buildAddTile();
+    addTile.classList.add('shot');
+    grid.appendChild(addTile);
+  }
 }
 
 function renderFilmstrip() {
   filmstripTrack.innerHTML = '';
   const first9 = items.slice(0, 9);
+  if (!first9.length) return;
+  // Duplicated once so the auto-scroll can loop seamlessly.
   first9.concat(first9).forEach(function (item, i) {
     const frame = document.createElement('div');
     frame.className = 'frame marked';
@@ -1438,6 +1448,11 @@ function renderFilmstrip() {
 function render() {
   renderGrid();
   renderFilmstrip();
+}
+
+async function refresh() {
+  items = await loadCollection(COLLECTION);
+  render();
 }
 
 async function ensureSeeded() {
@@ -1455,25 +1470,38 @@ async function handleAdd() {
   input.addEventListener('change', async function () {
     const file = input.files[0];
     if (!file) return;
-    await ensureSeeded();
-    const url = await uploadImage(file, 'portfolioShots');
-    await addCollectionItem(COLLECTION, { src: url, cat: 'portraits', place: '' }, items.length);
-    items = await loadCollection(COLLECTION);
-    render();
+    try {
+      await ensureSeeded();
+      const url = await uploadImage(file, 'portfolioShots');
+      items = await loadCollection(COLLECTION);
+      await addCollectionItem(COLLECTION, { src: url, cat: 'portraits', place: '' }, items.length);
+      await refresh();
+    } catch (err) {
+      alert('Could not add that photo: ' + (err && (err.code || err.message)));
+      await refresh();
+    }
   });
   input.click();
 }
 
 async function handleDelete(id) {
-  await deleteCollectionItem(COLLECTION, id);
-  items = await loadCollection(COLLECTION);
-  render();
+  try {
+    await deleteCollectionItem(COLLECTION, id);
+    await refresh();
+  } catch (err) {
+    alert('Could not delete that photo: ' + (err && (err.code || err.message)));
+    await refresh();
+  }
 }
 
 async function handleReorder(orderedIds) {
-  await reorderCollection(COLLECTION, orderedIds);
-  items = await loadCollection(COLLECTION);
-  renderFilmstrip();
+  try {
+    await reorderCollection(COLLECTION, orderedIds);
+    await refresh();
+  } catch (err) {
+    alert('Could not save the new order: ' + (err && (err.code || err.message)));
+    await refresh();
+  }
 }
 
 export async function initPortfolio() {
@@ -1489,19 +1517,23 @@ export async function initPortfolio() {
 
   onAdminChange(async function (active) {
     if (active) {
-      await ensureSeeded();
-      grid.classList.toggle('cms-editmode', true);
-    } else {
-      grid.classList.remove('cms-editmode');
+      try {
+        await ensureSeeded();
+      } catch (err) {
+        alert('Could not prepare the portfolio for editing: ' + (err && (err.code || err.message)));
+      }
     }
+    grid.classList.toggle('cms-editmode', active);
   });
 }
 ```
 
 - [ ] **Step 4: Append portfolio/filmstrip styles to `cms/cms.css`**
 
+The add tile needs the `shot` class (added by the code above) to size correctly in the grid:
+
 ```css
-.cms-collection-add.shot{aspect-ratio:3/4;}
+.cms-collection-add.shot{aspect-ratio:3/4;width:100%;}
 ```
 
 - [ ] **Step 5: Wire into `cms/main.js`**

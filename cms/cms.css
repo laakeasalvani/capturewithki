@@ -67,6 +67,8 @@
 }
 .cms-editmode .cms-collection-add{display:flex;}
 
+.cms-collection-add.shot{aspect-ratio:3/4;width:100%;}
+
 .cms-hero-thumb{position:relative;}
 .cms-hero-thumb .cms-collection-delete{width:16px;height:16px;font-size:11px;line-height:1;top:-6px;right:-6px;}
 #frames.cms-editmode{gap:12px;}
