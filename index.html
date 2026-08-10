@@ -1072,28 +1072,42 @@ p:last-child{margin-bottom:0;}
   var fsTrack = document.querySelector('.filmstrip-track');
   if (filmstrip && fsTrack) {
     var fsSpeed = 40; // px/sec
-    var fsPaused = false, fsResumeTimer, fsLast = null;
+    var fsPaused = false, fsResumeTimer, fsLast = null, fsExpected = null;
 
-    function fsInteract(){
-      fsPaused = true;
+    function fsScheduleResume(){
       clearTimeout(fsResumeTimer);
       fsResumeTimer = setTimeout(function(){ fsPaused = false; }, 2500);
     }
-    filmstrip.addEventListener('wheel', fsInteract, {passive:true});
-    filmstrip.addEventListener('touchstart', fsInteract, {passive:true});
-    filmstrip.addEventListener('touchmove', fsInteract, {passive:true});
-    filmstrip.addEventListener('mouseenter', fsInteract);
+    filmstrip.addEventListener('mouseenter', function(){
+      fsPaused = true;
+      fsScheduleResume();
+    });
 
+    // Use the scroll event (not touchmove/wheel) so momentum/inertial
+    // scrolling on mobile — which keeps moving scrollLeft after the
+    // finger lifts, with no further touch events — still counts as
+    // "still scrolling" and keeps pushing the resume timer out until
+    // it actually stops. fsExpected tracks what we last wrote ourselves;
+    // if the real scrollLeft doesn't match it, something else (the user)
+    // moved it, so treat that as interaction rather than trusting a
+    // simple "was this us" flag, which a coalesced scroll event could
+    // fire for both our write and a user's in the same tick.
     filmstrip.addEventListener('scroll', function(){
       var half = fsTrack.scrollWidth / 2;
       if (filmstrip.scrollLeft >= half) filmstrip.scrollLeft -= half;
+      if (fsExpected !== null && Math.abs(filmstrip.scrollLeft - fsExpected) < 1) return;
+      fsPaused = true;
+      fsScheduleResume();
     }, {passive:true});
 
     requestAnimationFrame(function fsStep(ts){
       if (fsLast === null) fsLast = ts;
       var dt = (ts - fsLast) / 1000;
       fsLast = ts;
-      if (!fsPaused) filmstrip.scrollLeft += fsSpeed * dt;
+      if (!fsPaused) {
+        filmstrip.scrollLeft += fsSpeed * dt;
+        fsExpected = filmstrip.scrollLeft;
+      }
       requestAnimationFrame(fsStep);
     });
   }
