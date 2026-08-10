@@ -1125,7 +1125,7 @@ function render() {
 function show(n) {
   const slides = mount.querySelectorAll('.slide');
   const thumbs = framesEl.querySelectorAll('.cms-hero-thumb > button');
-  if (!slides.length) return;
+  if (!slides.length) { counter.textContent = 'No slides'; return; }
   index = (n + slides.length) % slides.length;
   slides.forEach(function (s, k) { s.classList.toggle('on', k === index); });
   thumbs.forEach(function (t, k) { t.classList.toggle('on', k === index); });
@@ -1184,7 +1184,7 @@ async function handleDelete(id) {
 async function handleReorder(orderedIds) {
   try {
     await reorderCollection(COLLECTION, orderedIds);
-    items = await loadCollection(COLLECTION);
+    await refresh();
   } catch (err) {
     alert('Could not save the new order: ' + (err && (err.code || err.message)));
     await refresh();
@@ -1206,7 +1206,13 @@ export async function initHero() {
   document.getElementById('next').addEventListener('click', function () { show(index + 1); auto(); });
 
   onAdminChange(async function (active) {
-    if (active) await ensureSeeded();
+    if (active) {
+      try {
+        await ensureSeeded();
+      } catch (err) {
+        alert('Could not prepare the slideshow for editing: ' + (err && (err.code || err.message)));
+      }
+    }
     framesEl.classList.toggle('cms-editmode', active);
   });
 }
