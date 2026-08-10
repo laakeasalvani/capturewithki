@@ -263,10 +263,10 @@ p:last-child{margin-bottom:0;}
 
 
 /* testimonials — Love Letters carousel */
-.love-letters{display:grid;grid-template-columns:1fr 1fr;min-height:80vh;}
-.ll-media{position:relative;overflow:hidden;background:var(--cream);}
+.love-letters{display:grid;grid-template-columns:1fr 1fr;gap:clamp(34px,6vw,100px);align-items:center;padding:0 var(--gutter) clamp(80px,10vw,140px);}
+.ll-media{aspect-ratio:4/5;}
 .ll-media img{width:100%;height:100%;object-fit:cover;transition:opacity .2s ease;}
-.ll-panel{background:var(--cream);display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(50px,6vw,90px) clamp(30px,5vw,70px);}
+.ll-panel{background:var(--cream);display:flex;flex-direction:column;align-items:center;text-align:center;padding:clamp(30px,4vw,50px) 0;}
 .ll-title{font-family:var(--display);font-weight:300;font-size:clamp(28px,3vw,40px);display:flex;align-items:center;gap:12px;color:var(--khaki);margin:0;}
 .ll-heart{font-size:.65em;}
 .ll-body{margin:auto 0;max-width:44ch;}
@@ -316,9 +316,8 @@ p:last-child{margin-bottom:0;}
 @media (max-width:1000px){
   .split,.contact-wrap{grid-template-columns:1fr;}
   .inv-card{margin-top:-90px;}
-  .love-letters{grid-template-columns:1fr;min-height:auto;}
-  .ll-media{height:50vh;}
-  .ll-panel{padding-top:56px;padding-bottom:56px;}
+  .love-letters{grid-template-columns:1fr;}
+  .ll-panel{padding-top:36px;padding-bottom:56px;}
   .steps{grid-template-columns:1fr 1fr;}
   .split.reverse .media{order:0;}
   .grid{grid-template-columns:1fr 1fr;}
@@ -888,7 +887,7 @@ p:last-child{margin-bottom:0;}
 <!-- ================= TESTIMONIALS ================= -->
 <section class="page" id="testimonials">
   <div class="love-letters inner-top">
-    <div class="ll-media">
+    <div class="ll-media frame marked">
       <img id="llImg" src="images/gallery-a.jpg" alt="">
     </div>
     <div class="ll-panel">
@@ -902,6 +901,14 @@ p:last-child{margin-bottom:0;}
         <span class="ll-count" id="llCount">1 / 6</span>
         <button class="ll-arrow" id="llNext" aria-label="Next">&#8594;</button>
       </div>
+    </div>
+  </div>
+
+  <div class="banner">
+    <img src="images/pricing-final-banner.jpg" alt="">
+    <div class="over">
+      <h2 class="display">Let&#8217;s connect</h2>
+      <a href="#" class="submit" data-go="contact">Contact me</a>
     </div>
   </div>
 </section>
