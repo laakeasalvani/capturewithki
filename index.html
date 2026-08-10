@@ -220,19 +220,13 @@ p:last-child{margin-bottom:0;}
 .page-head .script{font-size:20px;margin-top:16px;color:var(--muted);}
 
 /* portfolio — offset archive grid */
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,34px) clamp(14px,2vw,26px);}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-flow:dense;gap:clamp(16px,2.4vw,34px) clamp(14px,2vw,26px);}
 .shot{position:relative;}
 .shot .frame{aspect-ratio:3/4;}
 .shot.wide{grid-column:span 2;}
 .shot.wide .frame{aspect-ratio:3/2;}
 .shot:nth-child(3n+2){margin-top:clamp(20px,4vw,64px);}
 .shot:nth-child(3n){margin-top:clamp(10px,2vw,30px);}
-.shot .meta{
-  display:flex;justify-content:space-between;gap:14px;margin-top:11px;
-  font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);
-  opacity:0;transform:translateY(-5px);transition:.45s ease;
-}
-.shot:hover .meta{opacity:1;transform:none;}
 
 /* pricing */
 .inv-hero{position:relative;height:78vh;min-height:520px;overflow:hidden;background:var(--cream);}
@@ -303,15 +297,16 @@ p:last-child{margin-bottom:0;}
 
 /* footer */
 .footer{background:var(--cream);padding:clamp(56px,7vw,90px) var(--gutter) 40px;text-align:center;}
-.footer .wordmark{font-size:46px;}
+.footer-brand{display:inline-flex;align-items:center;gap:14px;}
+.footer .wordmark{font-size:26px;}
 .footer nav{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin:34px 0 30px;}
 .footer nav a{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);transition:color .3s;}
 .footer nav a:hover{color:var(--ink);}
 .footer .fine{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:34px;padding-top:26px;border-top:1px solid var(--line);}
 .footer .credit{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);opacity:.65;margin-top:10px;}
-.footer .social{display:inline-flex;margin-top:18px;color:var(--muted);transition:color .3s;}
+.footer .social{display:inline-flex;color:var(--muted);transition:color .3s;}
 .footer .social:hover{color:var(--ink);}
-.footer .social svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.3;}
+.footer .social svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.3;}
 
 :focus-visible{outline:1px solid var(--ink);outline-offset:4px;}
 .nav :focus-visible{outline-color:currentColor;}
@@ -669,8 +664,8 @@ p:last-child{margin-bottom:0;}
     <img src="images/portfolio-banner.jpg" alt="">
   </div>
   <div class="inv-card">
-    <h1 class="display">Investment</h1>
-    <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
+    <h1 class="display">Elopements</h1>
+    <p>Two people, a handful of witnesses (or none at all), and a day built entirely around you. I keep elopements simple and unhurried &mdash; real vows, real reactions, and the quiet in-between moments that get missed at a bigger wedding.</p>
     <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
   </div>
 
@@ -936,7 +931,16 @@ p:last-child{margin-bottom:0;}
 
 <!-- ================= FOOTER ================= -->
 <footer class="footer">
-  <a href="#" class="wordmark" data-go="home">CaptureWithKi</a>
+  <div class="footer-brand">
+    <a href="#" class="wordmark" data-go="home">CaptureWithKi</a>
+    <a class="social" href="https://www.instagram.com/capturewithki/" target="_blank" rel="noopener noreferrer" aria-label="CaptureWithKi on Instagram">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/>
+        <circle cx="12" cy="12" r="5"/>
+        <circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+    </a>
+  </div>
   <nav>
     <a href="#" data-go="home">Home</a>
     <a href="#" data-go="about">About</a>
@@ -949,13 +953,6 @@ p:last-child{margin-bottom:0;}
   </nav>
   <div class="fine">&copy; 2026 CaptureWithKi &mdash; Khiara Salvani</div>
   <div class="credit">Made by Kea Web Creations</div>
-  <a class="social" href="https://www.instagram.com/capturewithki/" target="_blank" rel="noopener noreferrer" aria-label="CaptureWithKi on Instagram">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/>
-      <circle cx="12" cy="12" r="5"/>
-      <circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none"/>
-    </svg>
-  </a>
 </footer>
 
 <script>
@@ -1129,12 +1126,10 @@ p:last-child{margin-bottom:0;}
 
   function renderGrid(){
     grid.innerHTML = '';
-    shots.forEach(function(s, n){
+    shots.forEach(function(s){
       var d = document.createElement('div');
       d.className = 'shot' + (s.wide ? ' wide' : '');
-      d.innerHTML =
-        '<div class="frame marked"><img loading="lazy" alt="" src="' + B + s.src + '"></div>' +
-        '<div class="meta"><span>' + String(n+1).padStart(2,'0') + ' &mdash; ' + s.cat + '</span><span>' + s.place + '</span></div>';
+      d.innerHTML = '<div class="frame marked"><img loading="lazy" alt="" src="' + B + s.src + '"></div>';
       grid.appendChild(d);
     });
   }
