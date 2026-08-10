@@ -304,6 +304,9 @@ p:last-child{margin-bottom:0;}
 .footer nav a:hover{color:var(--ink);}
 .footer .fine{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:34px;padding-top:26px;border-top:1px solid var(--line);}
 .footer .credit{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);opacity:.65;margin-top:10px;}
+.footer .social{display:inline-flex;margin-top:18px;color:var(--muted);transition:color .3s;}
+.footer .social:hover{color:var(--ink);}
+.footer .social svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.3;}
 
 :focus-visible{outline:1px solid var(--ink);outline-offset:4px;}
 .nav :focus-visible{outline-color:currentColor;}
@@ -938,9 +941,9 @@ p:last-child{margin-bottom:0;}
         </div>
         <div class="row">
           <div class="field"><label for="em">Email</label><input id="em" type="email" placeholder="you@email.com"></div>
-          <div class="field"><label for="ph">Phone</label><input id="ph" type="tel" placeholder="Optional"></div>
+          <div class="field"><label for="ph">Phone</label><input id="ph" type="tel" placeholder="(808) 555-0123"></div>
         </div>
-        <div class="field"><label for="dt">Wedding date</label><input id="dt" type="date"></div>
+        <div class="field"><label for="dt">Do you have a date in mind?</label><input id="dt" type="date"></div>
         <div class="field">
           <label for="cl">Session you&#8217;re considering</label>
           <select id="cl">
@@ -983,6 +986,13 @@ p:last-child{margin-bottom:0;}
   </nav>
   <div class="fine">&copy; 2026 CaptureWithKi &mdash; Khiara Salvani</div>
   <div class="credit">Made by Kea Web Creations</div>
+  <a class="social" href="https://www.instagram.com/capturewithki/" target="_blank" rel="noopener noreferrer" aria-label="CaptureWithKi on Instagram">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/>
+      <circle cx="12" cy="12" r="5"/>
+      <circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+  </a>
 </footer>
 
 <script>
@@ -1209,9 +1219,10 @@ p:last-child{margin-bottom:0;}
   document.getElementById('send').addEventListener('click', function(){
     var name = document.getElementById('n1').value.trim();
     var mail = document.getElementById('em').value.trim();
+    var phone = document.getElementById('ph').value.trim();
     var note = document.getElementById('sent');
-    if(!name || !mail){
-      note.textContent = 'Add your name and email so Khiara can reply.';
+    if(!name || !mail || !phone){
+      note.textContent = 'Add your name, email, and phone so Khiara can reply.';
     } else {
       note.textContent = 'Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.';
     }
