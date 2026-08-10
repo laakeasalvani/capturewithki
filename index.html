@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="cms/cms.css">
 <style>
 /* ============================================================
    CaptureWithKi — Khiara Salvani
@@ -969,6 +970,30 @@ p:last-child{margin-bottom:0;}
   <div class="credit">Made by Kea Web Creations</div>
 </footer>
 
+<button class="cms-gear" id="cmsGear" aria-label="Site settings">&#9881;</button>
+
+<div class="cms-edit-badge" id="cmsEditBadge">
+  Edit mode is on
+  <button type="button" id="cmsLogoutBtn">Log out</button>
+</div>
+
+<div class="cms-modal-backdrop" id="cmsModalBackdrop">
+  <div class="cms-modal">
+    <h3>Log in</h3>
+    <form id="cmsLoginForm">
+      <label for="cmsEmail">Email</label>
+      <input id="cmsEmail" type="email" required>
+      <label for="cmsPassword">Password</label>
+      <input id="cmsPassword" type="password" required>
+      <div class="cms-modal-error" id="cmsLoginError"></div>
+      <div class="cms-modal-actions">
+        <button type="button" class="cms-modal-close" id="cmsModalClose">Cancel</button>
+        <button type="submit">Log in</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 (function(){
   var B = 'images/';
@@ -1203,5 +1228,6 @@ p:last-child{margin-bottom:0;}
 })();
 </script>
 <script type="module" src="cms/firebase.js"></script>
+<script type="module" src="cms/main.js"></script>
 </body>
 </html>
