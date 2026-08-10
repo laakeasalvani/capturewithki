@@ -1,6 +1,8 @@
 import { initAuth, login, logout, isAdmin, onAdminChange } from './auth.js';
+import { loadSiteContent } from './content-store.js';
 
-(function () {
+(async function () {
+  await loadSiteContent();
   initAuth();
 
   const gear = document.getElementById('cmsGear');
