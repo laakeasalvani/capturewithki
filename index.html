@@ -1074,30 +1074,33 @@ p:last-child{margin-bottom:0;}
     var fsSpeed = 40; // px/sec
     var fsPaused = false, fsResumeTimer, fsLast = null, fsExpected = null;
 
-    function fsScheduleResume(){
+    function fsPauseNow(){
+      fsPaused = true;
       clearTimeout(fsResumeTimer);
       fsResumeTimer = setTimeout(function(){ fsPaused = false; }, 2500);
     }
-    filmstrip.addEventListener('mouseenter', function(){
-      fsPaused = true;
-      fsScheduleResume();
-    });
+    // Immediate pause the instant a real interaction starts, so the
+    // auto-scroll never fights an active drag/wheel gesture in real time.
+    filmstrip.addEventListener('wheel', fsPauseNow, {passive:true});
+    filmstrip.addEventListener('touchstart', fsPauseNow, {passive:true});
+    filmstrip.addEventListener('touchmove', fsPauseNow, {passive:true});
+    filmstrip.addEventListener('mouseenter', fsPauseNow);
 
-    // Use the scroll event (not touchmove/wheel) so momentum/inertial
-    // scrolling on mobile — which keeps moving scrollLeft after the
-    // finger lifts, with no further touch events — still counts as
-    // "still scrolling" and keeps pushing the resume timer out until
-    // it actually stops. fsExpected tracks what we last wrote ourselves;
-    // if the real scrollLeft doesn't match it, something else (the user)
-    // moved it, so treat that as interaction rather than trusting a
-    // simple "was this us" flag, which a coalesced scroll event could
-    // fire for both our write and a user's in the same tick.
+    // Also watch the scroll event so momentum/inertial scrolling on
+    // mobile — which keeps moving scrollLeft after the finger lifts,
+    // with no further touch events — still counts as "still scrolling"
+    // and keeps pushing the resume timer out until it actually stops.
+    // fsExpected tracks what we last wrote ourselves; if the real
+    // scrollLeft doesn't match it, something else (the user, or
+    // momentum) moved it, so keep the pause going.
     filmstrip.addEventListener('scroll', function(){
       var half = fsTrack.scrollWidth / 2;
-      if (filmstrip.scrollLeft >= half) filmstrip.scrollLeft -= half;
+      if (filmstrip.scrollLeft >= half) {
+        filmstrip.scrollLeft -= half;
+        fsExpected = filmstrip.scrollLeft; // this jump is ours too, not interaction
+      }
       if (fsExpected !== null && Math.abs(filmstrip.scrollLeft - fsExpected) < 1) return;
-      fsPaused = true;
-      fsScheduleResume();
+      fsPauseNow();
     }, {passive:true});
 
     requestAnimationFrame(function fsStep(ts){
