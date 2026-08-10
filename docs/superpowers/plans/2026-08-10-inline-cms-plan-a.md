@@ -251,8 +251,13 @@ export function initAuth() {
         notify();
         return;
       }
-      const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-      adminActive = adminDoc.exists();
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        adminActive = adminDoc.exists();
+      } catch (e) {
+        console.warn('[cms] admin check failed:', e.code || e.message);
+        adminActive = false;
+      }
       notify();
     });
   });
