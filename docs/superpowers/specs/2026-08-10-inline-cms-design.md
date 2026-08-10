@@ -111,6 +111,23 @@ automated:
 Implementation work picks up once the config snippet and the created UID
 are shared.
 
+## Phasing
+
+The design above is implemented in two passes. **Plan A**
+(`docs/superpowers/plans/2026-08-10-inline-cms-plan-a.md`) builds all the
+infrastructure — auth, rules, content store, text/image editing, collection
+CRUD — plus the hero slideshow, portfolio grid + filmstrip, testimonials
+carousel, and the home/about/contact copy and photos. **Plan B** covers the
+remainder, which needs no new architecture: the Portraits/Elopements/Weddings
+pricing text and photos, and inline editing of existing testimonial
+quotes/names (which requires `edit-text.js` to write back to a collection
+item rather than the `content/site` doc).
+
+Note on testimonial reordering: the Love Letters carousel shows one item at a
+time, so it reorders via "move earlier / move later" buttons rather than
+drag-and-drop. The hero slideshow and portfolio grid use drag-and-drop as
+described.
+
 ## Out of scope
 
 - Nav links, button labels ("Send inquiry", "Learn more", etc.), contact
