@@ -99,8 +99,8 @@ p:last-child{margin-bottom:0;}
 }
 .nav.solid{background:var(--bg);color:var(--ink);box-shadow:0 1px 0 rgba(23,22,20,.07);}
 .wordmark{font-family:var(--display);font-style:italic;font-weight:400;font-size:36px;letter-spacing:.02em;white-space:nowrap;color:var(--khaki);transition:color .45s ease;}
-.nav.home .wordmark{color:var(--white);}
-.nav.home.solid .wordmark{color:var(--khaki);}
+.nav.nav-hero .wordmark{color:var(--white);}
+.nav.nav-hero.solid .wordmark{color:var(--khaki);}
 .burger{
   display:inline-block;line-height:1;box-sizing:border-box;
   font-size:11px;letter-spacing:.2em;text-transform:uppercase;
@@ -1033,7 +1033,7 @@ p:last-child{margin-bottom:0;}
     var threshold = onHome ? (window.innerHeight - 120) : (window.innerHeight * .78 - 120);
     var past = window.scrollY > threshold;
     nav.classList.toggle('solid', !(onHome || onHeroPage) || past);
-    nav.classList.toggle('home', onHome);
+    nav.classList.toggle('nav-hero', onHome || onHeroPage);
   }
   window.addEventListener('scroll', updateNav, {passive:true});
   updateNav();
