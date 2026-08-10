@@ -1,8 +1,10 @@
 import { initAuth, login, logout, isAdmin, onAdminChange } from './auth.js';
 import { loadSiteContent } from './content-store.js';
+import { initTextEditing } from './edit-text.js';
 
 (async function () {
   await loadSiteContent();
+  initTextEditing();
   initAuth();
 
   const gear = document.getElementById('cmsGear');

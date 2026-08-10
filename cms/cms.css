@@ -40,3 +40,7 @@
   z-index:700;pointer-events:none;
 }
 .cms-toast.show{opacity:1;transform:translate(-50%,0);}
+
+.cms-editable{outline:1px dashed transparent;cursor:text;transition:outline-color .15s;}
+.cms-editable:hover{outline-color:var(--khaki);}
+.cms-editable.cms-editing{outline:1px solid var(--khaki);outline-offset:2px;}
