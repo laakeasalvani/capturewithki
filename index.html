@@ -193,12 +193,11 @@ p:last-child{margin-bottom:0;}
 .split .copy .h2{margin-bottom:22px;}
 .split .copy .link{margin-top:26px;}
 
-/* filmstrip — full-bleed, continuously auto-scrolling photo strip */
-.filmstrip{overflow:hidden;background:var(--cream);padding-bottom:clamp(50px,6vw,80px);}
-.filmstrip-track{display:flex;gap:clamp(10px,1.4vw,18px);width:max-content;animation:filmstrip-scroll 50s linear infinite;}
-.filmstrip-track:hover{animation-play-state:paused;}
+/* filmstrip — full-bleed photo strip, auto-scrolls but scrollable by wheel/trackpad/touch */
+.filmstrip{overflow-x:auto;overflow-y:hidden;background:var(--cream);padding-bottom:clamp(50px,6vw,80px);scrollbar-width:none;-ms-overflow-style:none;}
+.filmstrip::-webkit-scrollbar{display:none;}
+.filmstrip-track{display:flex;gap:clamp(10px,1.4vw,18px);width:max-content;}
 .filmstrip .frame{width:min(60vw,340px);aspect-ratio:4/5;flex-shrink:0;}
-@keyframes filmstrip-scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
 
 
 /* banner */
@@ -411,9 +410,6 @@ p:last-child{margin-bottom:0;}
     </div>
   </div>
 
-  <div class="section cream tight" style="padding-bottom:24px;">
-    <span class="index" style="justify-content:center;display:flex;">Selects</span>
-  </div>
   <div class="filmstrip">
     <div class="filmstrip-track">
       <div class="frame marked"><img src="images/gallery-a.jpg" alt=""></div>
@@ -1063,6 +1059,37 @@ p:last-child{margin-bottom:0;}
   document.getElementById('next').addEventListener('click', function(){ show(i+1); auto(); });
   document.getElementById('prev').addEventListener('click', function(){ show(i-1); auto(); });
   show(0); auto();
+
+  /* ---------- filmstrip: auto-scroll, pausable by wheel/trackpad/touch/hover ---------- */
+  var filmstrip = document.querySelector('.filmstrip');
+  var fsTrack = document.querySelector('.filmstrip-track');
+  if (filmstrip && fsTrack) {
+    var fsSpeed = 40; // px/sec
+    var fsPaused = false, fsResumeTimer, fsLast = null;
+
+    function fsInteract(){
+      fsPaused = true;
+      clearTimeout(fsResumeTimer);
+      fsResumeTimer = setTimeout(function(){ fsPaused = false; }, 2500);
+    }
+    filmstrip.addEventListener('wheel', fsInteract, {passive:true});
+    filmstrip.addEventListener('touchstart', fsInteract, {passive:true});
+    filmstrip.addEventListener('touchmove', fsInteract, {passive:true});
+    filmstrip.addEventListener('mouseenter', fsInteract);
+
+    filmstrip.addEventListener('scroll', function(){
+      var half = fsTrack.scrollWidth / 2;
+      if (filmstrip.scrollLeft >= half) filmstrip.scrollLeft -= half;
+    }, {passive:true});
+
+    requestAnimationFrame(function fsStep(ts){
+      if (fsLast === null) fsLast = ts;
+      var dt = (ts - fsLast) / 1000;
+      fsLast = ts;
+      if (!fsPaused) filmstrip.scrollLeft += fsSpeed * dt;
+      requestAnimationFrame(fsStep);
+    });
+  }
 
   /* ---------- portfolio archive ---------- */
   var shots = [
