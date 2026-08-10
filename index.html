@@ -246,6 +246,11 @@ p:last-child{margin-bottom:0;}
 .svc-list li{font-size:13.5px;color:var(--muted);padding-left:18px;position:relative;line-height:1.65;margin-bottom:10px;}
 .svc-list li::before{content:"";position:absolute;left:0;top:10px;width:7px;height:1px;background:var(--ink);opacity:.5;}
 
+/* no-photo package layout (used while real photos aren't available yet) */
+.pkg-intro{max-width:640px;margin:0 auto;text-align:center;}
+.pkg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,3vw,36px);}
+.pkg-box{border:1px solid var(--line);padding:clamp(32px,4vw,48px) clamp(24px,3.4vw,36px);text-align:center;}
+
 /* the process — a real sequence, so it is numbered */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(22px,3vw,48px);}
 .step{border-top:1px solid var(--line);padding-top:22px;}
@@ -318,7 +323,7 @@ p:last-child{margin-bottom:0;}
 
 /* ---------- responsive ---------- */
 @media (max-width:1000px){
-  .split,.contact-wrap{grid-template-columns:1fr;}
+  .split,.contact-wrap,.pkg-grid{grid-template-columns:1fr;}
   .inv-card{margin-top:-90px;}
   .love-letters{grid-template-columns:1fr;}
   .ll-panel{padding-top:36px;padding-bottom:56px;}
@@ -760,31 +765,24 @@ p:last-child{margin-bottom:0;}
 <!-- ================= WEDDINGS ================= -->
 <section class="page" id="weddings">
 
-  <div class="inv-hero">
-    <img src="images/contact-photo.jpg" alt="">
-  </div>
-  <div class="inv-card">
+  <div class="inv-card" style="margin-top:0;padding-top:calc(var(--nav-h) + 70px);">
     <h1 class="display">Investment</h1>
     <p>Every session starts with the same idea: less posing, more living. Whether it&#8217;s a two-hour elopement on the coast or a full wedding day, I keep things relaxed and unhurried so the photos feel like you, not a performance.</p>
     <p>Not seeing quite what you&#8217;re looking for? Reach out and let&#8217;s figure out what fits.</p>
   </div>
 
   <div class="section tight">
-    <div class="split reverse">
-      <div class="media frame marked"><img src="images/pricing-weddings-banner.jpg" alt="Wedding day"></div>
-      <div class="copy">
-        <h2 class="h2" style="color:var(--khaki);">Weddings</h2>
-        <span class="index" style="margin-top:14px;">Your whole day, captured</span>
-        <p style="margin-top:22px;">From getting ready to the last dance &mdash; I&#8217;m there for all of it, camera ready, staying out of the way until the moment needs me.</p>
-        <p>Starting at $800.<br>The Intimate (4 hrs) $800 &middot; The Classic (6 hrs) $1,200 &middot; The Grand (8 hrs) $1,500.</p>
-      </div>
+    <div class="pkg-intro">
+      <h2 class="h2" style="color:var(--khaki);">Weddings</h2>
+      <span class="index" style="margin-top:14px;justify-content:center;display:flex;">Your whole day, captured</span>
+      <p style="margin-top:22px;">From getting ready to the last dance &mdash; I&#8217;m there for all of it, camera ready, staying out of the way until the moment needs me.</p>
+      <p>Starting at $800.<br>The Intimate (4 hrs) $800 &middot; The Classic (6 hrs) $1,200 &middot; The Grand (8 hrs) $1,500.</p>
     </div>
   </div>
 
   <div class="section tight" style="border-top:1px solid var(--line);">
-    <div class="split">
-      <div class="media frame marked"><img src="images/wedding-carry.jpg" alt="The Intimate wedding package"></div>
-      <div class="copy">
+    <div class="pkg-grid">
+      <div class="pkg-box">
         <h2 class="h2" style="color:var(--khaki);">The Intimate</h2>
         <div class="svc-price">4 Hours &mdash; $800</div>
         <ul class="svc-list">
@@ -793,13 +791,7 @@ p:last-child{margin-bottom:0;}
           <li>Private online gallery</li>
         </ul>
       </div>
-    </div>
-  </div>
-
-  <div class="section tight" style="border-top:1px solid var(--line);">
-    <div class="split reverse">
-      <div class="media frame marked"><img src="images/portfolio-banner.jpg" alt="The Classic wedding package"></div>
-      <div class="copy">
+      <div class="pkg-box">
         <h2 class="h2" style="color:var(--khaki);">The Classic</h2>
         <div class="svc-price">6 Hours &mdash; $1,200</div>
         <ul class="svc-list">
@@ -808,13 +800,7 @@ p:last-child{margin-bottom:0;}
           <li>Private online gallery</li>
         </ul>
       </div>
-    </div>
-  </div>
-
-  <div class="section tight" style="border-top:1px solid var(--line);">
-    <div class="split">
-      <div class="media frame marked"><img src="images/grid-09.jpg" alt="The Grand wedding package"></div>
-      <div class="copy">
+      <div class="pkg-box">
         <h2 class="h2" style="color:var(--khaki);">The Grand</h2>
         <div class="svc-price">8 Hours &mdash; $1,500</div>
         <ul class="svc-list">
