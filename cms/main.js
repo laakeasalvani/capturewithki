@@ -2,11 +2,13 @@ import { initAuth, login, logout, isAdmin, onAdminChange } from './auth.js';
 import { loadSiteContent } from './content-store.js';
 import { initTextEditing } from './edit-text.js';
 import { initImageEditing } from './edit-image.js';
+import { initHero } from './hero.js';
 
 (async function () {
   await loadSiteContent();
   initTextEditing();
   initImageEditing();
+  await initHero();
   initAuth();
 
   const gear = document.getElementById('cmsGear');

@@ -1050,6 +1050,13 @@ Replace with:
 
 - [ ] **Step 2: Create `cms/hero.js`**
 
+Note: this deviates from the original draft below in two ways found during review, both because `.slide` elements are `position:absolute; inset:0` (stacked, only the `.on` one visible/clickable) so they can't host drag/delete UI — the visible handle is the filmstrip thumbnail instead:
+
+1. `attachTile`/`buildAddTile` attach to a `.cms-hero-thumb` wrapper `<div>` around each filmstrip thumbnail button (in `#frames`), not to the `.slide` divs in `#heroSlides`. `.cms-editmode` is toggled on `#frames`, not on the mount.
+2. Each thumbnail wrapper is a plain `<div>` (not the `<button>` itself), because `attachTile` appends a `<button>` delete control to whatever it's given — a `<button>` inside a `<button>` is invalid HTML. The wrapper relies on the existing `.strip .frames button` descendant selector, so no CSS changes were needed for thumbnail styling.
+
+Every mutation handler (`handleAdd`, `handleDelete`, `handleReorder`) also catches its own errors, alerts the user, and reloads from Firestore so the UI can't silently diverge from the server.
+
 ```js
 import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection } from './collection-store.js';
 import { makeCollectionEditable } from './collection-ui.js';
@@ -1073,13 +1080,19 @@ const mount = document.getElementById('heroSlides');
 const framesEl = document.getElementById('frames');
 const counter = document.getElementById('counter');
 
+const ui = makeCollectionEditable({
+  onAdd: handleAdd,
+  onDelete: handleDelete,
+  onReorder: handleReorder
+});
+
 function render() {
   mount.innerHTML = '';
   framesEl.innerHTML = '';
 
   items.forEach(function (item, i) {
     const slide = document.createElement('div');
-    slide.className = 'slide' + (i === 0 ? ' on' : '');
+    slide.className = 'slide';
     const img = document.createElement('img');
     img.src = item.src;
     img.alt = item.alt || '';
@@ -1087,33 +1100,32 @@ function render() {
     slide.appendChild(img);
     mount.appendChild(slide);
 
+    // Slides are absolutely positioned and stacked, so the thumbnail is the
+    // only visible handle for reordering or deleting a slide.
+    const holder = document.createElement('div');
+    holder.className = 'cms-hero-thumb';
+
     const thumb = document.createElement('button');
+    thumb.type = 'button';
     thumb.setAttribute('aria-label', 'Frame ' + (i + 1));
     thumb.innerHTML = '<img alt="" src="' + item.src + '">';
     thumb.addEventListener('click', function () { show(i); auto(); });
-    framesEl.appendChild(thumb);
+    holder.appendChild(thumb);
+    framesEl.appendChild(holder);
+
+    if (!usingFallback) ui.attachTile(holder, item.id);
   });
 
-  if (!usingFallback) {
-    const ui = makeCollectionEditable({
-      onAdd: handleAdd,
-      onDelete: handleDelete,
-      onReorder: handleReorder
-    });
-    Array.prototype.forEach.call(mount.children, function (slide, i) {
-      ui.attachTile(slide, items[i].id);
-    });
-    mount.appendChild(ui.buildAddTile());
-  }
+  if (!usingFallback) framesEl.appendChild(ui.buildAddTile());
 
-  index = 0;
   show(0);
   auto();
 }
 
 function show(n) {
   const slides = mount.querySelectorAll('.slide');
-  const thumbs = framesEl.querySelectorAll('button');
+  const thumbs = framesEl.querySelectorAll('.cms-hero-thumb > button');
+  if (!slides.length) return;
   index = (n + slides.length) % slides.length;
   slides.forEach(function (s, k) { s.classList.toggle('on', k === index); });
   thumbs.forEach(function (t, k) { t.classList.toggle('on', k === index); });
@@ -1123,6 +1135,11 @@ function show(n) {
 function auto() {
   clearInterval(timer);
   timer = setInterval(function () { show(index + 1); }, 6800);
+}
+
+async function refresh() {
+  items = await loadCollection(COLLECTION);
+  render();
 }
 
 async function ensureSeeded() {
@@ -1140,24 +1157,38 @@ async function handleAdd() {
   input.addEventListener('change', async function () {
     const file = input.files[0];
     if (!file) return;
-    await ensureSeeded();
-    const url = await uploadImage(file, 'heroSlides');
-    await addCollectionItem(COLLECTION, { src: url, alt: '', objectPosition: '50% 50%' }, items.length);
-    items = await loadCollection(COLLECTION);
-    render();
+    try {
+      await ensureSeeded();
+      const url = await uploadImage(file, 'heroSlides');
+      items = await loadCollection(COLLECTION);
+      await addCollectionItem(COLLECTION, { src: url, alt: '', objectPosition: '50% 50%' }, items.length);
+      await refresh();
+    } catch (err) {
+      alert('Could not add that slide: ' + (err && (err.code || err.message)));
+      await refresh();
+    }
   });
   input.click();
 }
 
 async function handleDelete(id) {
-  await deleteCollectionItem(COLLECTION, id);
-  items = await loadCollection(COLLECTION);
-  render();
+  try {
+    await deleteCollectionItem(COLLECTION, id);
+    await refresh();
+  } catch (err) {
+    alert('Could not delete that slide: ' + (err && (err.code || err.message)));
+    await refresh();
+  }
 }
 
 async function handleReorder(orderedIds) {
-  await reorderCollection(COLLECTION, orderedIds);
-  items = await loadCollection(COLLECTION);
+  try {
+    await reorderCollection(COLLECTION, orderedIds);
+    items = await loadCollection(COLLECTION);
+  } catch (err) {
+    alert('Could not save the new order: ' + (err && (err.code || err.message)));
+    await refresh();
+  }
 }
 
 export async function initHero() {
@@ -1175,12 +1206,8 @@ export async function initHero() {
   document.getElementById('next').addEventListener('click', function () { show(index + 1); auto(); });
 
   onAdminChange(async function (active) {
-    if (active) {
-      await ensureSeeded();
-      mount.classList.toggle('cms-editmode', true);
-    } else {
-      mount.classList.remove('cms-editmode');
-    }
+    if (active) await ensureSeeded();
+    framesEl.classList.toggle('cms-editmode', active);
   });
 }
 ```
@@ -1221,12 +1248,13 @@ Leave everything above and below this block (routing, filmstrip auto-scroll, por
 
 - [ ] **Step 4: Append hero-specific styles to `cms/cms.css`**
 
+Note: this deviates from the original draft below — the collection UI now attaches to `.cms-hero-thumb` wrapper divs around the filmstrip thumbnails (see Step 2), not to `#heroSlides`, so the delete/add sizing targets `.cms-hero-thumb` and `#frames` instead.
+
 ```css
-#heroSlides .cms-collection-delete{top:16px;right:16px;}
-#heroSlides .cms-collection-add{
-  position:absolute;left:16px;bottom:120px;z-index:10;
-  width:auto;min-height:auto;padding:8px 16px;background:rgba(23,22,20,.55);color:#fff;
-}
+.cms-hero-thumb{position:relative;}
+.cms-hero-thumb .cms-collection-delete{width:16px;height:16px;font-size:11px;line-height:1;top:-6px;right:-6px;}
+#frames.cms-editmode{gap:12px;}
+#frames .cms-collection-add{min-height:34px;padding:0 10px;font-size:11px;}
 ```
 
 - [ ] **Step 5: Wire into `cms/main.js`**
