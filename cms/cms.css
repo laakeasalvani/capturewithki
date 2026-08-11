@@ -71,10 +71,33 @@
 
 .cms-collection-add.shot{aspect-ratio:3/4;width:100%;}
 
+/* index.html styles the filmstrip thumbnails with `.strip .frames button`,
+   which outranks a two-class selector and also matches these controls (they
+   are buttons in the same container). Everything below is scoped through
+   #frames so it wins, and explicitly resets the thumbnail look it inherits:
+   the 52x34 box, position:relative, grayscale and the .45 opacity. */
 .cms-hero-thumb{position:relative;}
-.cms-hero-thumb .cms-collection-delete{width:16px;height:16px;font-size:11px;line-height:1;top:-6px;right:-6px;}
-#frames.cms-editmode{gap:12px;}
-#frames .cms-collection-add{min-height:34px;padding:0 10px;font-size:11px;}
+
+#frames .cms-hero-thumb .cms-collection-delete{
+  position:absolute;top:-7px;right:-7px;
+  width:18px;height:18px;padding:0;
+  border-radius:50%;border:none;
+  background:rgba(23,22,20,.85);color:#fff;
+  font-size:12px;line-height:1;
+  filter:none;opacity:1;z-index:60;
+}
+#frames .cms-hero-thumb .cms-collection-delete:hover{background:#a33;}
+
+#frames.cms-editmode{gap:14px;}
+#frames .cms-collection-add{
+  position:relative;width:auto;min-width:64px;height:34px;min-height:0;
+  padding:0 12px;font-size:11px;white-space:nowrap;
+  border:none;border-radius:2px;
+  background:var(--khaki);color:#fff;
+  filter:none;opacity:1;
+}
+#frames.cms-editmode .cms-collection-add{display:flex;}
+#frames .cms-collection-add:hover{opacity:.85;}
 
 .cms-ll-controls{gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
 .cms-ll-controls button{
