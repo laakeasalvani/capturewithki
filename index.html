@@ -350,6 +350,7 @@ p:last-child{margin-bottom:0;}
   .inv-card{margin-top:-60px;}
 }
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
+.submit:disabled{opacity:.55;cursor:default;}
 </style>
 </head>
 <body>
@@ -944,9 +945,9 @@ p:last-child{margin-bottom:0;}
           <label for="ms" data-cms-id="contact.label.ms" data-cms-type="text">Tell me more!</label>
           <textarea id="ms" placeholder="How you met, what you're planning, what matters most to you in your photos." data-cms-id="contact.ph.ms" data-cms-type="attr" data-cms-attr="placeholder"></textarea>
         </div>
-        <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
+        <div class="hp" aria-hidden="true"><label for="cwk-ref">Reference</label><input id="cwk-ref" name="cwk-ref" type="text" tabindex="-1" autocomplete="off"></div>
         <button class="submit" id="send" data-cms-id="contact.submit" data-cms-type="text">Send inquiry</button>
-        <p class="sent" id="sent"></p>
+        <p class="sent" id="sent" aria-live="polite"></p>
       </div>
     </div>
   </div>
@@ -1144,7 +1145,7 @@ p:last-child{margin-bottom:0;}
       eventDate: document.getElementById('dt').value,
       sessionType: document.getElementById('cl').value,
       message: document.getElementById('ms').value.trim(),
-      honeypot: document.getElementById('website').value,
+      honeypot: document.getElementById('cwk-ref').value,
       renderedAt: formRenderedAt
     }).then(function(){
       note.textContent = 'Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.';
@@ -1155,9 +1156,13 @@ p:last-child{margin-bottom:0;}
       document.getElementById('dt').value = '';
       document.getElementById('ms').value = '';
     }).catch(function(err){
-      note.textContent = (err && err.message)
+      // Only our own function's errors carry wording written for a visitor.
+      // Anything else (network, CORS, function not deployed) yields a terse
+      // SDK string like "internal", which would read as gibberish.
+      var friendly = { 'functions/invalid-argument': 1, 'functions/resource-exhausted': 1 };
+      note.textContent = (err && friendly[err.code] && err.message)
         ? err.message
-        : 'Something went wrong. Please email netherlyk23@gmail.com directly.';
+        : 'Something went wrong sending your inquiry. Please email netherlyk23@gmail.com directly.';
     }).then(function(){
       sendBtn.disabled = false;
     });

@@ -946,8 +946,10 @@ git commit -m "Close inquiries and rateLimits to client access"
 In the contact form, immediately before `<button class="submit" id="send" ...>`, insert:
 
 ```html
-        <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
+        <div class="hp" aria-hidden="true"><label for="cwk-ref">Reference</label><input id="cwk-ref" name="cwk-ref" type="text" tabindex="-1" autocomplete="off"></div>
 ```
+
+The field's id/name/label are deliberately non-semantic (not "website") so autofillers and password managers don't recognize it as a real profile field and silently fill it in — a real visitor whose browser fills a recognizable honeypot has their inquiry discarded as spam while seeing a fake success message, the worst failure mode in this system.
 
 - [ ] **Step 2: Hide the honeypot**
 
@@ -955,9 +957,16 @@ Append to the `<style>` block in `<head>`:
 
 ```css
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
+.submit:disabled{opacity:.55;cursor:default;}
 ```
 
-It must be off-screen rather than `display:none` — some bots skip fields that are explicitly hidden.
+The `.hp` rule must keep the field off-screen rather than `display:none` — some bots skip fields that are explicitly hidden. The `.submit:disabled` rule gives the Send button a visible disabled state while the request is in flight.
+
+Also add `aria-live="polite"` to the `#sent` element (leave its `id` and `class` unchanged) so screen readers announce validation and status messages:
+
+```html
+        <p class="sent" id="sent" aria-live="polite"></p>
+```
 
 - [ ] **Step 3: Replace the `#send` handler**
 
@@ -1004,7 +1013,7 @@ Delete the whole existing `/* ---------- inquiry ---------- */` block (lines 110
       eventDate: document.getElementById('dt').value,
       sessionType: document.getElementById('cl').value,
       message: document.getElementById('ms').value.trim(),
-      honeypot: document.getElementById('website').value,
+      honeypot: document.getElementById('cwk-ref').value,
       renderedAt: formRenderedAt
     }).then(function(){
       note.textContent = 'Thank you — your inquiry is on its way. Expect a reply within 48 hours.';
@@ -1015,14 +1024,20 @@ Delete the whole existing `/* ---------- inquiry ---------- */` block (lines 110
       document.getElementById('dt').value = '';
       document.getElementById('ms').value = '';
     }).catch(function(err){
-      note.textContent = (err && err.message)
+      // Only our own function's errors carry wording written for a visitor.
+      // Anything else (network, CORS, function not deployed) yields a terse
+      // SDK string like "internal", which would read as gibberish.
+      var friendly = { 'functions/invalid-argument': 1, 'functions/resource-exhausted': 1 };
+      note.textContent = (err && friendly[err.code] && err.message)
         ? err.message
-        : 'Something went wrong. Please email netherlyk23@gmail.com directly.';
+        : 'Something went wrong sending your inquiry. Please email netherlyk23@gmail.com directly.';
     }).then(function(){
       sendBtn.disabled = false;
     });
   });
 ```
+
+Note `functions/internal` is deliberately excluded from the `friendly` allowlist: our own function's internal error already tells the visitor to email directly, and the Firebase Functions SDK reuses that same error code for infrastructure failures (network, CORS, function not deployed), so the generic fallback message correctly covers both cases.
 
 The handler calls `window.cmsSubmitInquiry`, defined in Step 4. The classic script is not a module and cannot import the Firebase SDK itself.
 
@@ -1055,9 +1070,10 @@ In `index.html`, immediately after the existing `<script type="module" src="cms/
 - [ ] **Step 6: Verify locally (no deploy needed for this step)**
 
 Serve the worktree and load the contact page. Confirm:
-- the honeypot input is not visible and does not appear in the tab order
+- `#cwk-ref` is not visible and does not appear in the tab order (`tabIndex` is `-1`); `#website` no longer exists
 - clicking Send with empty fields still shows the existing validation message
 - clicking Send with a bad email shows the email message
+- `#sent` has `aria-live="polite"`
 - the CMS still works on this page: labels, placeholders and the dropdown still carry their `data-cms-id` attributes (count them, expect 7 labels + 5 placeholder fields + 1 select)
 
 - [ ] **Step 7: Commit**
