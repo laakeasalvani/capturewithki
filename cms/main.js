@@ -4,6 +4,7 @@ import { initTextEditing } from './edit-text.js';
 import { initImageEditing } from './edit-image.js';
 import { initHero } from './hero.js';
 import { initPortfolio } from './portfolio.js';
+import { initFilmstrip } from './filmstrip.js';
 import { initTestimonials } from './testimonials.js';
 
 (async function () {
@@ -12,6 +13,7 @@ import { initTestimonials } from './testimonials.js';
   initImageEditing();
   await initHero();
   await initPortfolio();
+  await initFilmstrip();
   await initTestimonials();
   initAuth();
 

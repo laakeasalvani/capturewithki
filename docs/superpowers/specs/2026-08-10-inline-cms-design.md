@@ -36,18 +36,22 @@ of content, keyed by a stable id added to the HTML as `data-cms-id`:
 - Contact page copy (headings/paragraphs only — form field labels and
   placeholders are NOT included, see Out of scope)
 
-**Three CRUD collections**, each item ordered by a numeric sort field,
-add/remove/reorder (drag-and-drop) supported:
+**Four CRUD collections**, each item ordered by a numeric sort field,
+add/remove/reorder (drag-and-drop) and swap-photo-in-place supported:
 - `heroSlides` — the homepage's 4-image hero slideshow (image only; alt text
   defaults to a generic string on new slides, not individually editable in
   MVP)
 - `portfolioShots` — the portfolio grid (image, category tag, place caption)
+- `filmstripShots` — the homepage auto-scrolling row under the intro section
 - `testimonials` — the Love Letters carousel (photo, quote, names)
 
-**Filmstrip strip** (homepage auto-scrolling row under the intro section) is
-**not** an independent collection — it's derived automatically at render
-time from the first 9 items in `portfolioShots`. Editing the portfolio grid
-updates the filmstrip too.
+**Filmstrip strip** was originally derived from the first 9 `portfolioShots`
+so there was nothing to maintain twice. That was changed at the owner's
+request after she tried to edit those photos directly: it is now its own
+independent collection, so the strip and the Portfolio page no longer affect
+each other. It renders its items twice, with `aria-hidden="true"` on the
+duplicates, so the auto-scroll loops seamlessly; edit controls attach to the
+first copy only.
 
 ## Auth
 

@@ -47,7 +47,6 @@ let items = [];
 let usingFallback = true;
 
 const grid = document.getElementById('grid');
-const filmstripTrack = document.getElementById('filmstripTrack');
 
 // Exactly one instance: the drag state lives in its closure and must be
 // shared by every tile, or dragover on a different tile sees a null dragEl.
@@ -75,23 +74,8 @@ function renderGrid() {
   }
 }
 
-function renderFilmstrip() {
-  filmstripTrack.innerHTML = '';
-  const first9 = items.slice(0, 9);
-  if (!first9.length) return;
-  // Duplicated once so the auto-scroll can loop seamlessly.
-  first9.concat(first9).forEach(function (item, i) {
-    const frame = document.createElement('div');
-    frame.className = 'frame marked';
-    if (i >= first9.length) frame.setAttribute('aria-hidden', 'true');
-    frame.innerHTML = '<img src="' + item.src + '" alt="">';
-    filmstripTrack.appendChild(frame);
-  });
-}
-
 function render() {
   renderGrid();
-  renderFilmstrip();
 }
 
 async function refresh() {

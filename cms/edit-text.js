@@ -123,6 +123,17 @@ export function initTextEditing() {
   });
 
   document.addEventListener('click', function (e) {
+    // <summary> treats a click as activation and toggles its parent <details>
+    // open/closed. While the summary text is being edited, that would collapse
+    // the FAQ answer every time the owner clicks in to place the caret — so
+    // suppress the native toggle for the duration of the edit. Caret placement
+    // itself happens on mousedown, before this click fires, so it is unaffected.
+    const editingSummary = e.target.closest && e.target.closest('summary.cms-editing');
+    if (editingSummary) {
+      e.preventDefault();
+      return;
+    }
+
     const attrEl = e.target.closest && e.target.closest('[data-cms-type="attr"].cms-editable-attr');
     if (attrEl) {
       e.preventDefault();
@@ -173,6 +184,17 @@ export function initTextEditing() {
     el.contentEditable = 'true';
     el.classList.add('cms-editing');
     el.focus();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    // <summary> treats the spacebar as activation and toggles its parent
+    // <details> instead of typing a space. While the summary is being
+    // edited, insert the space ourselves and swallow the toggle.
+    if (e.key !== ' ') return;
+    const el = e.target.closest && e.target.closest('summary.cms-editing');
+    if (!el) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, ' ');
   });
 
   document.addEventListener(

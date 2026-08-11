@@ -80,6 +80,8 @@
 
 .cms-collection-add.shot{aspect-ratio:3/4;width:100%;}
 
+#filmstripTrack .cms-collection-add{width:min(60vw,340px);aspect-ratio:4/5;flex-shrink:0;}
+
 /* index.html styles the filmstrip thumbnails with `.strip .frames button`,
    which outranks a two-class selector and also matches these controls (they
    are buttons in the same container). Everything below is scoped through

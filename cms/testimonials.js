@@ -1,4 +1,4 @@
-import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection } from './collection-store.js';
+import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection, updateCollectionItem } from './collection-store.js';
 import { uploadImage } from './edit-image.js';
 import { onAdminChange } from './auth.js';
 import { setCurrentItem } from './edit-text.js';
@@ -22,6 +22,21 @@ const llQuote = document.getElementById('llQuote');
 const llWho = document.getElementById('llWho');
 const llCount = document.getElementById('llCount');
 const controls = document.getElementById('cmsLLControls');
+
+// llImg's parent (.ll-media.frame) is already position:relative via .frame,
+// so the reused .cms-image-overlay button lands on the photo without any
+// extra positioning.
+const llMedia = llImg.parentNode;
+const changePhotoBtn = document.createElement('button');
+changePhotoBtn.type = 'button';
+changePhotoBtn.className = 'cms-image-overlay';
+changePhotoBtn.textContent = 'Change photo';
+changePhotoBtn.addEventListener('click', function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  handleChangePhoto();
+});
+llMedia.appendChild(changePhotoBtn);
 
 function renderLL() {
   if (!items.length) return;
@@ -104,6 +119,28 @@ async function handleDelete() {
   }
 }
 
+async function handleChangePhoto() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.addEventListener('change', async function () {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      await ensureSeeded();
+      const id = items[index] && items[index].id;
+      if (!id) return;
+      const url = await uploadImage(file, 'testimonials');
+      await updateCollectionItem('testimonials', id, { img: url });
+      await refresh();
+    } catch (err) {
+      alert('Could not change that photo: ' + (err && (err.code || err.message)));
+      await refresh();
+    }
+  });
+  input.click();
+}
+
 async function move(delta) {
   try {
     await ensureSeeded();
@@ -160,5 +197,6 @@ export async function initTestimonials() {
       }
     }
     controls.style.display = active ? 'flex' : 'none';
+    changePhotoBtn.classList.toggle('cms-visible', active);
   });
 }
