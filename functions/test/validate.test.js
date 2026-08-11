@@ -56,3 +56,47 @@ test('coerces non-string input rather than throwing', () => {
   assert.equal(r.valid, true);
   assert.equal(r.value.name, '123');
 });
+
+test('a deeply nested array does not crash the validator', () => {
+  let root = [], cur = root;
+  for (let i = 0; i < 150000; i++) { const n = []; cur.push(n); cur = n; }
+  const r = validateInquiry({ name: root, email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, false);
+  assert.match(r.error, /did not look right/i);
+});
+
+test('an object value is refused rather than stringified', () => {
+  const r = validateInquiry({ name: { a: 1 }, email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, false);
+  assert.ok(!JSON.stringify(r).includes('[object Object]'));
+});
+
+test('an array value is refused', () => {
+  const r = validateInquiry({ name: ['a'], email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, false);
+});
+
+test('a non-object payload is refused cleanly', () => {
+  for (const bad of ['hello', 42, true, null, undefined, ['a']]) {
+    const r = validateInquiry(bad);
+    assert.equal(r.valid, false, 'should refuse ' + JSON.stringify(bad));
+    assert.ok(typeof r.error === 'string' && r.error.length > 0);
+  }
+});
+
+test('over-length errors name the field in human words', () => {
+  const r = validateInquiry({
+    name: 'S', email: 'a@b.com', phone: '1', sessionType: 'x',
+    partnerName: 'x'.repeat(201)
+  });
+  assert.equal(r.valid, false);
+  assert.ok(r.error.includes("partner's name"), 'got: ' + r.error);
+  assert.ok(!r.error.includes('partnerName'), 'leaked the raw field name');
+});
+
+test('a boolean or number is still accepted and coerced', () => {
+  const r = validateInquiry({ name: 123, email: 'a@b.com', phone: 5550123, sessionType: 'x' });
+  assert.equal(r.valid, true);
+  assert.equal(r.value.name, '123');
+  assert.equal(r.value.phone, '5550123');
+});

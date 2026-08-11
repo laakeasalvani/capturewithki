@@ -218,6 +218,50 @@ test('coerces non-string input rather than throwing', () => {
   assert.equal(r.valid, true);
   assert.equal(r.value.name, '123');
 });
+
+test('a deeply nested array does not crash the validator', () => {
+  let root = [], cur = root;
+  for (let i = 0; i < 150000; i++) { const n = []; cur.push(n); cur = n; }
+  const r = validateInquiry({ name: root, email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, false);
+  assert.match(r.error, /did not look right/i);
+});
+
+test('an object value is refused rather than stringified', () => {
+  const r = validateInquiry({ name: { a: 1 }, email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, false);
+  assert.ok(!JSON.stringify(r).includes('[object Object]'));
+});
+
+test('an array value is refused', () => {
+  const r = validateInquiry({ name: ['a'], email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, false);
+});
+
+test('a non-object payload is refused cleanly', () => {
+  for (const bad of ['hello', 42, true, null, undefined, ['a']]) {
+    const r = validateInquiry(bad);
+    assert.equal(r.valid, false, 'should refuse ' + JSON.stringify(bad));
+    assert.ok(typeof r.error === 'string' && r.error.length > 0);
+  }
+});
+
+test('over-length errors name the field in human words', () => {
+  const r = validateInquiry({
+    name: 'S', email: 'a@b.com', phone: '1', sessionType: 'x',
+    partnerName: 'x'.repeat(201)
+  });
+  assert.equal(r.valid, false);
+  assert.ok(r.error.includes("partner's name"), 'got: ' + r.error);
+  assert.ok(!r.error.includes('partnerName'), 'leaked the raw field name');
+});
+
+test('a boolean or number is still accepted and coerced', () => {
+  const r = validateInquiry({ name: 123, email: 'a@b.com', phone: 5550123, sessionType: 'x' });
+  assert.equal(r.valid, true);
+  assert.equal(r.value.name, '123');
+  assert.equal(r.value.phone, '5550123');
+});
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -230,28 +274,49 @@ Expected: FAIL — cannot find module `../lib/validate.js`
 ```js
 const MAX = { name: 200, partnerName: 200, email: 320, phone: 50, eventDate: 40, sessionType: 200, message: 5000 };
 
+// Shown to real visitors on a wedding photographer's contact form, so these
+// read as words rather than field names.
+const LABEL = {
+  name: 'name',
+  partnerName: "partner's name",
+  email: 'email',
+  phone: 'phone number',
+  eventDate: 'date',
+  sessionType: 'session type',
+  message: 'message'
+};
+
+// Returns a trimmed string, or null if the value is not a usable scalar.
+// Deliberately does NOT call String() on objects or arrays: payloads arrive
+// as parsed JSON, and String() on a deeply nested array overflows the stack.
 function str(v) {
   if (v === undefined || v === null) return '';
-  return String(v).trim();
+  const t = typeof v;
+  if (t === 'string') return v.trim();
+  if (t === 'number' || t === 'boolean') return String(v).trim();
+  return null;
 }
 
 export function validateInquiry(data) {
-  const d = data || {};
-  const value = {
-    name: str(d.name),
-    partnerName: str(d.partnerName),
-    email: str(d.email),
-    phone: str(d.phone),
-    eventDate: str(d.eventDate),
-    sessionType: str(d.sessionType),
-    message: str(d.message)
-  };
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return { valid: false, error: 'That submission did not look right. Please try again.' };
+  }
+
+  const value = {};
+  for (const key of Object.keys(MAX)) {
+    const s = str(data[key]);
+    if (s === null) {
+      return { valid: false, error: 'That ' + LABEL[key] + ' did not look right. Please try again.' };
+    }
+    value[key] = s;
+  }
 
   for (const key of Object.keys(MAX)) {
     if (value[key].length > MAX[key]) {
-      return { valid: false, error: 'That ' + key + ' is too long.' };
+      return { valid: false, error: 'That ' + LABEL[key] + ' is too long.' };
     }
   }
+
   if (!value.name) return { valid: false, error: 'Please add your name.' };
   if (!value.email) return { valid: false, error: 'Please add your email.' };
   // Deliberately permissive: one @, no spaces, a dot in the domain.
@@ -267,7 +332,7 @@ export function validateInquiry(data) {
 - [ ] **Step 4: Run to verify pass**
 
 Run: `cd functions && node --test test/validate.test.js`
-Expected: PASS, 7 tests.
+Expected: PASS, 13 tests.
 
 - [ ] **Step 5: Commit**
 
