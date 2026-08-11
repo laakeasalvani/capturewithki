@@ -151,13 +151,22 @@ service cloud.firestore {
 
 - [ ] **Step 2: Create `storage.rules`**
 
+`request.auth != null` alone is not an admin check: Firebase's Email/Password
+provider has no separate switch disabling self-service sign-up, and the
+project's Web API key is committed in the clear in `cms/firebase.js`, so
+anyone can self-register via the public Identity Toolkit `accounts:signUp`
+endpoint, obtain a valid token, and satisfy `request.auth != null`. Storage
+Rules must mirror the same admin check Firestore already uses, via the
+cross-service Firestore lookup:
+
 ```
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /uploads/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null &&
+        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
     }
   }
 }
@@ -1015,7 +1024,7 @@ git commit -m "Add generic collection edit UI (delete, drag-reorder, add)"
 
 **Files:**
 - Create: `cms/hero.js`
-- Modify: `index.html` (wrap the 4 hardcoded `.slide` divs in a `#heroSlides` mount point; delete the now-superseded inline hero-slideshow script block; add script import/init call)
+- Modify: `index.html` (wrap the 4 hardcoded `.slide` divs in a `#heroSlides` mount point, keeping them as static fallback markup so the hero still renders if the Firebase CDN is unreachable and `hero.js` never runs; delete the now-superseded inline hero-slideshow script block; add script import/init call)
 - Modify: `cms/cms.css` (append hero-specific tile sizing)
 - Modify: `cms/main.js` (import + init call)
 
@@ -1041,12 +1050,17 @@ Replace with:
 
 ```html
   <div class="hero">
-    <div class="hero-slides" id="heroSlides" style="display:contents;"></div>
+    <div class="hero-slides" id="heroSlides" style="display:contents;">
+      <div class="slide on"><img src="images/elopement-mountains.jpg" alt="Eloping couple embracing in front of the Koʻolau mountains" style="object-position:50% 58%;"></div>
+      <div class="slide"><img src="images/maternity-walk.jpg" alt="Pregnant couple holding hands while walking on the beach" style="object-position:40% 45%;"></div>
+      <div class="slide"><img src="images/park-embrace.jpg" alt="Couple embracing in a sunlit park" style="object-position:50% 35%;"></div>
+      <div class="slide"><img src="images/family-palm.jpg" alt="Family of four sitting on the beach under a palm tree" style="object-position:50% 55%;"></div>
+    </div>
 
     <div class="hero-cta">
 ```
 
-(Deleting the 4 hardcoded `.slide` divs entirely — their content becomes `hero.js`'s fallback data in Step 2.)
+(The 4 hardcoded `.slide` divs move inside the `#heroSlides` mount as static fallback markup — same values as `hero.js`'s `FALLBACK` array in Step 2. `render()` calls `mount.innerHTML = ''` before rebuilding, so this fallback is only ever visible if `hero.js` never runs, e.g. the Firebase CDN import fails.)
 
 - [ ] **Step 2: Create `cms/hero.js`**
 
@@ -1294,7 +1308,7 @@ git commit -m "Wire hero slideshow to Firestore heroSlides collection"
 
 **Files:**
 - Create: `cms/portfolio.js`
-- Modify: `index.html` (delete the now-superseded inline `shots` array/`renderGrid`; replace hardcoded filmstrip markup with an empty mount point; add script import/init call)
+- Modify: `index.html` (delete the now-superseded inline `shots` array/`renderGrid`; replace hardcoded filmstrip markup with a `#filmstripTrack` mount point that keeps 18 static fallback frames — first 9 `FALLBACK` images from `portfolio.js`, then the same 9 repeated with `aria-hidden="true"`, matching what `renderFilmstrip()` produces — so the homepage filmstrip still renders if the Firebase CDN is unreachable and `portfolio.js` never runs; add script import/init call)
 - Modify: `cms/cms.css` (append portfolio/filmstrip tile sizing)
 - Modify: `cms/main.js` (import + init call)
 
@@ -1342,11 +1356,30 @@ Find (around lines 422-443):
   </div>
 ```
 
-Replace with:
+Replace with (18 frames: the first 9 `src` values from `portfolio.js`'s `FALLBACK` array, then those same 9 repeated with `aria-hidden="true"` on the duplicates — this is static markup only, `renderFilmstrip()` clears and rebuilds it at runtime, so it's invisible whenever the CDN loads normally):
 
 ```html
   <div class="filmstrip">
-    <div class="filmstrip-track" id="filmstripTrack"></div>
+    <div class="filmstrip-track" id="filmstripTrack">
+      <div class="frame marked"><img src="images/kiss-windy.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/maternity-beach.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/wedding-carry.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/couple-park.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-a.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-b.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-c.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-d.jpg" alt=""></div>
+      <div class="frame marked"><img src="images/gallery-e.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/kiss-windy.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/maternity-beach.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/wedding-carry.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/couple-park.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-a.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-b.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-c.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-d.jpg" alt=""></div>
+      <div class="frame marked" aria-hidden="true"><img src="images/gallery-e.jpg" alt=""></div>
+    </div>
   </div>
 ```
 
