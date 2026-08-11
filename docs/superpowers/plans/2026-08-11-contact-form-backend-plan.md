@@ -134,10 +134,14 @@ cd functions && npm install && node --input-type=module -e "import('./index.js')
 
 Expected: prints `[ 'submitInquiry' ]` with no error.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Commit the generated `functions/package-lock.json`**
+
+`npm install` generates `functions/package-lock.json`. Commit it alongside the other files for reproducible deploys — two deploys on different days should pull identical transitive versions.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add firebase.json .firebaserc functions/package.json functions/.gitignore functions/index.js
+git add firebase.json .firebaserc functions/package.json functions/.gitignore functions/index.js functions/package-lock.json
 git commit -m "Add Cloud Functions scaffold for contact form"
 ```
 
