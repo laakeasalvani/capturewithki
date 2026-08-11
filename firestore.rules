@@ -26,8 +26,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // A signed-in user may read ONLY their own admin marker. This is how the
+    // client decides whether to show edit controls. It does not expose the
+    // admin list: you can check yourself and nobody else. Writes stay closed —
+    // admins are added by hand in the Firebase console.
     match /admins/{uid} {
-      allow read: if false;
+      allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
   }
