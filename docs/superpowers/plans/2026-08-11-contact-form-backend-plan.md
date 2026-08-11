@@ -106,7 +106,7 @@ node_modules/
   "main": "index.js",
   "engines": { "node": "20" },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",
@@ -115,6 +115,8 @@ node_modules/
   "private": true
 }
 ```
+
+(The glob form `test/*.test.js` is required on Node 22+; the directory form `test/` fails with `MODULE_NOT_FOUND`.)
 
 - [ ] **Step 5: Create a placeholder `functions/index.js`**
 
