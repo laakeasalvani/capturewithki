@@ -1,4 +1,4 @@
-import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection } from './collection-store.js';
+import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection, updateCollectionItem } from './collection-store.js';
 import { makeCollectionEditable } from './collection-ui.js';
 import { uploadImage } from './edit-image.js';
 import { onAdminChange } from './auth.js';
@@ -54,7 +54,8 @@ const filmstripTrack = document.getElementById('filmstripTrack');
 const ui = makeCollectionEditable({
   onAdd: handleAdd,
   onDelete: handleDelete,
-  onReorder: handleReorder
+  onReorder: handleReorder,
+  onSwap: handleSwap
 });
 
 function renderGrid() {
@@ -145,6 +146,25 @@ async function handleReorder(orderedIds) {
     alert('Could not save the new order: ' + (err && (err.code || err.message)));
     await refresh();
   }
+}
+
+function handleSwap(id) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.addEventListener('change', async function () {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const url = await uploadImage(file, 'portfolioShots');
+      await updateCollectionItem(COLLECTION, id, { src: url });
+      await refresh();
+    } catch (err) {
+      alert('Could not swap that photo: ' + (err && (err.code || err.message)));
+      await refresh();
+    }
+  });
+  input.click();
 }
 
 export async function initPortfolio() {

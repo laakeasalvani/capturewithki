@@ -1,6 +1,7 @@
 import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection } from './collection-store.js';
 import { uploadImage } from './edit-image.js';
 import { onAdminChange } from './auth.js';
+import { setCurrentItem } from './edit-text.js';
 
 const COLLECTION = 'testimonials';
 const FALLBACK = [
@@ -26,6 +27,7 @@ function renderLL() {
   if (!items.length) return;
   if (index >= items.length) index = 0;
   const d = items[index];
+  setCurrentItem('testimonials', d.id);
   llImg.style.opacity = 0;
   llQuote.style.opacity = 0;
   llWho.style.opacity = 0;
@@ -140,6 +142,10 @@ export async function initTestimonials() {
     index = (index + 1) % items.length;
     renderLL();
   });
+  document.addEventListener('cms:collection-item-saved', function (e) {
+    if (e.detail && e.detail.collection === COLLECTION) refresh();
+  });
+
   document.getElementById('cmsLLAdd').addEventListener('click', handleAdd);
   document.getElementById('cmsLLDelete').addEventListener('click', handleDelete);
   document.getElementById('cmsLLMoveLeft').addEventListener('click', function () { move(-1); });

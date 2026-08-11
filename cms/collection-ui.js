@@ -2,6 +2,7 @@ export function makeCollectionEditable(options) {
   const onAdd = options.onAdd;
   const onDelete = options.onDelete;
   const onReorder = options.onReorder;
+  const onSwap = options.onSwap;
   let dragEl = null;
 
   function orderedIdsOf(container) {
@@ -37,6 +38,20 @@ export function makeCollectionEditable(options) {
       if (confirm('Delete this item?')) onDelete(itemId);
     });
     tile.appendChild(del);
+
+    if (onSwap) {
+      const swap = document.createElement('button');
+      swap.type = 'button';
+      swap.className = 'cms-collection-swap';
+      swap.textContent = '⇄';
+      swap.setAttribute('aria-label', 'Swap photo');
+      swap.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        onSwap(itemId);
+      });
+      tile.appendChild(swap);
+    }
 
     tile.addEventListener('dragstart', function (e) {
       dragEl = tile;

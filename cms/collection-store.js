@@ -5,6 +5,7 @@ import {
   getDocs,
   addDoc,
   deleteDoc,
+  updateDoc,
   writeBatch,
   query,
   orderBy
@@ -40,6 +41,10 @@ export async function addCollectionItem(name, data, order) {
 
 export async function deleteCollectionItem(name, id) {
   await deleteDoc(doc(db, name, id));
+}
+
+export async function updateCollectionItem(name, id, data) {
+  await updateDoc(doc(db, name, id), data);
 }
 
 export async function reorderCollection(name, orderedIds) {
