@@ -594,6 +594,36 @@ test('client email greets by first name and promises 48 hours', () => {
 test('client subject is the fixed thank-you line', () => {
   assert.equal(clientEmail(full).subject, 'Thank you for reaching out — CaptureWithKi');
 });
+
+test('a newline in the name cannot forge extra fields in the owner email', () => {
+  const evil = { name: 'Sarah\nPhone:      555-000-9999', email: 'a@b.com',
+                 phone: '8085550123', sessionType: 'x', partnerName: '', eventDate: '', message: '' };
+  const t = ownerEmail(evil).text;
+  const phoneLines = t.split('\n').filter(l => l.startsWith('Phone:'));
+  assert.equal(phoneLines.length, 1, 'exactly one Phone line, got:\n' + t);
+  assert.ok(phoneLines[0].includes('8085550123'));
+});
+
+test('a newline in the name cannot reach the subject', () => {
+  const s = ownerEmail({ name: 'Sarah\nBcc: someone@evil.com', partnerName: '' }).subject;
+  assert.ok(!s.includes('\n'), 'subject contains a newline: ' + JSON.stringify(s));
+});
+
+test("the couple's message keeps its line breaks", () => {
+  const t = ownerEmail({ name: 'S', partnerName: '', email: 'a@b.com', phone: '1',
+                         eventDate: '', sessionType: 'x',
+                         message: 'Line one.\nLine two.' }).text;
+  assert.ok(t.includes('Line one.\nLine two.'), 'message line breaks were stripped');
+});
+
+test('a leading space in the name still greets them properly', () => {
+  assert.ok(clientEmail({ name: ' Sarah Connor' }).text.includes('Hi Sarah,'));
+});
+
+test('an empty or whitespace-only name falls back to a friendly greeting', () => {
+  assert.ok(clientEmail({ name: '' }).text.includes('Hi there,'));
+  assert.ok(clientEmail({ name: '   ' }).text.includes('Hi there,'));
+});
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -604,14 +634,35 @@ Expected: FAIL — cannot find module `../lib/email.js`
 - [ ] **Step 3: Implement**
 
 ```js
-const FROM = 'CaptureWithKi <onboarding@resend.dev>';
+// Resend's shared "onboarding" sandbox sender is test-only: it can deliver
+// ONLY to the email address on the Resend account, and any other recipient
+// gets a 403. The client thank-you email must reach real couples, so this
+// uses the owner's own domain instead. Sending will only work once
+// capturewithki.com is added and verified in the Resend dashboard.
+const FROM = 'CaptureWithKi <hello@capturewithki.com>';
+
+// Strip CR/LF from single-line fields so a crafted value cannot forge extra
+// labelled lines in the owner's email, or smuggle a newline into Subject.
+// The message body is deliberately NOT stripped: real couples write
+// paragraphs, and it is the last section, so it cannot fake a field above it.
+function oneLine(v) {
+  return String(v === undefined || v === null ? '' : v).replace(/[\r\n]+/g, ' ');
+}
 
 function orNone(v) {
-  return v && String(v).trim() ? String(v) : 'Not given';
+  const s = oneLine(v).trim();
+  return s ? s : 'Not given';
+}
+
+function orNoneMultiline(v) {
+  const s = String(v === undefined || v === null ? '' : v).trim();
+  return s ? s : 'Not given';
 }
 
 export function ownerEmail(i) {
-  const who = i.partnerName ? i.name + ' & ' + i.partnerName : i.name;
+  const name = oneLine(i.name).trim();
+  const partner = oneLine(i.partnerName).trim();
+  const who = partner ? name + ' & ' + partner : name;
   const text = [
     'New inquiry from the CaptureWithKi contact form.',
     '',
@@ -623,7 +674,7 @@ export function ownerEmail(i) {
     'Session:    ' + orNone(i.sessionType),
     '',
     'Message:',
-    orNone(i.message),
+    orNoneMultiline(i.message),
     '',
     'Reply to this email to answer them directly.'
   ].join('\n');
@@ -631,7 +682,7 @@ export function ownerEmail(i) {
 }
 
 export function clientEmail(i) {
-  const first = String(i.name || '').split(' ')[0] || 'there';
+  const first = oneLine(i.name).trim().split(' ')[0] || 'there';
   const text = [
     'Hi ' + first + ',',
     '',
@@ -661,7 +712,11 @@ export async function sendEmail(opts) {
       'Authorization': 'Bearer ' + opts.apiKey,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    // Without a timeout, a hung Resend request would stall this Cloud
+    // Function until its own platform timeout, burning billed time while
+    // the visitor waits on a response that never comes.
+    signal: AbortSignal.timeout(10000)
   });
 
   if (!res.ok) {
@@ -674,7 +729,7 @@ export async function sendEmail(opts) {
 - [ ] **Step 4: Run to verify pass**
 
 Run: `cd functions && node --test test/email.test.js`
-Expected: PASS, 6 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 5: Commit**
 

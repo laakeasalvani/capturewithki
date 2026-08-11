@@ -42,3 +42,33 @@ test('client email greets by first name and promises 48 hours', () => {
 test('client subject is the fixed thank-you line', () => {
   assert.equal(clientEmail(full).subject, 'Thank you for reaching out — CaptureWithKi');
 });
+
+test('a newline in the name cannot forge extra fields in the owner email', () => {
+  const evil = { name: 'Sarah\nPhone:      555-000-9999', email: 'a@b.com',
+                 phone: '8085550123', sessionType: 'x', partnerName: '', eventDate: '', message: '' };
+  const t = ownerEmail(evil).text;
+  const phoneLines = t.split('\n').filter(l => l.startsWith('Phone:'));
+  assert.equal(phoneLines.length, 1, 'exactly one Phone line, got:\n' + t);
+  assert.ok(phoneLines[0].includes('8085550123'));
+});
+
+test('a newline in the name cannot reach the subject', () => {
+  const s = ownerEmail({ name: 'Sarah\nBcc: someone@evil.com', partnerName: '' }).subject;
+  assert.ok(!s.includes('\n'), 'subject contains a newline: ' + JSON.stringify(s));
+});
+
+test("the couple's message keeps its line breaks", () => {
+  const t = ownerEmail({ name: 'S', partnerName: '', email: 'a@b.com', phone: '1',
+                         eventDate: '', sessionType: 'x',
+                         message: 'Line one.\nLine two.' }).text;
+  assert.ok(t.includes('Line one.\nLine two.'), 'message line breaks were stripped');
+});
+
+test('a leading space in the name still greets them properly', () => {
+  assert.ok(clientEmail({ name: ' Sarah Connor' }).text.includes('Hi Sarah,'));
+});
+
+test('an empty or whitespace-only name falls back to a friendly greeting', () => {
+  assert.ok(clientEmail({ name: '' }).text.includes('Hi there,'));
+  assert.ok(clientEmail({ name: '   ' }).text.includes('Hi there,'));
+});

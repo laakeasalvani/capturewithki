@@ -5,12 +5,28 @@
 // capturewithki.com is added and verified in the Resend dashboard.
 const FROM = 'CaptureWithKi <hello@capturewithki.com>';
 
+// Strip CR/LF from single-line fields so a crafted value cannot forge extra
+// labelled lines in the owner's email, or smuggle a newline into Subject.
+// The message body is deliberately NOT stripped: real couples write
+// paragraphs, and it is the last section, so it cannot fake a field above it.
+function oneLine(v) {
+  return String(v === undefined || v === null ? '' : v).replace(/[\r\n]+/g, ' ');
+}
+
 function orNone(v) {
-  return v && String(v).trim() ? String(v) : 'Not given';
+  const s = oneLine(v).trim();
+  return s ? s : 'Not given';
+}
+
+function orNoneMultiline(v) {
+  const s = String(v === undefined || v === null ? '' : v).trim();
+  return s ? s : 'Not given';
 }
 
 export function ownerEmail(i) {
-  const who = i.partnerName ? i.name + ' & ' + i.partnerName : i.name;
+  const name = oneLine(i.name).trim();
+  const partner = oneLine(i.partnerName).trim();
+  const who = partner ? name + ' & ' + partner : name;
   const text = [
     'New inquiry from the CaptureWithKi contact form.',
     '',
@@ -22,7 +38,7 @@ export function ownerEmail(i) {
     'Session:    ' + orNone(i.sessionType),
     '',
     'Message:',
-    orNone(i.message),
+    orNoneMultiline(i.message),
     '',
     'Reply to this email to answer them directly.'
   ].join('\n');
@@ -30,7 +46,7 @@ export function ownerEmail(i) {
 }
 
 export function clientEmail(i) {
-  const first = String(i.name || '').split(' ')[0] || 'there';
+  const first = oneLine(i.name).trim().split(' ')[0] || 'there';
   const text = [
     'Hi ' + first + ',',
     '',
@@ -60,7 +76,11 @@ export async function sendEmail(opts) {
       'Authorization': 'Bearer ' + opts.apiKey,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    // Without a timeout, a hung Resend request would stall this Cloud
+    // Function until its own platform timeout, burning billed time while
+    // the visitor waits on a response that never comes.
+    signal: AbortSignal.timeout(10000)
   });
 
   if (!res.ok) {
