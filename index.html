@@ -349,6 +349,7 @@ p:last-child{margin-bottom:0;}
   .inv-hero{height:56vh;min-height:360px;}
   .inv-card{margin-top:-60px;}
 }
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
 </style>
 </head>
 <body>
@@ -943,6 +944,7 @@ p:last-child{margin-bottom:0;}
           <label for="ms" data-cms-id="contact.label.ms" data-cms-type="text">Tell me more!</label>
           <textarea id="ms" placeholder="How you met, what you're planning, what matters most to you in your photos." data-cms-id="contact.ph.ms" data-cms-type="attr" data-cms-attr="placeholder"></textarea>
         </div>
+        <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
         <button class="submit" id="send" data-cms-id="contact.submit" data-cms-type="text">Send inquiry</button>
         <p class="sent" id="sent"></p>
       </div>
@@ -1103,21 +1105,67 @@ p:last-child{margin-bottom:0;}
   }
 
   /* ---------- inquiry ---------- */
-  document.getElementById('send').addEventListener('click', function(){
+  var formRenderedAt = Date.now();
+  var sendBtn = document.getElementById('send');
+
+  sendBtn.addEventListener('click', function(){
+    var note = document.getElementById('sent');
     var name = document.getElementById('n1').value.trim();
     var mail = document.getElementById('em').value.trim();
     var phone = document.getElementById('ph').value.trim();
-    var note = document.getElementById('sent');
+
     if(!name || !mail || !phone){
       note.textContent = 'Add your name, email, and phone so Khiara can reply.';
-    } else {
-      note.textContent = 'Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.';
+      note.classList.add('show');
+      return;
     }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){
+      note.textContent = 'That email address does not look right.';
+      note.classList.add('show');
+      return;
+    }
+    // cms/inquiry.js defines this. If the Firebase CDN was unreachable the
+    // module never ran, and clicking Send would otherwise throw silently.
+    if(typeof window.cmsSubmitInquiry !== 'function'){
+      note.textContent = 'The form is not available right now. Please email netherlyk23@gmail.com directly.';
+      note.classList.add('show');
+      return;
+    }
+
+    sendBtn.disabled = true;
+    note.textContent = 'Sending\u2026';
     note.classList.add('show');
+
+    window.cmsSubmitInquiry({
+      name: name,
+      partnerName: document.getElementById('n2').value.trim(),
+      email: mail,
+      phone: phone,
+      eventDate: document.getElementById('dt').value,
+      sessionType: document.getElementById('cl').value,
+      message: document.getElementById('ms').value.trim(),
+      honeypot: document.getElementById('website').value,
+      renderedAt: formRenderedAt
+    }).then(function(){
+      note.textContent = 'Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.';
+      document.getElementById('n1').value = '';
+      document.getElementById('n2').value = '';
+      document.getElementById('em').value = '';
+      document.getElementById('ph').value = '';
+      document.getElementById('dt').value = '';
+      document.getElementById('ms').value = '';
+    }).catch(function(err){
+      note.textContent = (err && err.message)
+        ? err.message
+        : 'Something went wrong. Please email netherlyk23@gmail.com directly.';
+    }).then(function(){
+      sendBtn.disabled = false;
+    });
   });
 })();
 </script>
 <script type="module" src="cms/firebase.js"></script>
 <script type="module" src="cms/main.js"></script>
+<script type="module" src="cms/inquiry.js"></script>
 </body>
 </html>
