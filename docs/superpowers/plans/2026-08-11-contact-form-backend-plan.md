@@ -355,6 +355,13 @@ git commit -m "Add server-side inquiry validation"
   - `hashIp(ip)` → hex SHA-256 string.
   - `checkRateLimit(db, ipHash, now)` → `Promise<{ allowed: boolean }>`. Consumed by `index.js` in Task 5. Uses Firestore collection `rateLimits`, doc id = `ipHash`, fields `{ count, windowStart }`, 1 hour window, limit 5.
 
+> **Note:** The original draft below (Step 1 tests, Step 3 implementation) shipped
+> with two critical bugs found in code review: `isBotSubmission` misclassified real
+> visitors whose browser clock ran ahead of the server as bots (their inquiry was
+> then silently discarded), and `checkRateLimit` was a non-atomic get-then-set that
+> a concurrent burst from one IP could bypass almost entirely. What actually shipped
+> is documented after the review note; it replaces both blocks below.
+
 - [ ] **Step 1: Write the failing tests**
 
 ```js
@@ -384,53 +391,6 @@ test('hashIp is stable and does not contain the raw ip', () => {
   assert.ok(!h.includes('203'));
   assert.equal(h.length, 64);
 });
-
-// Minimal fake Firestore: only what checkRateLimit uses.
-function fakeDb(existing) {
-  let stored = existing;
-  return {
-    saved: () => stored,
-    collection() {
-      return {
-        doc() {
-          return {
-            async get() {
-              return { exists: stored !== undefined, data: () => stored };
-            },
-            async set(v) { stored = v; }
-          };
-        }
-      };
-    }
-  };
-}
-
-test('first submission is allowed and starts a window', async () => {
-  const db = fakeDb(undefined);
-  const r = await checkRateLimit(db, 'abc', 1000);
-  assert.equal(r.allowed, true);
-  assert.equal(db.saved().count, 1);
-});
-
-test('fifth submission inside the window is allowed', async () => {
-  const db = fakeDb({ count: 4, windowStart: 1000 });
-  const r = await checkRateLimit(db, 'abc', 2000);
-  assert.equal(r.allowed, true);
-  assert.equal(db.saved().count, 5);
-});
-
-test('sixth submission inside the window is blocked', async () => {
-  const db = fakeDb({ count: 5, windowStart: 1000 });
-  const r = await checkRateLimit(db, 'abc', 2000);
-  assert.equal(r.allowed, false);
-});
-
-test('a new window resets the count', async () => {
-  const db = fakeDb({ count: 5, windowStart: 1000 });
-  const r = await checkRateLimit(db, 'abc', 1000 + 3600001);
-  assert.equal(r.allowed, true);
-  assert.equal(db.saved().count, 1);
-});
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -438,7 +398,15 @@ test('a new window resets the count', async () => {
 Run: `cd functions && node --test test/spam.test.js`
 Expected: FAIL — cannot find module `../lib/spam.js`
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 3: Implement (superseded — see "What actually shipped" below)**
+
+The draft implementation used a plain `>` comparison for elapsed fill time (no
+protection against a fast client clock) and a bare `get()`/`set()` for the rate
+limiter (not atomic). Both were replaced before merge; see below.
+
+### What actually shipped
+
+`functions/lib/spam.js`:
 
 ```js
 import { createHash } from 'node:crypto';
@@ -451,7 +419,12 @@ export function isBotSubmission(opts) {
   const o = opts || {};
   if (o.honeypot) return true;
   if (typeof o.renderedAt !== 'number' || !o.renderedAt) return false;
-  return (o.now - o.renderedAt) < MIN_FILL_MS;
+  const elapsed = o.now - o.renderedAt;
+  // A negative gap means the visitor's clock runs ahead of ours. We cannot
+  // judge fill time from a clock we do not trust, and wrongly flagging a real
+  // couple silently bins their inquiry — so give them the benefit of the doubt.
+  if (elapsed < 0) return false;
+  return elapsed < MIN_FILL_MS;
 }
 
 export function hashIp(ip) {
@@ -460,25 +433,97 @@ export function hashIp(ip) {
 
 export async function checkRateLimit(db, ipHash, now) {
   const ref = db.collection('rateLimits').doc(ipHash);
-  const snap = await ref.get();
-  const prev = snap.exists ? snap.data() : undefined;
+  // Must be a transaction: a plain get-then-set lets a concurrent burst all
+  // read the same count and every request in the burst gets allowed.
+  return db.runTransaction(async function (tx) {
+    const snap = await tx.get(ref);
+    const prev = snap.exists ? snap.data() : undefined;
 
-  if (!prev || (now - prev.windowStart) >= WINDOW_MS) {
-    await ref.set({ count: 1, windowStart: now });
+    if (!prev || (now - prev.windowStart) >= WINDOW_MS) {
+      tx.set(ref, { count: 1, windowStart: now });
+      return { allowed: true };
+    }
+    if (prev.count >= MAX_PER_WINDOW) {
+      return { allowed: false };
+    }
+    tx.set(ref, { count: prev.count + 1, windowStart: prev.windowStart });
     return { allowed: true };
-  }
-  if (prev.count >= MAX_PER_WINDOW) {
-    return { allowed: false };
-  }
-  await ref.set({ count: prev.count + 1, windowStart: prev.windowStart });
-  return { allowed: true };
+  });
 }
+```
+
+`functions/test/spam.test.js` uses a fake Firestore that records the call shape
+(collection/doc names, transaction use) instead of ignoring its arguments, so
+wiring bugs — a typo'd collection name, or one hardcoded document shared by every
+visitor — fail the tests instead of slipping through:
+
+```js
+function fakeDb(existing) {
+  let stored = existing;
+  const seen = { collection: null, doc: null, transactions: 0 };
+  const ref = { __isRef: true };
+  return {
+    saved: () => stored,
+    seen: () => seen,
+    collection(name) {
+      seen.collection = name;
+      return { doc(id) { seen.doc = id; return ref; } };
+    },
+    async runTransaction(fn) {
+      seen.transactions++;
+      return fn({
+        async get(r) {
+          if (r !== ref) throw new Error('transaction read an unexpected ref');
+          return { exists: stored !== undefined, data: () => stored };
+        },
+        set(r, v) {
+          if (r !== ref) throw new Error('transaction wrote an unexpected ref');
+          stored = v;
+        }
+      });
+    }
+  };
+}
+```
+
+Plus these additional tests beyond the original nine:
+
+```js
+test('a visitor whose clock runs ahead is not treated as a bot', () => {
+  const now = 1000000;
+  assert.equal(isBotSubmission({ honeypot: '', renderedAt: now + 20000, now: now }), false);
+});
+
+test('an instant submission is still treated as a bot', () => {
+  const now = 1000000;
+  assert.equal(isBotSubmission({ honeypot: '', renderedAt: now, now: now }), true);
+});
+
+test('rate limiting reads and writes the right document', async () => {
+  const db = fakeDb(undefined);
+  await checkRateLimit(db, 'abc123', 1000);
+  assert.equal(db.seen().collection, 'rateLimits');
+  assert.equal(db.seen().doc, 'abc123');
+});
+
+test('rate limiting runs inside a transaction', async () => {
+  const db = fakeDb(undefined);
+  await checkRateLimit(db, 'abc123', 1000);
+  assert.equal(db.seen().transactions, 1, 'must use runTransaction, not a bare get/set');
+});
+
+test('a blocked caller does not get their window extended', async () => {
+  const db = fakeDb({ count: 5, windowStart: 1000 });
+  const r = await checkRateLimit(db, 'abc', 2000);
+  assert.equal(r.allowed, false);
+  assert.deepEqual(db.saved(), { count: 5, windowStart: 1000 }, 'blocked path must not write');
+});
 ```
 
 - [ ] **Step 4: Run to verify pass**
 
 Run: `cd functions && node --test test/spam.test.js`
-Expected: PASS, 9 tests.
+Expected: PASS, 14 tests (the original 9 plus the 5 added in review).
 
 - [ ] **Step 5: Commit**
 
