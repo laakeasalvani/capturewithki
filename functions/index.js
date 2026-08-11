@@ -80,11 +80,13 @@ export const submitInquiry = onCall(
 
     const key = RESEND_API_KEY.value();
     const errors = [];
+    let ownerSent = false;
+    let clientSent = false;
 
     try {
       const m = ownerEmail(inquiry);
       await sendEmail({ apiKey: key, to: OWNER_EMAIL, replyTo: inquiry.email, subject: m.subject, text: m.text });
-      await ref.update({ emailToOwnerSent: true });
+      ownerSent = true;
     } catch (err) {
       errors.push('owner: ' + describeError(err));
     }
@@ -92,13 +94,20 @@ export const submitInquiry = onCall(
     try {
       const m = clientEmail(inquiry);
       await sendEmail({ apiKey: key, to: inquiry.email, subject: m.subject, text: m.text });
-      await ref.update({ emailToClientSent: true });
+      clientSent = true;
     } catch (err) {
       errors.push('client: ' + describeError(err));
     }
 
-    if (errors.length) {
-      await ref.update({ emailError: errors.join('; ') });
+    // One bookkeeping write, recording what actually happened. It must never
+    // fail the request: the inquiry is already safely in Firestore, and telling
+    // the visitor it failed would have them submit all over again.
+    try {
+      const patch = { emailToOwnerSent: ownerSent, emailToClientSent: clientSent };
+      if (errors.length) patch.emailError = errors.join('; ');
+      await ref.update(patch);
+    } catch (err) {
+      console.warn('[submitInquiry] could not record email status:', describeError(err));
     }
 
     // The inquiry is safely recorded either way, so the visitor sees success.
