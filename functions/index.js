@@ -87,16 +87,20 @@ export const submitInquiry = onCall(
       const m = ownerEmail(inquiry);
       await sendEmail({ apiKey: key, to: OWNER_EMAIL, replyTo: inquiry.email, subject: m.subject, text: m.text });
       ownerSent = true;
+      console.log('[submitInquiry] owner email accepted by Resend');
     } catch (err) {
       errors.push('owner: ' + describeError(err));
+      console.warn('[submitInquiry] owner email FAILED:', describeError(err));
     }
 
     try {
       const m = clientEmail(inquiry);
       await sendEmail({ apiKey: key, to: inquiry.email, subject: m.subject, text: m.text });
       clientSent = true;
+      console.log('[submitInquiry] client email accepted by Resend');
     } catch (err) {
       errors.push('client: ' + describeError(err));
+      console.warn('[submitInquiry] client email FAILED:', describeError(err));
     }
 
     // One bookkeeping write, recording what actually happened. It must never

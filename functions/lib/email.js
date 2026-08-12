@@ -84,7 +84,14 @@ export async function sendEmail(opts) {
   });
 
   if (!res.ok) {
-    // Deliberately does NOT include the request body or key in the message.
-    throw new Error('Resend responded ' + res.status);
+    // Resend explains refusals in the response body. Include it — but never
+    // the API key and never the request we sent.
+    let detail = '';
+    try {
+      detail = (await res.text()).slice(0, 300);
+    } catch (e) {
+      detail = '(no body)';
+    }
+    throw new Error('Resend responded ' + res.status + ': ' + detail);
   }
 }
