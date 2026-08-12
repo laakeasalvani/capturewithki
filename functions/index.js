@@ -14,13 +14,19 @@ initializeApp();
 const db = getFirestore();
 
 // Describes a caught error for storage/logging without ever risking
-// `undefined` in the output. sendEmail() throws a plain Error('Resend
-// responded <status>') on a non-2xx response, but a timed-out fetch()
-// rejects first with a DOMException named 'TimeoutError' that has no
-// meaningful .message — so name/code must be checked before message.
+// `undefined` in the output. Keeps every part that carries information:
+// a timed-out fetch() rejects with a DOMException named 'TimeoutError'
+// whose message is unhelpful, while sendEmail() throws a plain Error whose
+// message ("Resend responded 401: ...") is the only useful part. An earlier
+// version returned `err.code || err.name || err.message`, which always
+// stopped at `name` ("Error") for the latter and discarded the reason.
 function describeError(err) {
   if (!err) return 'unknown error';
-  return err.code || err.name || err.message || String(err);
+  const parts = [];
+  if (err.code) parts.push(String(err.code));
+  if (err.name && err.name !== 'Error') parts.push(String(err.name));
+  if (err.message) parts.push(String(err.message));
+  return parts.length ? parts.join(' ') : String(err);
 }
 
 export const submitInquiry = onCall(
