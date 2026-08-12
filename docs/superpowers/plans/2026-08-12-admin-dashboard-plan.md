@@ -83,7 +83,12 @@ Replace it with:
       allow create, delete: if false;
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data)
-             .affectedKeys().hasOnly(['status', 'notes']);
+             .affectedKeys().hasOnly(['status', 'notes'])
+        && (!('status' in request.resource.data)
+            || request.resource.data.status in ['new', 'replied'])
+        && (!('notes' in request.resource.data)
+            || (request.resource.data.notes is string
+                && request.resource.data.notes.size() <= 5000));
     }
 ```
 
