@@ -31,6 +31,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Inquiries hold client contact details, so unlike the CMS collections
+    // they are NOT publicly readable. Only the function writes them, via the
+    // Admin SDK, which bypasses these rules entirely.
+    match /inquiries/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Spam bookkeeping, written only by the function.
+    match /rateLimits/{ipHash} {
+      allow read: if false;
+      allow write: if false;
+    }
+
     // A signed-in user may read ONLY their own admin marker. This is how the
     // client decides whether to show edit controls. It does not expose the
     // admin list: you can check yourself and nobody else. Writes stay closed —

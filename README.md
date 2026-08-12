@@ -67,6 +67,38 @@ design, and `docs/superpowers/plans/2026-08-10-inline-cms-plan-a.md` for
 what's covered by this pass vs. deferred (pricing page text/photos are not
 yet editable — same mechanism, just not wired up yet).
 
+## Contact form
+
+Submissions go to a Firebase Cloud Function (`functions/index.js`,
+`submitInquiry`, region `us-west1`) which records the inquiry in the
+Firestore `inquiries` collection and then sends two emails through Resend:
+one to Khiara with the client's address as Reply-To, and a thank-you to the
+client.
+
+The inquiry is saved **before** the emails are sent, so a delivery failure
+never loses an inquiry — it shows up in the database with `emailError` set.
+
+Inquiries are readable only by a logged-in admin and cannot be written from
+a browser at all.
+
+To deploy after changing anything under `functions/`:
+
+```bash
+firebase deploy --only functions --project capturewithki-69dd3
+```
+
+The Resend API key is stored as a Firebase secret named `RESEND_API_KEY`
+and is never committed. To rotate it:
+
+```bash
+firebase functions:secrets:set RESEND_API_KEY --project capturewithki-69dd3
+firebase deploy --only functions --project capturewithki-69dd3
+```
+
+Email sends from `hello@capturewithki.com` — `capturewithki.com` is bought
+and its DNS records (MX, SPF, DKIM) are verified in Resend. The `FROM`
+constant lives in `functions/lib/email.js` if it ever needs to change.
+
 ## Content to replace before launch
 
 - **Photos** — the home page hero slideshow uses real, self-hosted photos
