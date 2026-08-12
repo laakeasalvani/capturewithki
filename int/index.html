@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CaptureWithKi — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+<div id="dashLoading" class="dash-state">Loading…</div>
+
+<div id="dashLogin" class="dash-state" hidden>
+  <form id="dashLoginForm" class="dash-card">
+    <h1>CaptureWithKi</h1>
+    <p class="dash-sub">Admin sign in</p>
+    <label for="dashEmail">Email</label>
+    <input id="dashEmail" type="email" autocomplete="username" required>
+    <label for="dashPassword">Password</label>
+    <input id="dashPassword" type="password" autocomplete="current-password" required>
+    <p class="dash-error" id="dashLoginError" aria-live="polite"></p>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+
+<div id="dashDenied" class="dash-state" hidden>
+  <div class="dash-card">
+    <h1>No access</h1>
+    <p>You are signed in, but this account is not set up as an admin, so the dashboard cannot be shown.</p>
+    <button type="button" id="dashDeniedLogout">Sign out</button>
+  </div>
+</div>
+
+<div id="dashApp" hidden>
+  <header class="dash-header">
+    <span class="dash-brand">CaptureWithKi</span>
+    <nav class="dash-tabs">
+      <button type="button" id="tabInquiries" class="on">Inquiries</button>
+      <button type="button" id="tabSettings">Auto-reply</button>
+    </nav>
+    <button type="button" id="dashLogout" class="dash-logout">Sign out</button>
+  </header>
+
+  <main>
+    <section id="screenInquiries"></section>
+    <section id="screenSettings" hidden></section>
+  </main>
+</div>
+
+<script type="module" src="dashboard.js"></script>
+</body>
+</html>

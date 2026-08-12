@@ -1,0 +1,27 @@
+:root{
+  --cream:#E8DFCE; --bg:#F2ECE0; --paper:#FAF6EE; --ink:#171614;
+  --muted:#6B6560; --line:#DCD0BC; --khaki:#6E7C5C;
+  --display:"Cormorant Garamond",serif; --sans:"Jost",Arial,sans-serif;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;}
+
+.dash-state{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.dash-state[hidden]{display:none;}
+.dash-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:30px;width:min(92vw,360px);}
+.dash-card h1{font-family:var(--display);font-weight:400;font-size:26px;margin:0 0 4px;}
+.dash-sub{margin:0 0 18px;color:var(--muted);font-size:13px;}
+.dash-card label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;}
+.dash-card input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;font-size:15px;font-family:inherit;}
+.dash-card button{margin-top:18px;background:var(--khaki);color:#fff;border:none;border-radius:20px;padding:9px 20px;font-size:14px;font-family:inherit;cursor:pointer;}
+.dash-card button:disabled{opacity:.55;cursor:default;}
+.dash-error{color:#a33;font-size:13px;min-height:17px;margin:10px 0 0;}
+
+.dash-header{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 20px;background:var(--paper);border-bottom:1px solid var(--line);}
+.dash-brand{font-family:var(--display);font-size:20px;}
+.dash-tabs{display:flex;gap:8px;margin-left:auto;}
+.dash-tabs button{background:none;border:1px solid var(--line);border-radius:18px;padding:6px 15px;font-family:inherit;font-size:13px;cursor:pointer;color:var(--muted);}
+.dash-tabs button.on{background:var(--khaki);border-color:var(--khaki);color:#fff;}
+.dash-logout{background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;font-family:inherit;font-size:13px;}
+
+main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
