@@ -85,18 +85,6 @@ export const submitInquiry = onCall(
     }
 
     const key = RESEND_API_KEY.value();
-    // TEMPORARY DIAGNOSTIC. Logs only the shape of the secret, never its value:
-    // its length, its first three characters (every Resend key starts "re_",
-    // which is not sensitive), and whether it carries stray whitespace. This
-    // distinguishes "the key never reached the function" from "Resend rejected
-    // a key that did arrive". Remove once email delivery is confirmed.
-    console.log('[submitInquiry] key shape:',
-      JSON.stringify({
-        present: !!key,
-        length: key ? key.length : 0,
-        prefix: key ? key.slice(0, 3) : null,
-        hasWhitespace: key ? /\s/.test(key) : false
-      }));
     const errors = [];
     let ownerSent = false;
     let clientSent = false;
