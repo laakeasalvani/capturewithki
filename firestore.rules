@@ -32,11 +32,26 @@ service cloud.firestore {
     }
 
     // Inquiries hold client contact details, so unlike the CMS collections
-    // they are NOT publicly readable. Only the function writes them, via the
-    // Admin SDK, which bypasses these rules entirely.
+    // they are NOT publicly readable. Only the Cloud Function creates them,
+    // via the Admin SDK, which bypasses these rules.
+    //
+    // Updates are deliberately narrow: an admin may change ONLY the status
+    // and her own private note. What the client actually wrote — name,
+    // email, phone, message — stays immutable to every client, including
+    // her and including anyone who obtains her session.
     match /inquiries/{id} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow create, delete: if false;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['status', 'notes']);
+    }
+
+    // Dashboard-owned settings, e.g. the auto-reply email template.
+    // Admin-only both ways — there is no reason for the public to read it.
+    match /settings/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Spam bookkeeping, written only by the function.
