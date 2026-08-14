@@ -112,3 +112,29 @@ constant lives in `functions/lib/email.js` if it ever needs to change.
 - **Testimonials** — the three "Kind words" quotes are placeholder text.
 - **Contact form** — the "Send inquiry" button only shows a client-side
   confirmation message; it does not actually send an email anywhere yet.
+
+## Admin dashboard
+
+A private page at `/int/` where Khiara reads inquiries, marks them replied,
+keeps private notes, and edits the automatic thank-you clients receive.
+
+It reuses the same login as the site's CMS. The `/int/` path is convenience,
+not security — this repository is public. Access is enforced by Firebase Auth
+plus the `admins` check, and by Firestore rules.
+
+Inquiries can be updated ONLY in `status` (which must be `new` or `replied`)
+and `notes` (a string, max 5000 characters). What a client actually wrote is
+immutable to every client, including an admin and including anyone who obtains
+her session. Creating and deleting inquiries is closed to everyone; only the
+Cloud Function creates them.
+
+Any inquiry whose notification email failed is flagged at the top of the list.
+Until that existed, a failed notification was invisible — the inquiry was saved
+but nothing said so, which from the couple's side looks identical to being
+ignored.
+
+The thank-you wording lives in the Firestore document `settings/email`
+(`clientSubject`, `clientBody`), admin-only both ways. `{first_name}` is
+substituted. If the document is missing or blank, the function falls back to
+the wording hardcoded in `functions/lib/email.js` — those two copies must stay
+identical, or the dashboard's preview will misrepresent what clients receive.
