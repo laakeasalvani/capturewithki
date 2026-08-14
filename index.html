@@ -5,10 +5,13 @@
   (function () {
     var d = document.documentElement;
     d.classList.add('cms-pending');
-    // If the CMS modules never run — CDN blocked, offline, script error —
-    // reveal the built-in fallback photos rather than leaving the page
-    // permanently empty. This is the safety net for the safety net.
-    setTimeout(function () { d.classList.remove('cms-pending'); }, 2000);
+    // Last-resort safety net, for when the CMS modules never run at all —
+    // CDN blocked, offline, script error. Deliberately long: cms/main.js
+    // lifts the guard as soon as the real photo has actually loaded, so this
+    // timer must never win a race against a merely-slow load. An earlier
+    // 2-second version did exactly that, revealing the cached old photo
+    // whenever Firestore took longer than two seconds.
+    setTimeout(function () { d.classList.remove('cms-pending'); }, 12000);
   })();
 </script>
 <meta charset="utf-8">

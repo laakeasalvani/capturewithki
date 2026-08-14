@@ -66,8 +66,32 @@ import { initTestimonials } from './testimonials.js';
       : 'Signed in — click the gear to edit';
   });
 
-  // Everything the CMS owns has now been painted from Firestore, so the
-  // photos can be shown. The inline timeout in index.html covers the case
-  // where we never get here.
-  document.documentElement.classList.remove('cms-pending');
+  // The CMS has now set the real photo sources, but setting a src is not the
+  // same as the photo being on screen — a 2MB upload can still be a second or
+  // two from arriving. Lifting the guard at that moment reveals whatever the
+  // browser already has in cache, which is the OLD photo. So wait for the
+  // visible hero image to genuinely finish loading before revealing anything.
+  await revealWhenHeroIsReady();
+
+  async function revealWhenHeroIsReady() {
+    const img = document.querySelector('.hero .slide.on img');
+    const done = function () {
+      document.documentElement.classList.remove('cms-pending');
+    };
+
+    // Nothing to wait for, or it is already decoded.
+    if (!img || (img.complete && img.naturalWidth > 0)) { done(); return; }
+
+    await new Promise(function (resolve) {
+      let settled = false;
+      const finish = function () { if (!settled) { settled = true; resolve(); } };
+      // 'error' resolves too: a broken photo should still reveal the page
+      // rather than leave a visitor staring at an empty hero.
+      img.addEventListener('load', finish, { once: true });
+      img.addEventListener('error', finish, { once: true });
+      // Cap the wait so a stalled download cannot hold the page hostage.
+      setTimeout(finish, 8000);
+    });
+    done();
+  }
 })();
