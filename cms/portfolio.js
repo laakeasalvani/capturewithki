@@ -1,7 +1,7 @@
 import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection, updateCollectionItem } from './collection-store.js';
 import { makeCollectionEditable } from './collection-ui.js';
 import { uploadImage } from './edit-image.js';
-import { onAdminChange } from './auth.js';
+import { onEditingChange } from './auth.js';
 
 const COLLECTION = 'portfolioShots';
 const FALLBACK = [
@@ -162,7 +162,7 @@ export async function initPortfolio() {
   }
   render();
 
-  onAdminChange(async function (active) {
+  onEditingChange(async function (active) {
     if (active) {
       try {
         await ensureSeeded();

@@ -1,6 +1,6 @@
 import { getField, setField } from './content-store.js';
 import { updateCollectionItem } from './collection-store.js';
-import { onAdminChange } from './auth.js';
+import { onEditingChange } from './auth.js';
 
 // collection name -> currently displayed document id (or null while a
 // collection is still showing fallback data with no real id yet).
@@ -100,7 +100,7 @@ export function initTextEditing() {
     applyOptionsField(el);
   });
 
-  onAdminChange(function (active) {
+  onEditingChange(function (active) {
     adminActive = active;
 
     textFields.forEach(function (el) {

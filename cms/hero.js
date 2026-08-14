@@ -1,7 +1,7 @@
 import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection, updateCollectionItem } from './collection-store.js';
 import { makeCollectionEditable } from './collection-ui.js';
 import { uploadImage } from './edit-image.js';
-import { onAdminChange } from './auth.js';
+import { onEditingChange } from './auth.js';
 
 const COLLECTION = 'heroSlides';
 const FALLBACK = [
@@ -165,7 +165,7 @@ export async function initHero() {
   document.getElementById('prev').addEventListener('click', function () { show(index - 1); auto(); });
   document.getElementById('next').addEventListener('click', function () { show(index + 1); auto(); });
 
-  onAdminChange(async function (active) {
+  onEditingChange(async function (active) {
     if (active) {
       try {
         await ensureSeeded();

@@ -1,4 +1,4 @@
-import { initAuth, login, logout, isAdmin, onAdminChange } from './auth.js';
+import { initAuth, login, logout, isAdmin, onAdminChange, isEditing, setEditing, onEditingChange } from './auth.js';
 import { loadSiteContent } from './content-store.js';
 import { initTextEditing } from './edit-text.js';
 import { initImageEditing } from './edit-image.js';
@@ -25,7 +25,7 @@ import { initTestimonials } from './testimonials.js';
   const logoutBtn = document.getElementById('cmsLogoutBtn');
 
   gear.addEventListener('click', function () {
-    if (isAdmin()) return;
+    if (isAdmin()) { setEditing(!isEditing()); return; }
     modal.classList.add('open');
   });
 
@@ -52,8 +52,17 @@ import { initTestimonials } from './testimonials.js';
     logout();
   });
 
+  const badgeText = document.getElementById('cmsBadgeText');
+
   onAdminChange(function (active) {
-    gear.classList.toggle('cms-admin', active);
+    // Badge visible whenever signed in, so Log out is always reachable.
     badge.classList.toggle('visible', active);
+  });
+
+  onEditingChange(function (on) {
+    gear.classList.toggle('cms-admin', on);
+    badgeText.textContent = on
+      ? 'Edit mode is on'
+      : 'Signed in — click the gear to edit';
   });
 })();

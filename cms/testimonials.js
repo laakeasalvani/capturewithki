@@ -1,6 +1,6 @@
 import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem, reorderCollection, updateCollectionItem } from './collection-store.js';
 import { uploadImage } from './edit-image.js';
-import { onAdminChange } from './auth.js';
+import { onEditingChange } from './auth.js';
 import { setCurrentItem } from './edit-text.js';
 
 const COLLECTION = 'testimonials';
@@ -188,7 +188,7 @@ export async function initTestimonials() {
   document.getElementById('cmsLLMoveLeft').addEventListener('click', function () { move(-1); });
   document.getElementById('cmsLLMoveRight').addEventListener('click', function () { move(1); });
 
-  onAdminChange(async function (active) {
+  onEditingChange(async function (active) {
     if (active) {
       try {
         await ensureSeeded();

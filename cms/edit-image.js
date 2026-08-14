@@ -1,7 +1,7 @@
 import { storage } from './firebase.js';
 import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js';
 import { getField, setField } from './content-store.js';
-import { onAdminChange } from './auth.js';
+import { onEditingChange } from './auth.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -62,7 +62,7 @@ export function initImageEditing() {
     img.parentNode.appendChild(buildOverlay(img));
   });
 
-  onAdminChange(function (active) {
+  onEditingChange(function (active) {
     document.querySelectorAll('.cms-image-overlay').forEach(function (btn) {
       btn.classList.toggle('cms-visible', active);
     });
