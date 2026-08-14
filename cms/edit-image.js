@@ -3,19 +3,60 @@ import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/fireba
 import { getField, setField } from './content-store.js';
 import { onEditingChange } from './auth.js';
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_EDGE = 2560;
+const JPEG_QUALITY = 0.85;
+
+// Photos come straight off a camera or phone — often 5000px and several MB.
+// A full-screen hero never needs more than about 2560px, so serving the
+// original means visitors download roughly four times the pixels they can
+// see. Shrinking here, in her browser, also makes her own upload faster.
+// The original file on her device is never touched.
+function shrink(file) {
+  return new Promise(function (resolve) {
+    // Anything we cannot decode (HEIC, a corrupt file, an exotic format) is
+    // passed through untouched rather than rejected — better a large upload
+    // than a blocked one.
+    if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) { resolve(file); return; }
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      // Already small enough AND already efficiently encoded: leave it alone.
+      if (scale === 1 && file.size <= 900 * 1024) { resolve(file); return; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(function (blob) {
+        // Never make things worse: if re-encoding gained nothing, keep hers.
+        if (!blob || blob.size >= file.size) { resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', JPEG_QUALITY);
+    };
+
+    img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
 
 export async function uploadImage(file, pathPrefix) {
   if (!file.type.startsWith('image/')) {
     throw new Error('Please choose an image file.');
   }
   if (file.size > MAX_BYTES) {
-    throw new Error('That image is larger than 10MB.');
+    throw new Error('That image is larger than 25MB.');
   }
-  const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(-100);
+  const ready = await shrink(file);
+  const safeName = ready.name.replace(/[^\w.\-]+/g, '_').slice(-100);
   const path = 'uploads/' + pathPrefix + '/' + Date.now() + '-' + safeName;
   const fileRef = ref(storage, path);
-  await uploadBytes(fileRef, file);
+  await uploadBytes(fileRef, ready);
   return getDownloadURL(fileRef);
 }
 
