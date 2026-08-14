@@ -157,7 +157,7 @@ git commit -m "Allow admins to update inquiry status and notes only; add setting
 - Create: `int/index.html`, `int/dashboard.css`, `int/dashboard.js`
 
 **Interfaces:**
-- Consumes: `initAuth`, `login`, `logout`, `isAdmin`, `onAdminChange` from `../cms/auth.js`.
+- Consumes: `initAuth`, `login`, `logout`, `onAdminChange` from `../cms/auth.js`; `auth` from `../cms/firebase.js`; `onAuthStateChanged` from the pinned Firebase Auth SDK.
 - Produces: the four DOM containers later tasks render into — `#dashLoading`, `#dashLogin`, `#dashDenied`, `#dashApp` — plus `#screenInquiries` and `#screenSettings` inside `#dashApp`, and the tab buttons `#tabInquiries` / `#tabSettings`.
 
 - [ ] **Step 1: Create `int/index.html`**
@@ -233,6 +233,7 @@ git commit -m "Allow admins to update inquiry status and notes only; add setting
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;}
 
 .dash-state{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.dash-state[hidden]{display:none;}
 .dash-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:30px;width:min(92vw,360px);}
 .dash-card h1{font-family:var(--display);font-weight:400;font-size:26px;margin:0 0 4px;}
 .dash-sub{margin:0 0 18px;color:var(--muted);font-size:13px;}
@@ -258,7 +259,9 @@ Note: the file is CSS, so do NOT include the trailing `</style>` — that line i
 - [ ] **Step 3: Create `int/dashboard.js`**
 
 ```js
-import { initAuth, login, logout, isAdmin, onAdminChange } from '../cms/auth.js';
+import { initAuth, login, logout, onAdminChange } from '../cms/auth.js';
+import { auth } from '../cms/firebase.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
 import { initInquiries } from './inquiries.js';
 import { initSettings } from './settings.js';
 
@@ -311,15 +314,26 @@ form.addEventListener('submit', function (e) {
   });
 });
 
-document.getElementById('dashLogout').addEventListener('click', function () { logout(); });
-document.getElementById('dashDeniedLogout').addEventListener('click', function () { logout(); });
+function signOut() {
+  logout().then(function () { window.location.reload(); });
+}
+document.getElementById('dashLogout').addEventListener('click', signOut);
+document.getElementById('dashDeniedLogout').addEventListener('click', signOut);
 
+// Auth resolves in two steps: cms/auth.js notifies admin state immediately
+// (with a stale default), and Firebase separately restores any saved session
+// a moment later. Painting before BOTH have spoken is what flashes the login
+// form at someone who is already signed in — so hold on "Loading…" until
+// authResolved is true.
+let authResolved = false;
+let currentUser = null;
+let adminActive = false;
 let started = false;
 
-initAuth();
+function paint() {
+  if (!authResolved) { show('loading'); return; }
 
-onAdminChange(function (active) {
-  if (active) {
+  if (adminActive) {
     show('app');
     if (!started) {
       started = true;
@@ -328,14 +342,23 @@ onAdminChange(function (active) {
     }
     return;
   }
-  // Not an admin. Distinguish "signed in but not permitted" from "signed
-  // out" — a blank page for the former is exactly the bug that cost an
-  // evening on the CMS.
-  import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js').then(function (m) {
-    const user = m.getAuth().currentUser;
-    show(user ? 'denied' : 'login');
-  });
+  // Signed in but not an admin is a different situation from signed out, and
+  // must say so rather than silently showing a login form.
+  show(currentUser ? 'denied' : 'login');
+}
+
+onAuthStateChanged(auth, function (user) {
+  authResolved = true;
+  currentUser = user;
+  paint();
 });
+
+onAdminChange(function (active) {
+  adminActive = active;
+  paint();
+});
+
+initAuth();
 ```
 
 - [ ] **Step 4: Verify the signed-out state**

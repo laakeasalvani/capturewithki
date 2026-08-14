@@ -1,4 +1,6 @@
-import { initAuth, login, logout, isAdmin, onAdminChange } from '../cms/auth.js';
+import { initAuth, login, logout, onAdminChange } from '../cms/auth.js';
+import { auth } from '../cms/firebase.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
 import { initInquiries } from './inquiries.js';
 import { initSettings } from './settings.js';
 
@@ -51,15 +53,26 @@ form.addEventListener('submit', function (e) {
   });
 });
 
-document.getElementById('dashLogout').addEventListener('click', function () { logout(); });
-document.getElementById('dashDeniedLogout').addEventListener('click', function () { logout(); });
+function signOut() {
+  logout().then(function () { window.location.reload(); });
+}
+document.getElementById('dashLogout').addEventListener('click', signOut);
+document.getElementById('dashDeniedLogout').addEventListener('click', signOut);
 
+// Auth resolves in two steps: cms/auth.js notifies admin state immediately
+// (with a stale default), and Firebase separately restores any saved session
+// a moment later. Painting before BOTH have spoken is what flashes the login
+// form at someone who is already signed in — so hold on "Loading…" until
+// authResolved is true.
+let authResolved = false;
+let currentUser = null;
+let adminActive = false;
 let started = false;
 
-initAuth();
+function paint() {
+  if (!authResolved) { show('loading'); return; }
 
-onAdminChange(function (active) {
-  if (active) {
+  if (adminActive) {
     show('app');
     if (!started) {
       started = true;
@@ -68,11 +81,20 @@ onAdminChange(function (active) {
     }
     return;
   }
-  // Not an admin. Distinguish "signed in but not permitted" from "signed
-  // out" — a blank page for the former is exactly the bug that cost an
-  // evening on the CMS.
-  import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js').then(function (m) {
-    const user = m.getAuth().currentUser;
-    show(user ? 'denied' : 'login');
-  });
+  // Signed in but not an admin is a different situation from signed out, and
+  // must say so rather than silently showing a login form.
+  show(currentUser ? 'denied' : 'login');
+}
+
+onAuthStateChanged(auth, function (user) {
+  authResolved = true;
+  currentUser = user;
+  paint();
 });
+
+onAdminChange(function (active) {
+  adminActive = active;
+  paint();
+});
+
+initAuth();
