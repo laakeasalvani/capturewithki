@@ -72,3 +72,46 @@ test('an empty or whitespace-only name falls back to a friendly greeting', () =>
   assert.ok(clientEmail({ name: '' }).text.includes('Hi there,'));
   assert.ok(clientEmail({ name: '   ' }).text.includes('Hi there,'));
 });
+
+test('clientEmail uses a saved template and substitutes the first name', () => {
+  const e = clientEmail({ name: 'Sarah Chen' }, {
+    clientSubject: 'Got your note!',
+    clientBody: 'Hey {first_name},\n\nSpeak soon.\nK'
+  });
+  assert.equal(e.subject, 'Got your note!');
+  assert.ok(e.text.includes('Hey Sarah,'));
+  assert.ok(!e.text.includes('{first_name}'));
+});
+
+test('clientEmail falls back when the template is missing or empty', () => {
+  const def = clientEmail({ name: 'Sarah Chen' });
+  assert.match(def.text, /48 hours/);
+  const empty = clientEmail({ name: 'Sarah Chen' }, { clientSubject: '', clientBody: '   ' });
+  assert.equal(empty.subject, def.subject);
+  assert.equal(empty.text, def.text);
+});
+
+test('a saved subject cannot smuggle a newline', () => {
+  const e = clientEmail({ name: 'Sarah' }, {
+    clientSubject: 'Hello\nBcc: someone@evil.com',
+    clientBody: 'Hi {first_name}'
+  });
+  assert.ok(!e.subject.includes('\n'));
+});
+
+test('a saved body keeps its line breaks', () => {
+  const e = clientEmail({ name: 'Sarah' }, { clientBody: 'One\n\nTwo' });
+  assert.ok(e.text.includes('One\n\nTwo'));
+});
+
+test('every occurrence of the token is replaced', () => {
+  const e = clientEmail({ name: 'Sarah' }, { clientBody: '{first_name} {first_name}' });
+  assert.equal(e.text, 'Sarah Sarah');
+});
+
+test('a non-object template is ignored rather than throwing', () => {
+  for (const bad of [null, 'x', 42, [], undefined]) {
+    const e = clientEmail({ name: 'Sarah' }, bad);
+    assert.match(e.text, /48 hours/);
+  }
+});

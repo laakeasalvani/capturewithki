@@ -45,20 +45,35 @@ export function ownerEmail(i) {
   return { subject: 'New inquiry — ' + who, text: text };
 }
 
-export function clientEmail(i) {
+const DEFAULT_CLIENT_SUBJECT = 'Thank you for reaching out — CaptureWithKi';
+const DEFAULT_CLIENT_BODY = [
+  'Hi {first_name},',
+  '',
+  'Thank you so much for reaching out — your inquiry came through and I have it.',
+  '',
+  'I will get back to you within 48 hours.',
+  '',
+  'Talk soon,',
+  'Khiara',
+  'CaptureWithKi'
+].join('\n');
+
+export function clientEmail(i, template) {
   const first = oneLine(i.name).trim().split(' ')[0] || 'there';
-  const text = [
-    'Hi ' + first + ',',
-    '',
-    'Thank you so much for reaching out — your inquiry came through and I have it.',
-    '',
-    'I will get back to you within 48 hours.',
-    '',
-    'Talk soon,',
-    'Khiara',
-    'CaptureWithKi'
-  ].join('\n');
-  return { subject: 'Thank you for reaching out — CaptureWithKi', text: text };
+
+  // A saved template is optional. Anything that is not a plain object, or
+  // whose fields are blank, falls back to the wording above — a couple must
+  // always receive something sensible.
+  const t = (template && typeof template === 'object' && !Array.isArray(template)) ? template : {};
+  const rawSubject = typeof t.clientSubject === 'string' ? t.clientSubject.trim() : '';
+  const rawBody = typeof t.clientBody === 'string' ? t.clientBody.trim() : '';
+
+  // The subject is a mail header, so it must never carry a line break.
+  // The body is free text and keeps hers.
+  const subject = oneLine(rawSubject || DEFAULT_CLIENT_SUBJECT).trim();
+  const text = (rawBody || DEFAULT_CLIENT_BODY).split('{first_name}').join(first);
+
+  return { subject: subject, text: text };
 }
 
 export async function sendEmail(opts) {

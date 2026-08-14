@@ -99,8 +99,19 @@ export const submitInquiry = onCall(
       console.warn('[submitInquiry] owner email FAILED:', describeError(err));
     }
 
+    // The owner can reword the thank-you from the dashboard. A missing or
+    // unreadable document is not an error: clientEmail falls back to the
+    // hardcoded wording, so a couple always gets a sensible reply.
+    let template = null;
     try {
-      const m = clientEmail(inquiry);
+      const tSnap = await db.collection('settings').doc('email').get();
+      if (tSnap.exists) template = tSnap.data();
+    } catch (err) {
+      console.warn('[submitInquiry] could not read the auto-reply template:', describeError(err));
+    }
+
+    try {
+      const m = clientEmail(inquiry, template);
       await sendEmail({ apiKey: key, to: inquiry.email, subject: m.subject, text: m.text });
       clientSent = true;
       console.log('[submitInquiry] client email accepted by Resend');
