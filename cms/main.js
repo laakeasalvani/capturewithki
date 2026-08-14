@@ -65,4 +65,9 @@ import { initTestimonials } from './testimonials.js';
       ? 'Edit mode is on'
       : 'Signed in — click the gear to edit';
   });
+
+  // Everything the CMS owns has now been painted from Firestore, so the
+  // photos can be shown. The inline timeout in index.html covers the case
+  // where we never get here.
+  document.documentElement.classList.remove('cms-pending');
 })();

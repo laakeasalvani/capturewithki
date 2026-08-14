@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  (function () {
+    var d = document.documentElement;
+    d.classList.add('cms-pending');
+    // If the CMS modules never run — CDN blocked, offline, script error —
+    // reveal the built-in fallback photos rather than leaving the page
+    // permanently empty. This is the safety net for the safety net.
+    setTimeout(function () { d.classList.remove('cms-pending'); }, 2000);
+  })();
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CaptureWithKi — Khiara Salvani</title>
@@ -351,6 +361,15 @@ p:last-child{margin-bottom:0;}
 }
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
 .submit:disabled{opacity:.55;cursor:default;}
+
+/* The photos below exist in the markup as a fallback, but the CMS replaces
+   them from Firestore a moment after load. Hiding them until that happens
+   avoids showing a stale photo first. visibility (not display) keeps the
+   layout stable so nothing jumps when they appear. */
+.cms-pending .hero .slide img,
+.cms-pending #filmstripTrack .frame img,
+.cms-pending #llImg,
+.cms-pending [data-cms-type="image"]{visibility:hidden;}
 </style>
 </head>
 <body>
