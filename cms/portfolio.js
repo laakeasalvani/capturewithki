@@ -101,8 +101,7 @@ async function handleAdd() {
     try {
       await ensureSeeded();
       const url = await uploadImage(file, 'portfolioShots');
-      items = await loadCollection(COLLECTION);
-      await addCollectionItem(COLLECTION, { src: url, cat: 'portraits', place: '' }, items.length);
+      await addCollectionItem(COLLECTION, { src: url, cat: 'portraits', place: '' });
       await refresh();
     } catch (err) {
       alert('Could not add that photo: ' + (err && (err.code || err.message)));

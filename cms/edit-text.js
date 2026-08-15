@@ -2,6 +2,7 @@ import { getField, setField } from './content-store.js';
 import { updateCollectionItem } from './collection-store.js';
 import { onEditingChange } from './auth.js';
 import { sanitizeHtml, initPasteGuard } from './sanitize.js';
+import { showToast } from './toast.js';
 
 // collection name -> currently displayed document id (or null while a
 // collection is still showing fallback data with no real id yet).
@@ -56,20 +57,6 @@ function applyOptionsField(el) {
   const id = el.getAttribute('data-cms-id');
   const value = getField(id, null);
   if (value) rebuildOptions(el, value);
-}
-
-function showToast(message) {
-  let toast = document.getElementById('cmsToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'cmsToast';
-    toast.className = 'cms-toast';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.classList.add('show');
-  clearTimeout(toast.__timer);
-  toast.__timer = setTimeout(function () { toast.classList.remove('show'); }, 1500);
 }
 
 function refreshItemTextClasses() {

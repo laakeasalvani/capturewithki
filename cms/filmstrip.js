@@ -72,8 +72,7 @@ async function handleAdd() {
     try {
       await ensureSeeded();
       const url = await uploadImage(file, 'filmstripShots');
-      items = await loadCollection(COLLECTION);
-      await addCollectionItem(COLLECTION, { src: url }, items.length);
+      await addCollectionItem(COLLECTION, { src: url });
       await refresh();
     } catch (err) {
       alert('Could not add that photo: ' + (err && (err.code || err.message)));

@@ -101,8 +101,7 @@ async function handleAdd() {
     try {
       await ensureSeeded();
       const url = await uploadImage(file, 'heroSlides');
-      items = await loadCollection(COLLECTION);
-      await addCollectionItem(COLLECTION, { src: url, alt: '', objectPosition: '50% 50%' }, items.length);
+      await addCollectionItem(COLLECTION, { src: url, alt: '', objectPosition: '50% 50%' });
       await refresh();
     } catch (err) {
       alert('Could not add that slide: ' + (err && (err.code || err.message)));

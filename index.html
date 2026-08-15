@@ -785,6 +785,27 @@ p:last-child{margin-bottom:0;}
         <button type="button" id="cmsLLDelete">Delete this one</button>
         <button type="button" id="cmsLLAdd">+ Add testimonial</button>
       </div>
+      <!-- The add flow used two prompt() boxes and then opened a file picker
+           programmatically. iOS Safari will not reliably open a picker once
+           dialogs have interrupted the tap, so on a phone the flow died with no
+           message at all. This is a real form, and the file input is in the
+           page for her to tap directly. -->
+      <div class="cms-ll-form" id="cmsLLForm" hidden>
+        <label class="cms-ll-field">Quote
+          <textarea id="cmsLLQuote" rows="4" maxlength="1000"></textarea>
+        </label>
+        <label class="cms-ll-field">Names
+          <input id="cmsLLWho" type="text" maxlength="120" placeholder="Mailani &amp; Josh">
+        </label>
+        <label class="cms-ll-field">Photo
+          <input id="cmsLLPhoto" type="file" accept="image/*">
+        </label>
+        <div class="cms-ll-form-actions">
+          <button type="button" id="cmsLLSave">Add testimonial</button>
+          <button type="button" id="cmsLLCancel">Cancel</button>
+        </div>
+        <p class="cms-ll-status" id="cmsLLStatus" role="status" aria-live="polite"></p>
+      </div>
     </div>
   </div>
 
