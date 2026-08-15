@@ -5,7 +5,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 import { validateInquiry } from './lib/validate.js';
 import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
-import { ownerEmail, clientEmail, sendEmail } from './lib/email.js';
+import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'netherlyk23@gmail.com';
@@ -91,7 +91,8 @@ export const submitInquiry = onCall(
 
     try {
       const m = ownerEmail(inquiry);
-      await sendEmail({ apiKey: key, to: OWNER_EMAIL, replyTo: inquiry.email, subject: m.subject, text: m.text });
+      await sendEmail({ apiKey: key, to: OWNER_EMAIL, replyTo: inquiry.email,
+                        subject: m.subject, text: m.text, html: ownerEmailHtml(inquiry) });
       ownerSent = true;
       console.log('[submitInquiry] owner email accepted by Resend');
     } catch (err) {
@@ -112,7 +113,11 @@ export const submitInquiry = onCall(
 
     try {
       const m = clientEmail(inquiry, template);
-      await sendEmail({ apiKey: key, to: inquiry.email, subject: m.subject, text: m.text });
+      // The banner photo lives on the same settings document as the wording.
+      // clientEmailHtml drops the banner if it is missing or fails its check.
+      const banner = template && template.clientImage;
+      await sendEmail({ apiKey: key, to: inquiry.email, subject: m.subject, text: m.text,
+                        html: clientEmailHtml(inquiry, template, banner) });
       clientSent = true;
       console.log('[submitInquiry] client email accepted by Resend');
     } catch (err) {

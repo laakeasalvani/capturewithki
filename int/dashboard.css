@@ -58,5 +58,20 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 .s-actions button{background:var(--khaki);color:#fff;border:none;border-radius:18px;padding:8px 18px;font-family:inherit;font-size:14px;cursor:pointer;}
 .s-secondary{background:none !important;border:1px solid var(--line) !important;color:var(--muted) !important;}
 .s-status{font-size:13px;color:var(--khaki);}
+.s-actions button[disabled]{opacity:.5;cursor:default;}
+
+/* The banner photo for the client email. */
+.s-photo{margin:0 0 22px;padding-top:4px;}
+.s-photo .s-help{margin-bottom:12px;}
+.s-photo-preview{
+  display:block;width:100%;max-width:420px;height:auto;
+  border:1px solid var(--line);border-radius:8px;margin-bottom:12px;
+}
+.s-photo-none{color:var(--muted);font-size:13px;margin:0 0 12px;font-style:italic;}
+/* 44px targets: she does this from her phone as often as not. */
+@media (max-width:768px){
+  .s-actions button{min-height:44px;}
+  .s-label input,.s-label textarea{min-height:44px;}
+}
 .s-preview-title{font-family:var(--display);font-weight:400;font-size:18px;margin:26px 0 8px;}
 .s-preview{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px;white-space:pre-wrap;font-family:inherit;font-size:14px;margin:0;}
