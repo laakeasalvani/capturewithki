@@ -3,16 +3,26 @@ import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/fireba
 import { getField, setField } from './content-store.js';
 import { onEditingChange } from './auth.js';
 
-const MAX_BYTES = 25 * 1024 * 1024;
-const MAX_EDGE = 2560;
-const JPEG_QUALITY = 0.85;
+const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_EDGE = 6000;
+const JPEG_QUALITY = 0.95;
 
-// Photos come straight off a camera or phone — often 5000px and several MB.
-// A full-screen hero never needs more than about 2560px, so serving the
-// original means visitors download roughly four times the pixels they can
-// see. Shrinking here, in her browser, also makes her own upload faster.
-// The original file on her device is never touched.
-function shrink(file) {
+// Earlier this capped every upload at 2560px and re-encoded it at quality 85.
+// Khiara could see the difference, and she was right to: her camera produces
+// ~5239px files, so every photo was both scaled down and put through a second
+// round of JPEG compression on top of the camera's own. That is generation
+// loss, and it shows in skin, hair and fabric.
+//
+// So the ceiling now sits above her camera rather than below it. A normal
+// photo never reaches the canvas at all — it uploads byte-for-byte as she
+// exported it. Only something genuinely enormous, a stitched panorama or a
+// scan, is touched, and then at quality 95, which is visually indistinguishable.
+//
+// The tradeoff is deliberate and hers: full-size photos mean a heavier page,
+// most of all on the 36-image Portfolio grid. Quality won.
+//
+// Exported so the behaviour can be tested without performing a real upload.
+export function capIfEnormous(file) {
   return new Promise(function (resolve) {
     // Anything we cannot decode (HEIC, a corrupt file, an exotic format) is
     // passed through untouched rather than rejected — better a large upload
@@ -24,10 +34,13 @@ function shrink(file) {
 
     img.onload = function () {
       URL.revokeObjectURL(url);
-      const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
-      // Already small enough AND already efficiently encoded: leave it alone.
-      if (scale === 1 && file.size <= 900 * 1024) { resolve(file); return; }
+      // The common path, and the point of the change: her file, untouched.
+      if (Math.max(img.naturalWidth, img.naturalHeight) <= MAX_EDGE) {
+        resolve(file);
+        return;
+      }
 
+      const scale = MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight);
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
@@ -50,9 +63,9 @@ export async function uploadImage(file, pathPrefix) {
     throw new Error('Please choose an image file.');
   }
   if (file.size > MAX_BYTES) {
-    throw new Error('That image is larger than 25MB.');
+    throw new Error('That image is larger than 50MB.');
   }
-  const ready = await shrink(file);
+  const ready = await capIfEnormous(file);
   const safeName = ready.name.replace(/[^\w.\-]+/g, '_').slice(-100);
   const path = 'uploads/' + pathPrefix + '/' + Date.now() + '-' + safeName;
   const fileRef = ref(storage, path);
