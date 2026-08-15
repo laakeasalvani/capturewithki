@@ -3,7 +3,7 @@
   "description": "Cloud Functions for CaptureWithKi",
   "type": "module",
   "main": "index.js",
-  "engines": { "node": "20" },
+  "engines": { "node": "24" },
   "scripts": {
     "test": "node --test test/*.test.js"
   },

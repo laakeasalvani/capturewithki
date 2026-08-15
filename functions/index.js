@@ -1,3 +1,13 @@
+// Node runtime is pinned in TWO places and they must agree:
+//   firebase.json     -> functions[0].runtime  ("nodejs24")
+//   functions/package.json -> engines.node     ("24")
+// firebase.json wins. Changing only package.json looks like it worked — the
+// deploy succeeds and says nothing — but the function stays on the old runtime.
+//
+// A second trap: the CLI skips redeploying a function whose SOURCE is
+// unchanged, so a runtime-only change deploys as "Skipped (No changes
+// detected)" and silently does nothing. Verify with `firebase functions:list`
+// after any runtime change rather than trusting the deploy output.
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
