@@ -119,3 +119,60 @@ Real inbox rendering in Gmail, Outlook and Apple Mail. Nothing in this
 environment can send or receive a real message, and the owner's Resend account
 is hers. Recommended before relying on it: send one real test inquiry and look
 at both emails on a phone and a computer.
+
+---
+
+## Addendum — dark mode
+
+*2026-08-15, after the first real send*
+
+Real inbox screenshots showed the phone version had been recoloured by the mail
+app's dark theme: the cream became a muddy brown and the khaki wordmark washed
+out to a pale sage. Nothing was wrong with the chosen colours — the client had
+inverted them. **Dark mode was not flagged in the original design; it should
+have been.**
+
+Client identified by the owner: the **Gmail app**, which is the hard case.
+
+Owner's decision: do both — ask for light where a client honours it, and supply
+a chosen dark palette where it does not.
+
+### What was added
+
+1. `<meta name="color-scheme" content="light">` and
+   `supported-color-schemes`, plus `color-scheme:light` in CSS. Apple Mail and
+   Outlook honour these and will leave the light design alone.
+2. A `<style>` block with `@media (prefers-color-scheme:dark)` overrides, so
+   where a client supports it the dark version is *chosen* rather than
+   computed: `#12110F` page, `#1C1A17` card, `#A9B892` wordmark, `#D8D2C7`
+   body, `#5A6650` header strip.
+3. `[data-ogsc]` / `[data-ogsb]` duplicates, because Outlook.com rewrites the
+   document and prefixes those attributes instead of honouring the media query.
+
+Every themed element gained a `cwk-*` class. The inline styles are untouched
+and remain the light default for any client that strips the head, so nothing
+regresses where the `<style>` block never arrives. The dark rules carry
+`!important` because a stylesheet rule must beat an inline style.
+
+### Verified
+
+Rendered at 375px in a browser forced to each scheme:
+
+| | Light | Dark |
+|---|---|---|
+| Page | `rgb(242,236,224)` — site cream | `rgb(18,17,15)` |
+| Card | `rgb(250,246,238)` — site paper | `rgb(28,26,23)` |
+| Wordmark | `rgb(110,124,92)` — site khaki | `rgb(169,184,146)` |
+| Body | `rgb(107,101,96)` | `rgb(216,210,199)` |
+
+No horizontal overflow in either. `npm test`: **66 passing**, including
+assertions that the light inline styles survive, that every dark rule carries
+`!important`, and that each themed element carries the class its rule targets.
+
+### Limit, stated plainly
+
+**The Gmail app's dark theme cannot be switched off.** These changes steer it
+and give it better colours to start from, but Gmail applies its own
+transformation and may still differ from the palette above. Apple Mail and
+Outlook should now match the light design exactly. Only a real send to a real
+Gmail app can show how much of this it took — worth re-testing after deploy.

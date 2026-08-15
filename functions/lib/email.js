@@ -79,16 +79,65 @@ export function safeImageUrl(url) {
 
 // Her template is plain text she typed. Preserve her paragraph breaks without
 // trusting the content: escape first, then rebuild the breaks.
-function textToParagraphs(text, style) {
+function textToParagraphs(text, style, cls) {
   return String(text)
     .split(/\n\s*\n/)
     .map(function (block) { return block.trim(); })
     .filter(function (block) { return block.length > 0; })
     .map(function (block) {
-      return '<p style="' + style + '">' + escapeHtml(block).split('\n').join('<br>') + '</p>';
+      return '<p class="' + (cls || 'cwk-body') + '" style="' + style + '">' +
+        escapeHtml(block).split('\n').join('<br>') + '</p>';
     })
     .join('');
 }
+
+// Dark mode, learned from a real inbox screenshot. A phone in dark mode does
+// not show what was designed: it inverts the cream to a muddy brown and
+// washes the khaki out to a pale sage. Two defences, because no single one
+// covers every client:
+//
+//   1. color-scheme / supported-color-schemes ask the client to leave a
+//      light-designed email alone. Apple Mail and Outlook honour this. The
+//      Gmail app largely does not — it cannot be switched off, only steered.
+//   2. Where the client does support a <style> block and prefers-color-scheme
+//      (Apple Mail, and Gmail for Gmail-hosted accounts), these rules give a
+//      dark version that was *chosen* rather than computed: warm near-black
+//      instead of muddy brown, and a lighter khaki that still reads as hers.
+//
+// Rules in a <style> block need !important to beat the inline styles, which
+// stay the light default for every client that strips the head.
+const D = {
+  bg: '#12110F',
+  card: '#1C1A17',
+  mark: '#A9B892',
+  body: '#D8D2C7',
+  muted: '#9E978C',
+  line: '#3A362F',
+  head: '#5A6650'
+};
+
+const DARK_CSS =
+  ':root{color-scheme:light;supported-color-schemes:light;}' +
+  '@media (prefers-color-scheme:dark){' +
+    '.cwk-bg{background:' + D.bg + ' !important;}' +
+    '.cwk-card{background:' + D.card + ' !important;}' +
+    '.cwk-mark{color:' + D.mark + ' !important;}' +
+    '.cwk-body{color:' + D.body + ' !important;}' +
+    '.cwk-strong{color:' + D.body + ' !important;}' +
+    '.cwk-label{color:' + D.muted + ' !important;}' +
+    '.cwk-rule{background:' + D.line + ' !important;}' +
+    '.cwk-head{background:' + D.head + ' !important;}' +
+  '}' +
+  // Outlook.com rewrites the document and prefixes these attributes instead of
+  // honouring the media query, so it needs its own copy.
+  '[data-ogsc] .cwk-card{background:' + D.card + ' !important;}' +
+  '[data-ogsc] .cwk-mark{color:' + D.mark + ' !important;}' +
+  '[data-ogsc] .cwk-body{color:' + D.body + ' !important;}' +
+  '[data-ogsc] .cwk-strong{color:' + D.body + ' !important;}' +
+  '[data-ogsc] .cwk-label{color:' + D.muted + ' !important;}' +
+  '[data-ogsb] .cwk-bg{background:' + D.bg + ' !important;}' +
+  '[data-ogsb] .cwk-card{background:' + D.card + ' !important;}' +
+  '[data-ogsb] .cwk-head{background:' + D.head + ' !important;}';
 
 function shell(inner) {
   // The charset declaration is not optional. Without it her em dashes and
@@ -96,9 +145,12 @@ function shell(inner) {
   return '<!doctype html><html><head>' +
     '<meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="color-scheme" content="light">' +
+    '<meta name="supported-color-schemes" content="light">' +
+    '<style>' + DARK_CSS + '</style>' +
     '</head>' +
-    '<body style="margin:0;padding:0;background:' + C.bg + ';">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ' +
+    '<body class="cwk-bg" style="margin:0;padding:0;background:' + C.bg + ';">' +
+    '<table role="presentation" class="cwk-bg" width="100%" cellpadding="0" cellspacing="0" border="0" ' +
       'style="background:' + C.bg + ';margin:0;padding:0;">' +
       '<tr><td align="center" style="padding:28px 12px;">' +
         // width="600" is for Outlook, which ignores CSS max-width. Everywhere
@@ -107,7 +159,7 @@ function shell(inner) {
         // hard 600 pushes the layout viewport wider than the screen and the
         // reader has to pinch and scroll sideways — which is exactly what it
         // did before this was caught on a 375px render.
-        '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" ' +
+        '<table role="presentation" class="cwk-card" width="600" cellpadding="0" cellspacing="0" border="0" ' +
           'style="width:100%;max-width:600px;background:' + C.paper + ';">' +
           inner +
         '</table>' +
@@ -117,21 +169,21 @@ function shell(inner) {
 }
 
 function wordmark() {
-  return '<tr><td align="center" style="padding:28px 32px 0;">' +
-    '<div style="font-family:' + SERIF + ';font-style:italic;font-size:30px;' +
+  return '<tr><td align="center" class="cwk-card" style="padding:28px 32px 0;">' +
+    '<div class="cwk-mark" style="font-family:' + SERIF + ';font-style:italic;font-size:30px;' +
       'letter-spacing:.02em;color:' + C.khaki + ';">CaptureWithKi</div>' +
     '</td></tr>';
 }
 
 function rule() {
-  return '<tr><td style="padding:20px 32px 0;">' +
-    '<div style="height:1px;background:' + C.line + ';font-size:0;line-height:0;">&nbsp;</div>' +
+  return '<tr><td class="cwk-card" style="padding:20px 32px 0;">' +
+    '<div class="cwk-rule" style="height:1px;background:' + C.line + ';font-size:0;line-height:0;">&nbsp;</div>' +
     '</td></tr>';
 }
 
 function footer() {
-  return '<tr><td align="center" style="padding:26px 32px 32px;">' +
-    '<div style="font-family:' + SANS + ';font-size:11px;letter-spacing:.16em;' +
+  return '<tr><td align="center" class="cwk-card" style="padding:26px 32px 32px;">' +
+    '<div class="cwk-label" style="font-family:' + SANS + ';font-size:11px;letter-spacing:.16em;' +
       'text-transform:uppercase;color:' + C.muted + ';">' +
       'capturewithki.com &nbsp;&middot;&nbsp; @capturewithki' +
     '</div></td></tr>';
@@ -160,7 +212,7 @@ export function clientEmailHtml(i, template, imageUrl) {
     banner +
     wordmark() +
     rule() +
-    '<tr><td style="padding:24px 32px 4px;">' + paragraphs + '</td></tr>' +
+    '<tr><td class="cwk-card" style="padding:24px 32px 4px;">' + paragraphs + '</td></tr>' +
     footer()
   );
 }
@@ -175,10 +227,10 @@ export function ownerEmailHtml(i) {
     ['Session', orNone(i.sessionType)]
   ].map(function (pair) {
     return '<tr>' +
-      '<td style="padding:7px 14px 7px 0;font-family:' + SANS + ';font-size:11px;' +
+      '<td class="cwk-label" style="padding:7px 14px 7px 0;font-family:' + SANS + ';font-size:11px;' +
         'letter-spacing:.16em;text-transform:uppercase;color:' + C.muted + ';' +
         'white-space:nowrap;vertical-align:top;">' + escapeHtml(pair[0]) + '</td>' +
-      '<td style="padding:7px 0;font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';">' +
+      '<td class="cwk-strong" style="padding:7px 0;font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';">' +
         escapeHtml(pair[1]) + '</td>' +
     '</tr>';
   }).join('');
@@ -186,22 +238,23 @@ export function ownerEmailHtml(i) {
   // No photo here by choice: this is a work alert she scans on a phone, and a
   // banner would push the details she actually needs below the fold.
   return shell(
-    '<tr><td style="padding:18px 32px;background:' + C.khaki + ';">' +
+    '<tr><td class="cwk-head" style="padding:18px 32px;background:' + C.khaki + ';">' +
       '<div style="font-family:' + SANS + ';font-size:12px;letter-spacing:.2em;' +
         'text-transform:uppercase;color:' + C.paper + ';">New inquiry</div>' +
     '</td></tr>' +
-    '<tr><td style="padding:24px 32px 0;">' +
+    '<tr><td class="cwk-card" style="padding:24px 32px 0;">' +
       '<table role="presentation" cellpadding="0" cellspacing="0" border="0">' + rows + '</table>' +
     '</td></tr>' +
     rule() +
-    '<tr><td style="padding:20px 32px 0;">' +
-      '<div style="font-family:' + SANS + ';font-size:11px;letter-spacing:.16em;' +
+    '<tr><td class="cwk-card" style="padding:20px 32px 0;">' +
+      '<div class="cwk-label" style="font-family:' + SANS + ';font-size:11px;letter-spacing:.16em;' +
         'text-transform:uppercase;color:' + C.muted + ';padding-bottom:8px;">Message</div>' +
       textToParagraphs(orNoneMultiline(i.message),
-        'margin:0 0 14px;font-family:' + SANS + ';font-size:15px;line-height:1.8;color:' + C.ink + ';') +
+        'margin:0 0 14px;font-family:' + SANS + ';font-size:15px;line-height:1.8;color:' + C.ink + ';',
+        'cwk-strong') +
     '</td></tr>' +
-    '<tr><td style="padding:6px 32px 30px;">' +
-      '<div style="font-family:' + SANS + ';font-size:13px;line-height:1.7;color:' + C.muted + ';">' +
+    '<tr><td class="cwk-card" style="padding:6px 32px 30px;">' +
+      '<div class="cwk-label" style="font-family:' + SANS + ';font-size:13px;line-height:1.7;color:' + C.muted + ';">' +
         'Reply to this email to answer them directly.</div>' +
     '</td></tr>'
   );
