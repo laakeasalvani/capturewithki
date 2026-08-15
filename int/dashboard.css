@@ -75,3 +75,50 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 }
 .s-preview-title{font-family:var(--display);font-weight:400;font-size:18px;margin:26px 0 8px;}
 .s-preview{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px;white-space:pre-wrap;font-family:inherit;font-size:14px;margin:0;}
+
+/* ---------- client galleries ---------- */
+.g-new{border:1px solid var(--line);border-radius:10px;padding:16px;margin:0 0 22px;}
+.g-list{display:flex;flex-direction:column;gap:16px;}
+
+.g-card{border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--paper);}
+.g-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.g-card-title{font-family:var(--display);font-weight:400;font-size:19px;margin:0;}
+.g-status{font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:3px 10px;border-radius:12px;}
+.g-status-draft{background:var(--cream);color:var(--muted);}
+.g-status-live{background:var(--khaki);color:#fff;}
+.g-status-expired{background:#e6d9d6;color:#8a3a2e;}
+
+.g-meta{display:flex;flex-wrap:wrap;gap:18px;margin:12px 0;}
+.g-meta div{min-width:88px;}
+.g-meta dt{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0;}
+.g-meta dd{margin:2px 0 0;font-size:14px;}
+
+.g-link{margin:0 0 12px;}
+.g-link code{font-size:12px;background:var(--cream);padding:4px 8px;border-radius:5px;word-break:break-all;}
+
+/* A file input styled as a button. It stays a real input in the page, tapped
+   directly — the same shape the testimonial form needed, for the same iOS
+   reason: a picker opened after anything else has interrupted the tap is
+   unreliable there. */
+.g-upload-label{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--khaki);color:#fff;border-radius:18px;padding:8px 18px;
+  font-size:14px;cursor:pointer;min-height:44px;box-sizing:border-box;
+}
+.g-upload-label input{display:none;}
+
+.g-progress{height:6px;background:var(--cream);border-radius:3px;overflow:hidden;margin-top:12px;}
+.g-progress-bar{height:100%;width:0;background:var(--khaki);transition:width .2s ease;}
+
+/* The plaintext password is shown once and never again, so it gets a panel
+   rather than a toast that could vanish before she has copied it. */
+.g-password{border:1px solid var(--khaki);border-radius:10px;padding:16px;margin:0 0 18px;background:var(--paper);}
+.g-password-note{margin:0 0 8px;font-size:14px;}
+.g-password-value{margin:0 0 8px;}
+.g-password-value code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:26px;letter-spacing:.14em;background:var(--cream);padding:8px 14px;border-radius:6px;display:inline-block;}
+.g-password-warn{margin:0 0 12px;font-size:13px;color:#8a3a2e;}
+
+@media (max-width:768px){
+  .g-upload-label{width:100%;}
+  .g-card .s-actions button{min-height:44px;}
+}

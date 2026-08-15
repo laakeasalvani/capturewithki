@@ -17,7 +17,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { validateInquiry } from './lib/validate.js';
 import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
 import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
-import { verifyPassword, galleryOpenable, isValidGalleryId } from './lib/gallery-auth.js';
+import { verifyPassword, galleryOpenable, isValidGalleryId, generatePassword, hashPassword } from './lib/gallery-auth.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'netherlyk23@gmail.com';
@@ -243,5 +243,76 @@ export const openGallery = onCall(
         ? gallery.expiresAt.toMillis()
         : null
     };
+  }
+);
+
+// Creating a gallery has to happen here, not in the browser: the password is
+// hashed with scrypt, which the browser cannot do compatibly, and the plaintext
+// must never be written to Firestore. It is returned exactly once, to her.
+async function requireAdmin(request) {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('permission-denied', 'Sign in first.');
+  let snap;
+  try {
+    snap = await db.collection('admins').doc(uid).get();
+  } catch (err) {
+    console.warn('[admin] could not check admin status:', describeError(err));
+    throw new HttpsError('internal', 'Something went wrong. Please try again.');
+  }
+  if (!snap.exists) throw new HttpsError('permission-denied', 'Not allowed.');
+  return uid;
+}
+
+export const createGallery = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    await requireAdmin(request);
+
+    const raw = request.data && request.data.title;
+    const title = (typeof raw === 'string' ? raw : '').trim().slice(0, 120);
+    if (!title) throw new HttpsError('invalid-argument', 'Give the gallery a name.');
+
+    const password = generatePassword();
+    const { hash, salt } = await hashPassword(password);
+
+    const ref = await db.collection('galleries').add({
+      title: title,
+      passwordHash: hash,
+      passwordSalt: salt,
+      status: 'draft',
+      createdAt: FieldValue.serverTimestamp(),
+      sentAt: null,
+      expiresAt: null,
+      photoCount: 0,
+      coverThumb: null
+    });
+
+    // The only time the plaintext exists outside her screen.
+    return { galleryId: ref.id, password: password };
+  }
+);
+
+export const regenerateGalleryPassword = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    await requireAdmin(request);
+
+    const galleryId = typeof (request.data && request.data.galleryId) === 'string'
+      ? request.data.galleryId.trim() : '';
+    if (!isValidGalleryId(galleryId)) {
+      throw new HttpsError('invalid-argument', 'Unknown gallery.');
+    }
+
+    const ref = db.collection('galleries').doc(galleryId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpsError('not-found', 'Unknown gallery.');
+
+    const password = generatePassword();
+    const { hash, salt } = await hashPassword(password);
+    await ref.update({ passwordHash: hash, passwordSalt: salt });
+
+    // Anyone already inside keeps their session until it lapses. Say so rather
+    // than implying the old password is instantly dead everywhere.
+    return { password: password };
   }
 );
