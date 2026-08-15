@@ -12,10 +12,12 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 import { validateInquiry } from './lib/validate.js';
 import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
 import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
+import { verifyPassword, galleryOpenable, isValidGalleryId } from './lib/gallery-auth.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'netherlyk23@gmail.com';
@@ -148,5 +150,98 @@ export const submitInquiry = onCall(
 
     // The inquiry is safely recorded either way, so the visitor sees success.
     return { ok: true };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Client galleries
+//
+// The couple sends a gallery id and a password. Everything that decides
+// whether they get in happens HERE, on the server — the page never sees the
+// hash, never learns whether an id is real, and never decides anything itself.
+//
+// On success this mints a Firebase custom token carrying the claim
+// `gal: <galleryId>`. That token IS the "temporary login": Firestore and
+// Storage rules refuse the gallery's photos to anyone without it, and a token
+// for one gallery grants nothing in any other.
+// ---------------------------------------------------------------------------
+
+// Every failure returns this same message. Saying "expired" or "no such
+// gallery" instead of "wrong password" would confirm to someone probing ids
+// that a gallery is real, which is exactly what probing is trying to learn.
+const GALLERY_DENIED = 'That link or password is not right. Check with Khiara.';
+
+export const openGallery = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    const data = request.data || {};
+    const galleryId = typeof data.galleryId === 'string' ? data.galleryId.trim() : '';
+    const password = typeof data.password === 'string' ? data.password.trim() : '';
+
+    // Checked before touching Firestore: the id becomes a document path and a
+    // token claim, so its shape is not negotiable.
+    if (!isValidGalleryId(galleryId) || !password) {
+      throw new HttpsError('permission-denied', GALLERY_DENIED);
+    }
+
+    // Rate limited on a bucket of its own. Sharing the contact form's bucket
+    // would mean a couple fumbling their password could block a real inquiry,
+    // and a spammer hitting the form could lock a couple out of their photos.
+    const now = Date.now();
+    const ipHash = hashIp('gallery:' + (request.rawRequest && request.rawRequest.ip));
+    try {
+      const limit = await checkRateLimit(db, ipHash, now);
+      if (!limit.allowed) {
+        throw new HttpsError('resource-exhausted', 'Too many tries. Please wait an hour and try again.');
+      }
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      // A rate-limiter failure must not lock a couple out of their own photos.
+      console.warn('[openGallery] rate limit check failed, allowing:', describeError(err));
+    }
+
+    let snap;
+    try {
+      snap = await db.collection('galleries').doc(galleryId).get();
+    } catch (err) {
+      console.warn('[openGallery] could not read gallery:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    const gallery = snap.exists ? snap.data() : null;
+
+    // The password is verified even when the gallery is missing or closed, so
+    // the time taken does not reveal which galleries exist.
+    const salt = (gallery && gallery.passwordSalt) || 'absent-gallery-salt';
+    const hash = (gallery && gallery.passwordHash) || 'f'.repeat(64);
+    const passwordOk = await verifyPassword(password, salt, hash);
+    const openable = galleryOpenable(gallery, now);
+
+    if (!passwordOk || !openable.ok) {
+      console.log('[openGallery] refused:', galleryId, 'password:', passwordOk, 'state:', openable.reason);
+      throw new HttpsError('permission-denied', GALLERY_DENIED);
+    }
+
+    // One Auth identity per gallery rather than one per visitor. Both partners
+    // share the same password, so they are the same principal — and a fresh
+    // uid per visit would fill her Firebase Auth user list with thousands of
+    // one-off accounts. An `admins/{uid}` document never exists for these, so
+    // they can never be mistaken for her.
+    let token;
+    try {
+      token = await getAuth().createCustomToken('gallery_' + galleryId, { gal: galleryId });
+    } catch (err) {
+      console.warn('[openGallery] could not mint token:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    console.log('[openGallery] opened:', galleryId);
+    return {
+      token: token,
+      title: typeof gallery.title === 'string' ? gallery.title : '',
+      expiresAt: gallery.expiresAt && gallery.expiresAt.toMillis
+        ? gallery.expiresAt.toMillis()
+        : null
+    };
   }
 );
