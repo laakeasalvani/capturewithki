@@ -22,6 +22,52 @@
     });
   })();
 </script>
+
+<script>
+  // Instagram's in-app browser served a visitor an old copy of this site.
+  //
+  // GitHub Pages sends `cache-control: max-age=600` on everything and gives us
+  // no way to change that — there is no _headers file, no config, nothing. And
+  // the in-app browsers inside Instagram and Facebook keep their own cache
+  // which does not reliably revalidate when a bio link is tapped. So a stale
+  // copy has nothing to prompt it to update, possibly for days.
+  //
+  // Nothing here can be fixed with cache headers we do not control, so the page
+  // checks for itself: fetch a tiny version file that is never cached, and if
+  // this document is older than what the server has, load it again at a URL the
+  // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
+  // step; they must always match in a commit.
+  (function () {
+    var BUILD = '20260815234307';
+    var KEY = 'cwkStaleReload';
+
+    // Without storage there is no way to remember an attempt, and retrying
+    // blindly risks a reload loop. Doing nothing is strictly better than that.
+    var store;
+    try { store = window.sessionStorage; } catch (e) { return; }
+    if (!store) return;
+
+    // Already tried to refresh away from THIS build and still landed here:
+    // the reload did not help, so stop rather than loop.
+    try { if (store.getItem(KEY) === BUILD) return; } catch (e) { return; }
+
+    if (!window.fetch || !window.URL) return;
+
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || typeof data.v !== 'string' || !data.v) return;
+        if (data.v === BUILD) return;
+        try { store.setItem(KEY, BUILD); } catch (e) { return; }
+        // reload() would very likely be served the same cached document. A URL
+        // the cache has no entry for will not be.
+        var url = new URL(window.location.href);
+        url.searchParams.set('_v', data.v);
+        window.location.replace(url.toString());
+      })
+      .catch(function () { /* offline, blocked, whatever — leave the page alone */ });
+  })();
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CaptureWithKi — Khiara Salvani</title>
