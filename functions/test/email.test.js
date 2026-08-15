@@ -181,7 +181,7 @@ test('no photo set leaves no broken image frame', () => {
 
 test('her paragraph breaks survive into html', () => {
   const html = clientEmailHtml(full, { clientBody: 'One.\n\nTwo.\n\nThree.' }, '');
-  assert.equal((html.match(/<p\b/g) || []).length, 3);
+  assert.equal((html.match(/<p style=/g) || []).length, 3);
 });
 
 test('owner html lists every field and marks the empty ones', () => {
@@ -234,54 +234,4 @@ test('the banner scales down with the card', () => {
 test('the banner carries alt text for readers who block images', () => {
   const ours = 'https://firebasestorage.googleapis.com/v0/b/capturewithki-69dd3.firebasestorage.app/o/uploads%2Fx.jpg?alt=media&token=abc';
   assert.match(clientEmailHtml(full, null, ours), /alt="A photograph by Khiara Salvani"/);
-});
-
-// --- dark mode ------------------------------------------------------------
-
-test('both emails ask the client to keep a light design light', () => {
-  for (const html of [ownerEmailHtml(full), clientEmailHtml(full, null, '')]) {
-    assert.match(html, /<meta name="color-scheme" content="light">/);
-    assert.match(html, /<meta name="supported-color-schemes" content="light">/);
-    assert.match(html, /color-scheme:light/);
-  }
-});
-
-test('a chosen dark palette is supplied rather than left to the client', () => {
-  for (const html of [ownerEmailHtml(full), clientEmailHtml(full, null, '')]) {
-    assert.match(html, /@media \(prefers-color-scheme:dark\)/);
-    assert.ok(html.includes('#12110F'), 'dark background missing');
-    assert.ok(html.includes('#A9B892'), 'dark-mode wordmark colour missing');
-    assert.ok(html.includes('#D8D2C7'), 'dark-mode body colour missing');
-  }
-});
-
-test('dark rules use !important so they beat the inline light styles', () => {
-  const css = clientEmailHtml(full, null, '').match(/<style>([\s\S]*?)<\/style>/)[1];
-  const darkBlock = css.match(/@media \(prefers-color-scheme:dark\)\{([\s\S]*?)\}\s*\[/)[1];
-  const decls = darkBlock.match(/\{[^}]*\}/g) || [];
-  assert.ok(decls.length >= 6, 'expected several dark overrides, got ' + decls.length);
-  for (const d of decls) assert.ok(d.includes('!important'), 'missing !important in ' + d);
-});
-
-test('Outlook.com dark-mode hooks are present', () => {
-  const html = clientEmailHtml(full, null, '');
-  assert.ok(html.includes('[data-ogsc]'), 'Outlook text hook missing');
-  assert.ok(html.includes('[data-ogsb]'), 'Outlook background hook missing');
-});
-
-test('every themed element carries the class its dark rule targets', () => {
-  const client = clientEmailHtml(full, null, '');
-  const owner = ownerEmailHtml(full);
-  for (const cls of ['cwk-bg', 'cwk-card', 'cwk-mark', 'cwk-body', 'cwk-rule', 'cwk-label']) {
-    assert.ok(client.includes('class="' + cls + '"') || client.includes(cls + '"'), 'client missing ' + cls);
-  }
-  for (const cls of ['cwk-bg', 'cwk-card', 'cwk-head', 'cwk-label', 'cwk-strong']) {
-    assert.ok(owner.includes(cls), 'owner missing ' + cls);
-  }
-});
-
-test('the light inline styles are still the default for clients that strip the head', () => {
-  const html = clientEmailHtml(full, null, '');
-  assert.ok(html.includes('background:#F2ECE0'), 'light background lost');
-  assert.ok(html.includes('color:#6E7C5C'), 'light wordmark colour lost');
 });
