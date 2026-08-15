@@ -1,6 +1,7 @@
 import { getField, setField } from './content-store.js';
 import { updateCollectionItem } from './collection-store.js';
 import { onEditingChange } from './auth.js';
+import { sanitizeHtml, initPasteGuard } from './sanitize.js';
 
 // collection name -> currently displayed document id (or null while a
 // collection is still showing fallback data with no real id yet).
@@ -15,7 +16,10 @@ export function setCurrentItem(collection, id) {
 function applyContent(el) {
   const id = el.getAttribute('data-cms-id');
   const value = getField(id, el.__cmsFallback);
-  el.innerHTML = value;
+  // Cleaning on the way out repairs values already stored in Firestore —
+  // several paragraphs carry a pasted-in colour, one of them white against a
+  // cream background — without writing to a live business's content.
+  el.innerHTML = sanitizeHtml(value);
 }
 
 function applyAttr(el) {
@@ -81,6 +85,8 @@ function refreshItemTextClasses() {
 }
 
 export function initTextEditing() {
+  initPasteGuard();
+
   const textFields = document.querySelectorAll('[data-cms-type="text"]');
   const attrFields = document.querySelectorAll('[data-cms-type="attr"]');
   const optionFields = document.querySelectorAll('[data-cms-type="options"]');
@@ -224,7 +230,13 @@ export function initTextEditing() {
       }
 
       const id = el.getAttribute('data-cms-id');
-      setField(id, el.innerHTML)
+      // Safety net behind the paste guard, for styling that arrives some other
+      // way — dragged-in text, an unusual phone keyboard, a browser we have
+      // not seen. Repaint from the cleaned value so she sees the correction
+      // immediately rather than on the next load.
+      const clean = sanitizeHtml(el.innerHTML);
+      if (clean !== el.innerHTML) el.innerHTML = clean;
+      setField(id, clean)
         .then(function () {
           showToast('Saved');
         })
