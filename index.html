@@ -25,6 +25,31 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CaptureWithKi — Khiara Salvani</title>
+<meta name="description" content="Khiara Salvani is a wedding and lifestyle photographer based in Portland, Oregon and available worldwide — weddings, elopements, engagements and portraits, photographed warm, editorial and true to how the day actually felt.">
+
+<!-- Inline SVG so the tab icon can never 404 and needs no binary in the repo.
+     Site colours: khaki #6E7C5C on the cream #F2ECE0. Swap freely. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%236E7C5C'/%3E%3Ctext x='32' y='46' font-family='Georgia,serif' font-style='italic' font-size='40' fill='%23F2ECE0' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%236E7C5C'/%3E%3Ctext x='32' y='46' font-family='Georgia,serif' font-style='italic' font-size='40' fill='%23F2ECE0' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
+
+<!-- Without these, sharing the link on Instagram, iMessage or Facebook shows a
+     bare URL with no photo and no title — for a photographer, the worst place
+     to look unfinished. Absolute URLs are required: scrapers do not resolve
+     relative paths. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CaptureWithKi">
+<meta property="og:url" content="https://capturewithki.com/">
+<meta property="og:title" content="CaptureWithKi — Khiara Salvani">
+<meta property="og:description" content="Wedding and lifestyle photographer in Portland, Oregon and beyond. Weddings, elopements, engagements and portraits.">
+<meta property="og:image" content="https://capturewithki.com/images/home-banner.jpg">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1600">
+<meta property="og:image:alt" content="A couple photographed by Khiara Salvani">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CaptureWithKi — Khiara Salvani">
+<meta name="twitter:description" content="Wedding and lifestyle photographer in Portland, Oregon and beyond.">
+<meta name="twitter:image" content="https://capturewithki.com/images/home-banner.jpg">
+<link rel="canonical" href="https://capturewithki.com/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
@@ -147,6 +172,12 @@ p:last-child{margin-bottom:0;}
   transform:translateY(-100%);transition:transform .55s cubic-bezier(.6,0,.2,1);
 }
 .mobile.open{transform:translateY(0);}
+/* The overlay is z-index 70 and the nav bar was 60, so opening the menu buried
+   the Menu button underneath it: invisible, and clicks landed on the overlay
+   instead. The only ways out were picking a page or pressing Escape, and a
+   phone has no Escape key. Lift the bar above the overlay while it is open. */
+.nav.menu-open{z-index:80;}
+.nav.menu-open .wordmark{color:var(--khaki);}
 .mobile a{font-family:var(--display);font-size:30px;letter-spacing:.04em;text-transform:uppercase;font-weight:300;}
 .mob-drop{display:flex;flex-direction:column;align-items:center;}
 .mob-drop-toggle{font-family:var(--display);font-size:30px;letter-spacing:.04em;text-transform:uppercase;font-weight:300;cursor:pointer;}
@@ -331,6 +362,10 @@ p:last-child{margin-bottom:0;}
 .submit:hover{opacity:.82;}
 .sent{margin-top:20px;font-size:13px;color:var(--ink);display:none;}
 .sent.show{display:block;}
+/* Success and failure used identical styling, so "your inquiry is on its way"
+   and "that email address does not look right" looked the same at a glance. */
+.sent.sent-err{color:#a4342a;}
+.sent.sent-ok{color:var(--khaki);}
 .detail{margin-bottom:30px;}
 .detail .k{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
 .detail .v{font-family:var(--display);font-size:22px;}
@@ -381,6 +416,38 @@ p:last-child{margin-bottom:0;}
   .inv-hero{height:56vh;min-height:360px;}
   .inv-card{margin-top:-60px;}
 }
+/* Touch targets. On a phone the Menu button was 31px tall and the contact
+   fields about 40px, against the 44px both Apple and WCAG ask for. Desktop
+   sizing is left alone — this only applies where a finger is doing the aiming. */
+@media (max-width:768px){
+  .burger{display:inline-flex;align-items:center;min-height:44px;}
+  #contact input,
+  #contact select,
+  #contact textarea{min-height:44px;}
+  #contact .submit{min-height:44px;}
+  .ll-arrow{min-width:44px;min-height:44px;}
+  /* Footer links are 10px type by design. Grow the tappable box with padding
+     rather than the type, so the footer still looks the way it looks. The
+     negative margin keeps the row from growing taller than it did. */
+  .footer nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px;}
+  .footer nav{margin:22px 0 18px;}
+  .footer .social{min-width:44px;min-height:44px;align-items:center;justify-content:center;}
+
+  /* The hero arrows are thin rules by design and measure 29x2px — unhittable
+     with a thumb. The frame thumbnails are 52x34. Rather than resize them and
+     disturb a deliberate layout, overlay an invisible 44px hit area centred on
+     each. Pure gain: nothing moves, nothing looks different. */
+  .strip .arrow,
+  #frames button,
+  .copy a.link{position:relative;}
+  .strip .arrow::after,
+  #frames button::after,
+  .copy a.link::after{
+    content:"";position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    width:max(100%,44px);height:max(100%,44px);
+  }
+}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
 .submit:disabled{opacity:.55;cursor:default;}
 
@@ -406,7 +473,7 @@ p:last-child{margin-bottom:0;}
 <!-- ================= NAV ================= -->
 <header class="nav" id="nav">
   <a href="#" class="wordmark" data-go="home">CaptureWithKi</a>
-  <button class="burger" id="burger" aria-label="Open menu">Menu</button>
+  <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false" aria-controls="mobile">Menu</button>
 </header>
 
 <div class="mobile" id="mobile">
@@ -457,7 +524,10 @@ p:last-child{margin-bottom:0;}
     <div class="split reverse">
       <div class="media frame marked"><img src="images/about-bio-2.jpg" data-cms-id="home.introImage" data-cms-type="image" srcset="images/about-bio-2-mobile.jpg 800w, images/about-bio-2.jpg 1066w" sizes="(max-width:1000px) 100vw, 50vw" width="1066" height="1600" loading="lazy" decoding="async" alt="Khiara Salvani holding her camera in a grassy field"></div>
       <div class="copy">
-        <h2 class="h2" data-cms-id="home.heading" data-cms-type="text">Wedding photographer in Hawai&#699;i and beyond</h2>
+        <!-- h1, not h2: the Home page had no top-level heading at all, which
+             costs it in search results and leaves screen readers without a
+             landmark. Keeps its class and CMS id, so nothing else changes. -->
+        <h1 class="h2" data-cms-id="home.heading" data-cms-type="text">Wedding photographer in Hawai&#699;i and beyond</h1>
         <p data-cms-id="home.paragraph1" data-cms-type="text">I photograph weddings as living, breathing stories &mdash; not staged perfection, but composed moments shaped by light, emotion, and attention. My work leans editorial and warm at once: fashion-inspired framing, real feeling underneath.</p>
         <p data-cms-id="home.paragraph2" data-cms-type="text">I love modern celebrations, thoughtful details, and couples who care about how the day looks as much as how it felt.</p>
         <a href="#" class="link" data-go="about">Learn more</a>
@@ -883,14 +953,18 @@ p:last-child{margin-bottom:0;}
         <div class="frame marked" style="aspect-ratio:4/5;margin-top:38px;"><img src="images/contact-photo.jpg" alt="" data-cms-id="contact.photo" data-cms-type="image"></div>
       </div>
 
-      <div>
+      <!-- A real form element, so pressing Enter in any field sends it the way people
+           expect. novalidate keeps the browser's own bubbles out of the way of
+           the wording written for visitors below. autocomplete lets a phone
+           offer the details it already knows. -->
+      <form id="inqForm" novalidate>
         <div class="row">
-          <div class="field"><label for="n1" data-cms-id="contact.label.n1" data-cms-type="text">Your name</label><input id="n1" type="text" placeholder="First and last" data-cms-id="contact.ph.n1" data-cms-type="attr" data-cms-attr="placeholder"></div>
-          <div class="field"><label for="n2" data-cms-id="contact.label.n2" data-cms-type="text">Partner&#8217;s name</label><input id="n2" type="text" placeholder="Optional" data-cms-id="contact.ph.n2" data-cms-type="attr" data-cms-attr="placeholder"></div>
+          <div class="field"><label for="n1" data-cms-id="contact.label.n1" data-cms-type="text">Your name</label><input id="n1" type="text" autocomplete="name" placeholder="First and last" data-cms-id="contact.ph.n1" data-cms-type="attr" data-cms-attr="placeholder"></div>
+          <div class="field"><label for="n2" data-cms-id="contact.label.n2" data-cms-type="text">Partner&#8217;s name</label><input id="n2" type="text" autocomplete="off" placeholder="Optional" data-cms-id="contact.ph.n2" data-cms-type="attr" data-cms-attr="placeholder"></div>
         </div>
         <div class="row">
-          <div class="field"><label for="em" data-cms-id="contact.label.em" data-cms-type="text">Email</label><input id="em" type="email" placeholder="you@email.com" data-cms-id="contact.ph.em" data-cms-type="attr" data-cms-attr="placeholder"></div>
-          <div class="field"><label for="ph" data-cms-id="contact.label.ph" data-cms-type="text">Phone</label><input id="ph" type="tel" placeholder="(808) 555-0123" data-cms-id="contact.ph.ph" data-cms-type="attr" data-cms-attr="placeholder"></div>
+          <div class="field"><label for="em" data-cms-id="contact.label.em" data-cms-type="text">Email</label><input id="em" type="email" autocomplete="email" inputmode="email" placeholder="you@email.com" data-cms-id="contact.ph.em" data-cms-type="attr" data-cms-attr="placeholder"></div>
+          <div class="field"><label for="ph" data-cms-id="contact.label.ph" data-cms-type="text">Phone</label><input id="ph" type="tel" autocomplete="tel" inputmode="tel" placeholder="(808) 555-0123" data-cms-id="contact.ph.ph" data-cms-type="attr" data-cms-attr="placeholder"></div>
         </div>
         <div class="field"><label for="dt" data-cms-id="contact.label.dt" data-cms-type="text">Do you have a date in mind?</label><input id="dt" type="date"></div>
         <div class="field">
@@ -914,7 +988,7 @@ p:last-child{margin-bottom:0;}
         <div class="hp" aria-hidden="true"><label for="cwk-ref">Reference</label><input id="cwk-ref" name="cwk-ref" type="text" tabindex="-1" autocomplete="off"></div>
         <button class="submit" id="send" data-cms-id="contact.submit" data-cms-type="text">Send inquiry</button>
         <p class="sent" id="sent" aria-live="polite"></p>
-      </div>
+      </form>
     </div>
   </div>
 </section>
@@ -990,7 +1064,8 @@ p:last-child{margin-bottom:0;}
       var el = document.getElementById(opts.anchor);
       if(el) setTimeout(function(){ el.scrollIntoView({behavior:'smooth'}); }, 70);
     }
-    mobile.classList.remove('open');
+    // go() runs before setMenu is defined on first load, hence the guard.
+    if(window.__setMenu) window.__setMenu(false); else mobile.classList.remove('open');
     updateNav();
   }
 
@@ -1003,8 +1078,28 @@ p:last-child{margin-bottom:0;}
     });
   });
 
-  document.getElementById('burger').addEventListener('click', function(){
-    mobile.classList.toggle('open');
+  var burger = document.getElementById('burger');
+
+  // One place that knows how the menu looks when open, so the button, the bar's
+  // stacking and the accessibility state cannot drift apart. go() closes the
+  // menu when a page is chosen and calls this too.
+  function setMenu(open){
+    mobile.classList.toggle('open', open);
+    nav.classList.toggle('menu-open', open);
+    burger.textContent = open ? 'Close' : 'Menu';
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    burger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
+  window.__setMenu = setMenu;
+
+  burger.addEventListener('click', function(){
+    setMenu(!mobile.classList.contains('open'));
+  });
+
+  // There was no Escape handler at all, so with the button buried the only way
+  // out of the menu was to pick a page.
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && mobile.classList.contains('open')) setMenu(false);
   });
 
   document.getElementById('invToggle').addEventListener('click', function(){
@@ -1075,33 +1170,44 @@ p:last-child{margin-bottom:0;}
   var formRenderedAt = Date.now();
   var sendBtn = document.getElementById('send');
 
-  sendBtn.addEventListener('click', function(){
+  // Bound to the form's submit rather than the button's click, so pressing
+  // Enter in any field works too. The button is inside the form and has no
+  // explicit type, so it submits \u2014 one code path, no double sends.
+  document.getElementById('inqForm').addEventListener('submit', function(e){
+    e.preventDefault();
     var note = document.getElementById('sent');
+
+    // Success and failure used to look identical. Colour them apart.
+    function say(message, isError){
+      note.textContent = message;
+      note.classList.add('show');
+      note.classList.toggle('sent-err', !!isError);
+      note.classList.toggle('sent-ok', !isError);
+    }
+
     var name = document.getElementById('n1').value.trim();
     var mail = document.getElementById('em').value.trim();
     var phone = document.getElementById('ph').value.trim();
 
     if(!name || !mail || !phone){
-      note.textContent = 'Add your name, email, and phone so Khiara can reply.';
-      note.classList.add('show');
+      say('Add your name, email, and phone so Khiara can reply.', true);
+      document.getElementById(!name ? 'n1' : (!mail ? 'em' : 'ph')).focus();
       return;
     }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){
-      note.textContent = 'That email address does not look right.';
-      note.classList.add('show');
+      say('That email address does not look right.', true);
+      document.getElementById('em').focus();
       return;
     }
     // cms/inquiry.js defines this. If the Firebase CDN was unreachable the
-    // module never ran, and clicking Send would otherwise throw silently.
+    // module never ran, and sending would otherwise throw silently.
     if(typeof window.cmsSubmitInquiry !== 'function'){
-      note.textContent = 'The form is not available right now. Please email netherlyk23@gmail.com directly.';
-      note.classList.add('show');
+      say('The form is not available right now. Please email netherlyk23@gmail.com directly.', true);
       return;
     }
 
     sendBtn.disabled = true;
-    note.textContent = 'Sending\u2026';
-    note.classList.add('show');
+    say('Sending\u2026', false);
 
     window.cmsSubmitInquiry({
       name: name,
@@ -1114,7 +1220,7 @@ p:last-child{margin-bottom:0;}
       honeypot: document.getElementById('cwk-ref').value,
       renderedAt: formRenderedAt
     }).then(function(){
-      note.textContent = 'Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.';
+      say('Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.', false);
       document.getElementById('n1').value = '';
       document.getElementById('n2').value = '';
       document.getElementById('em').value = '';
@@ -1126,9 +1232,9 @@ p:last-child{margin-bottom:0;}
       // Anything else (network, CORS, function not deployed) yields a terse
       // SDK string like "internal", which would read as gibberish.
       var friendly = { 'functions/invalid-argument': 1, 'functions/resource-exhausted': 1 };
-      note.textContent = (err && friendly[err.code] && err.message)
+      say((err && friendly[err.code] && err.message)
         ? err.message
-        : 'Something went wrong sending your inquiry. Please email netherlyk23@gmail.com directly.';
+        : 'Something went wrong sending your inquiry. Please email netherlyk23@gmail.com directly.', true);
     }).then(function(){
       sendBtn.disabled = false;
     });

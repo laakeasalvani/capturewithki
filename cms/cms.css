@@ -9,6 +9,17 @@
 .cms-gear:hover{opacity:1;color:var(--khaki);}
 .cms-gear.cms-admin{color:var(--khaki);opacity:.9;}
 
+/* The gear was an 11px target — the thing Khiara has to hit before she can do
+   anything at all on her phone. Grow the tappable box, not the icon: it stays
+   just as quiet to a visitor, and the negative margin keeps the footer credit
+   line from shifting. */
+@media (max-width:768px){
+  .cms-gear{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:44px;min-height:44px;margin:-14px 0 -14px 2px;vertical-align:middle;
+  }
+}
+
 .cms-modal-backdrop{
   position:fixed;inset:0;background:rgba(23,22,20,.5);
   display:none;align-items:center;justify-content:center;z-index:600;
