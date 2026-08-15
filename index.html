@@ -12,6 +12,14 @@
     // 2-second version did exactly that, revealing the cached old photo
     // whenever Firestore took longer than two seconds.
     setTimeout(function () { d.classList.remove('cms-pending'); }, 12000);
+
+    // No right-click / long-press "Save image" menu on photos. Scoped to IMG
+    // so a visitor can still long-press the phone number or email to copy it.
+    // Lives here, in plain inline code, so it survives the CMS modules failing
+    // to load at all — the same case the timer above exists for.
+    document.addEventListener('contextmenu', function (e) {
+      if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+    });
   })();
 </script>
 <meta charset="utf-8">
@@ -62,6 +70,17 @@ body::after{
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 img{display:block;width:100%;height:100%;object-fit:cover;}
+/* Photos are not casually savable. -webkit-touch-callout suppresses the iOS
+   long-press "Save Image" sheet; user-drag stops dragging a photo off the page
+   on a desktop; user-select stops Android's long-press selection reaching it.
+   None of this defeats a screenshot or a direct URL — it removes the one
+   gesture almost everyone would use. Paired with the contextmenu handler in
+   the head script. */
+img{-webkit-touch-callout:none;-webkit-user-drag:none;-webkit-user-select:none;user-select:none;}
+/* Edit mode drags these tiles to reorder, and -webkit-user-drag:none on a
+   child can block a drag that starts on it. Put the images back exactly where
+   cms/collection-ui.js already leaves them (draggable="false"). */
+.cms-collection-tile img{-webkit-user-drag:auto;}
 a{color:inherit;text-decoration:none;}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;}
 
