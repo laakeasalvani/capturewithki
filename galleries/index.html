@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your gallery — CaptureWithKi</title>
+<!-- A private page. Keep it out of search results entirely. -->
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%236E7C5C'/%3E%3Ctext x='32' y='46' font-family='Georgia,serif' font-style='italic' font-size='40' fill='%23F2ECE0' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gallery.css">
+</head>
+<body>
+
+<header class="g-head">
+  <a class="g-wordmark" href="/">CaptureWithKi</a>
+</header>
+
+<main id="gMain">
+  <!-- No link at all: someone typed the address by hand. -->
+  <section id="gNoLink" class="g-panel" hidden>
+    <h1 class="g-title">Your gallery</h1>
+    <p class="g-copy">This page needs the private link Khiara sent you. If you
+      cannot find it, reply to her email and she will send it again.</p>
+  </section>
+
+  <!-- The password gate. -->
+  <section id="gLock" class="g-panel" hidden>
+    <h1 class="g-title">Your gallery</h1>
+    <p class="g-copy">Enter the password Khiara gave you.</p>
+    <form id="gForm" novalidate>
+      <label class="g-label" for="gPassword">Password</label>
+      <input id="gPassword" type="text" inputmode="text" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" maxlength="64">
+      <button type="submit" id="gEnter" class="g-btn">Open my gallery</button>
+      <p class="g-note" id="gError" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <!-- The photos. -->
+  <section id="gGallery" hidden>
+    <div class="g-gallery-head">
+      <h1 class="g-title" id="gName">Your gallery</h1>
+      <p class="g-copy" id="gMeta"></p>
+    </div>
+    <div class="g-grid" id="gGrid"></div>
+    <p class="g-note" id="gGridNote" aria-live="polite"></p>
+  </section>
+</main>
+
+<!-- One photo, larger, with its download button. -->
+<div class="g-viewer" id="gViewer" hidden>
+  <button type="button" class="g-viewer-close" id="gClose" aria-label="Close">&#10005;</button>
+  <button type="button" class="g-viewer-nav g-prev" id="gPrev" aria-label="Previous photo">&#8592;</button>
+  <img id="gViewerImg" alt="">
+  <button type="button" class="g-viewer-nav g-next" id="gNext" aria-label="Next photo">&#8594;</button>
+  <div class="g-viewer-bar">
+    <span class="g-viewer-count" id="gCount"></span>
+    <a class="g-btn g-download" id="gDownload" download>Download this photo</a>
+  </div>
+</div>
+
+<script type="module" src="gallery.js"></script>
+</body>
+</html>
