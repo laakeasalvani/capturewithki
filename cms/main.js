@@ -6,6 +6,7 @@ import { initHero } from './hero.js';
 import { initPortfolio } from './portfolio.js';
 import { initFilmstrip } from './filmstrip.js';
 import { initTestimonials } from './testimonials.js';
+import { initRetries } from './reveal.js';
 
 (async function () {
   await loadSiteContent();
@@ -67,31 +68,18 @@ import { initTestimonials } from './testimonials.js';
   });
 
   // The CMS has now set the real photo sources, but setting a src is not the
-  // same as the photo being on screen — a 2MB upload can still be a second or
-  // two from arriving. Lifting the guard at that moment reveals whatever the
-  // browser already has in cache, which is the OLD photo. So wait for the
-  // visible hero image to genuinely finish loading before revealing anything.
-  await revealWhenHeroIsReady();
-
-  async function revealWhenHeroIsReady() {
-    const img = document.querySelector('.hero .slide.on img');
-    const done = function () {
-      document.documentElement.classList.remove('cms-pending');
-    };
-
-    // Nothing to wait for, or it is already decoded.
-    if (!img || (img.complete && img.naturalWidth > 0)) { done(); return; }
-
-    await new Promise(function (resolve) {
-      let settled = false;
-      const finish = function () { if (!settled) { settled = true; resolve(); } };
-      // 'error' resolves too: a broken photo should still reveal the page
-      // rather than leave a visitor staring at an empty hero.
-      img.addEventListener('load', finish, { once: true });
-      img.addEventListener('error', finish, { once: true });
-      // Cap the wait so a stalled download cannot hold the page hostage.
-      setTimeout(finish, 8000);
-    });
-    done();
-  }
+  // Hand over from the one global flag to per-image hiding.
+  //
+  // `cms-pending` hides every managed photo at once, and it used to be dropped
+  // when the HERO finished loading — which revealed everything else on the
+  // hero's schedule rather than its own. Any photo whose real source had not
+  // arrived yet then painted the placeholder from index.html and flipped to
+  // Khiara's a moment later. That was the flash.
+  //
+  // By the time we get here every module above has already pointed its images
+  // at their real sources through cms/reveal.js, so each one now carries its
+  // own `cms-img-pending` and will uncover itself when ITS photo has painted.
+  // Dropping the global flag therefore uncovers nothing that is not ready.
+  initRetries();
+  document.documentElement.classList.remove('cms-pending');
 })();

@@ -3,6 +3,7 @@ import { auth } from '../cms/firebase.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
 import { initInquiries } from './inquiries.js';
 import { initSettings } from './settings.js';
+import { initGalleries } from './galleries.js';
 
 const loading = document.getElementById('dashLoading');
 const loginView = document.getElementById('dashLogin');
@@ -15,10 +16,12 @@ const submitBtn = form.querySelector('button[type="submit"]');
 
 const screens = {
   inquiries: document.getElementById('screenInquiries'),
+  galleries: document.getElementById('screenGalleries'),
   settings: document.getElementById('screenSettings')
 };
 const tabs = {
   inquiries: document.getElementById('tabInquiries'),
+  galleries: document.getElementById('tabGalleries'),
   settings: document.getElementById('tabSettings')
 };
 
@@ -37,6 +40,7 @@ function selectTab(name) {
 }
 
 tabs.inquiries.addEventListener('click', function () { selectTab('inquiries'); });
+tabs.galleries.addEventListener('click', function () { selectTab('galleries'); });
 tabs.settings.addEventListener('click', function () { selectTab('settings'); });
 
 form.addEventListener('submit', function (e) {
@@ -77,6 +81,7 @@ function paint() {
     if (!started) {
       started = true;
       initInquiries(screens.inquiries);
+      initGalleries(screens.galleries);
       initSettings(screens.settings);
     }
     return;

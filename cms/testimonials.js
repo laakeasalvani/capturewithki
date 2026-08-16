@@ -3,6 +3,7 @@ import { uploadImage } from './edit-image.js';
 import { onEditingChange } from './auth.js';
 import { setCurrentItem } from './edit-text.js';
 import { showToast, hideToast } from './toast.js';
+import { showWhenLoaded } from './reveal.js';
 
 const COLLECTION = 'testimonials';
 const FALLBACK = [
@@ -48,7 +49,7 @@ function renderLL() {
   llQuote.style.opacity = 0;
   llWho.style.opacity = 0;
   setTimeout(function () {
-    llImg.src = d.img;
+    showWhenLoaded(llImg, d.img);
     llQuote.textContent = d.quote;
     llWho.textContent = d.who.toUpperCase();
     llCount.textContent = (index + 1) + ' / ' + items.length;

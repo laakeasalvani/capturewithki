@@ -31,6 +31,33 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Client galleries.
+    //
+    // The gallery document is NOT publicly readable. It holds passwordHash and
+    // passwordSalt, and a public read would also let someone probe ids to learn
+    // which galleries exist. The couple's page never reads it directly — the
+    // openGallery function returns the title only after checking the password.
+    //
+    // `gal` is a claim on the custom token that function mints. Unlike the
+    // Storage rules, expiry IS re-checked here: this is a single document read
+    // rather than one per photo, so it is cheap enough to be worth doing.
+    match /galleries/{galleryId} {
+      allow read: if isAdmin() ||
+        (request.auth != null
+         && request.auth.token.gal == galleryId
+         && resource.data.status == 'live'
+         && resource.data.expiresAt > request.time);
+      allow write: if isAdmin();
+
+      // Photo records carry no secrets, so the token claim alone is the gate
+      // here. The files themselves are governed by storage.rules.
+      match /photos/{photoId} {
+        allow read: if isAdmin() ||
+          (request.auth != null && request.auth.token.gal == galleryId);
+        allow write: if isAdmin();
+      }
+    }
+
     // Inquiries hold client contact details, so unlike the CMS collections
     // they are NOT publicly readable. Only the Cloud Function creates them,
     // via the Admin SDK, which bypasses these rules.

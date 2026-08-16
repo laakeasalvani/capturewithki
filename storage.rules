@@ -1,10 +1,34 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAdmin() {
+      return request.auth != null &&
+        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    // Website photos: public on purpose. That is how a browser shows them.
     match /uploads/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null &&
-        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+      allow write: if isAdmin();
+    }
+
+    // Client galleries, deliberately NOT under uploads/ — everything there is
+    // world-readable, and a password in front of publicly addressable files
+    // would be theatre.
+    //
+    // `gal` is a claim on a custom token that openGallery mints only after
+    // checking the password, that the gallery is live, and that it has not
+    // expired. A token for one gallery grants nothing in any other.
+    //
+    // Expiry is deliberately NOT re-checked here: it would cost a Firestore
+    // read per file, and an 800-photo gallery would pay 800 of them per view.
+    // The scheduled cleanup deletes the files at expiry, so a refreshed token
+    // ends up authorised to read nothing. Deletion is the enforcement; this is
+    // the gate.
+    match /galleries/{galleryId}/{allPaths=**} {
+      allow read: if isAdmin() ||
+        (request.auth != null && request.auth.token.gal == galleryId);
+      allow write: if isAdmin();
     }
   }
 }

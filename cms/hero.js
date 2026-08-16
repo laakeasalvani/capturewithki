@@ -2,6 +2,7 @@ import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem
 import { makeCollectionEditable } from './collection-ui.js';
 import { uploadImage } from './edit-image.js';
 import { onEditingChange } from './auth.js';
+import { showWhenLoaded } from './reveal.js';
 
 const COLLECTION = 'heroSlides';
 const FALLBACK = [
@@ -35,7 +36,7 @@ function render() {
     const slide = document.createElement('div');
     slide.className = 'slide';
     const img = document.createElement('img');
-    img.src = item.src;
+    showWhenLoaded(img, item.src);
     img.alt = item.alt || '';
     img.style.objectPosition = item.objectPosition || '50% 50%';
     slide.appendChild(img);
@@ -49,7 +50,8 @@ function render() {
     const thumb = document.createElement('button');
     thumb.type = 'button';
     thumb.setAttribute('aria-label', 'Frame ' + (i + 1));
-    thumb.innerHTML = '<img alt="" src="' + item.src + '">';
+    thumb.innerHTML = '<img alt="">';
+    showWhenLoaded(thumb.querySelector('img'), item.src);
     thumb.addEventListener('click', function () { show(i); auto(); });
     holder.appendChild(thumb);
     framesEl.appendChild(holder);

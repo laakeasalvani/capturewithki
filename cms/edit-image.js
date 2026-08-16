@@ -2,6 +2,7 @@ import { storage } from './firebase.js';
 import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js';
 import { getField, setField } from './content-store.js';
 import { onEditingChange } from './auth.js';
+import { showWhenLoaded, showAsIs } from './reveal.js';
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const MAX_EDGE = 6000;
@@ -76,9 +77,18 @@ export async function uploadImage(file, pathPrefix) {
 function applyImage(img) {
   const id = img.getAttribute('data-cms-id');
   const value = getField(id, img.__cmsFallback);
-  img.src = value;
+
   if (value !== img.__cmsFallback) {
+    // srcset would otherwise win over the src we are about to set, and the
+    // browser would keep showing the markup's photo.
     img.removeAttribute('srcset');
+    // Hidden until THIS photo has painted. Revealing on the hero's schedule
+    // is what let the placeholder flash first.
+    showWhenLoaded(img, value);
+  } else {
+    // No CMS override: the markup's own photo is the current one.
+    img.src = value;
+    showAsIs(img);
   }
 }
 
