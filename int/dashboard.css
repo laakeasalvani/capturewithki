@@ -122,3 +122,17 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
   .g-upload-label{width:100%;}
   .g-card .s-actions button{min-height:44px;}
 }
+
+.q-toolbar{margin:0 0 16px;}
+.q-toggle{
+  background:none;border:1px solid var(--line);border-radius:18px;
+  padding:7px 16px;font-family:inherit;font-size:13px;color:var(--muted);cursor:pointer;
+}
+.q-toggle:hover{border-color:var(--khaki);color:var(--khaki);}
+.q-archive{
+  background:none;border:1px solid var(--line);border-radius:16px;
+  padding:6px 14px;font-family:inherit;font-size:13px;color:var(--muted);cursor:pointer;
+}
+.q-archive:hover{border-color:var(--khaki);color:var(--khaki);}
+.q-archive:disabled{opacity:.5;cursor:default;}
+@media (max-width:768px){ .q-toggle,.q-archive{min-height:44px;} }

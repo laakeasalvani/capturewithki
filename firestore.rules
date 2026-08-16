@@ -71,9 +71,15 @@ service cloud.firestore {
       allow create, delete: if false;
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data)
-             .affectedKeys().hasOnly(['status', 'notes'])
+             .affectedKeys().hasOnly(['status', 'notes', 'archived'])
         && (!('status' in request.resource.data)
             || request.resource.data.status in ['new', 'replied'])
+        // Archiving is a separate flag, not a third status: an inquiry can be
+        // archived AND still show she replied to it. Folding it into status
+        // would erase that. Nothing here can delete an inquiry — `delete` is
+        // still false above, so archiving only hides it from the default view.
+        && (!('archived' in request.resource.data)
+            || request.resource.data.archived is bool)
         && (!('notes' in request.resource.data)
             || (request.resource.data.notes is string
                 && request.resource.data.notes.size() <= 5000));

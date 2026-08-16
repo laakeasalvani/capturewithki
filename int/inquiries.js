@@ -35,18 +35,35 @@ function render() {
     return;
   }
 
-  const failed = items.filter(function (i) {
+  const archivedCount = items.filter(function (i) { return i.archived === true; }).length;
+  const visible = items.filter(function (i) {
+    return showArchived ? i.archived === true : i.archived !== true;
+  });
+
+  const failed = visible.filter(function (i) {
     return i.emailError || i.emailToOwnerSent === false;
   });
 
   let html = '';
+  if (archivedCount || showArchived) {
+    html += '<div class="q-toolbar">' +
+      '<button type="button" class="q-toggle" id="qToggleArchived">' +
+      (showArchived ? '\u2190 Back to inquiries' : 'Show archived (' + archivedCount + ')') +
+      '</button></div>';
+  }
+  if (showArchived && !visible.length) {
+    html += '<p class="q-empty">Nothing archived yet.</p>';
+  }
+  if (!showArchived && !visible.length && items.length) {
+    html += '<p class="q-empty">No active inquiries — everything is archived.</p>';
+  }
   if (failed.length) {
     html += '<div class="q-warn"><strong>' + failed.length +
       (failed.length === 1 ? ' inquiry' : ' inquiries') +
       ' may not have reached your inbox.</strong> They are saved here safely — the email notification failed, so check these even if you never saw an email.</div>';
   }
 
-  items.forEach(function (i) {
+  visible.forEach(function (i) {
     const who = i.partnerName ? esc(i.name) + ' &amp; ' + esc(i.partnerName) : esc(i.name);
     const isNew = i.status !== 'replied';
     html +=
@@ -65,6 +82,9 @@ function render() {
         '</dl>' +
         '<p class="q-message">' + orNone(i.message) + '</p>' +
         '<div class="q-actions">' +
+          '<button type="button" class="q-archive s-secondary" data-id="' + esc(i.id) + '">' +
+            (i.archived ? 'Unarchive' : 'Archive') +
+          '</button>' +
           '<button type="button" class="q-status" data-id="' + esc(i.id) + '">' +
             (isNew ? 'Mark replied' : 'Mark unreplied') +
           '</button>' +
@@ -95,6 +115,10 @@ async function load() {
   }
 }
 
+// Archived inquiries are hidden, never deleted — the rules still forbid
+// deleting an inquiry entirely. This only controls what the list shows.
+let showArchived = false;
+
 function flash(id, text) {
   const el = root.querySelector('[data-saved="' + id + '"]');
   if (!el) return;
@@ -106,7 +130,31 @@ function flash(id, text) {
 export function initInquiries(container) {
   root = container;
 
+  root.addEventListener('click', function (e) {
+    if (!e.target.closest('#qToggleArchived')) return;
+    showArchived = !showArchived;
+    render();
+  });
+
   root.addEventListener('click', async function (e) {
+    const arc = e.target.closest('.q-archive');
+    if (arc) {
+      const id = arc.getAttribute('data-id');
+      const item = items.filter(function (i) { return i.id === id; })[0];
+      if (!item) return;
+      const next = !(item.archived === true);
+      arc.disabled = true;
+      try {
+        await updateDoc(doc(db, 'inquiries', id), { archived: next });
+        item.archived = next;
+        render();
+      } catch (err) {
+        flash(id, 'Could not save: ' + (err && (err.code || err.message)));
+        arc.disabled = false;
+      }
+      return;
+    }
+
     const btn = e.target.closest('.q-status');
     if (!btn) return;
     const id = btn.getAttribute('data-id');
