@@ -9,15 +9,18 @@
 // detected)" and silently does nothing. Verify with `firebase functions:list`
 // after any runtime change rather than trusting the deploy output.
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
 
 import { validateInquiry } from './lib/validate.js';
 import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
 import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
 import { verifyPassword, galleryOpenable, isValidGalleryId, generatePassword, hashPassword } from './lib/gallery-auth.js';
+import { dueGalleries } from './lib/gallery-expiry.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'netherlyk23@gmail.com';
@@ -314,5 +317,75 @@ export const regenerateGalleryPassword = onCall(
     // Anyone already inside keeps their session until it lapses. Say so rather
     // than implying the old password is instantly dead everywhere.
     return { password: password };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Expiry cleanup
+//
+// Runs daily. Finds galleries whose moment has passed, deletes their photo
+// files and photo records, and marks the gallery expired. The gallery record
+// itself survives so her list keeps a history of what she sent and when.
+//
+// This function DELETES A CLIENT'S PHOTOS. Everything below is written to fail
+// closed: anything it cannot read confidently is skipped rather than guessed
+// at, and one gallery going wrong must not stop the others.
+// ---------------------------------------------------------------------------
+export const cleanupExpiredGalleries = onSchedule(
+  { region: 'us-west1', schedule: 'every day 03:00', timeZone: 'Pacific/Honolulu' },
+  async () => {
+    const now = Date.now();
+
+    let snap;
+    try {
+      // Only live ones are candidates. Filtering here rather than in code keeps
+      // the read small as her history grows.
+      snap = await db.collection('galleries').where('status', '==', 'live').get();
+    } catch (err) {
+      console.error('[cleanup] could not list galleries:', describeError(err));
+      return;
+    }
+
+    const all = [];
+    snap.forEach(function (d) { all.push(Object.assign({ id: d.id }, d.data())); });
+    const due = dueGalleries(all, now);
+
+    console.log('[cleanup] live galleries:', all.length, 'due:', due.length);
+    if (!due.length) return;
+
+    const bucket = getStorage().bucket();
+
+    for (const g of due) {
+      try {
+        // The files first. If this fails we do NOT mark the gallery expired,
+        // so the next run tries again rather than leaving orphaned files
+        // nobody will ever find or pay attention to.
+        await bucket.deleteFiles({ prefix: 'galleries/' + g.id + '/', force: true });
+
+        // Then the photo records, in batches — a wedding gallery can hold
+        // hundreds and a single batch is capped at 500 writes.
+        const photos = await db.collection('galleries').doc(g.id).collection('photos').get();
+        let batch = db.batch();
+        let n = 0;
+        for (const doc of photos.docs) {
+          batch.delete(doc.ref);
+          n++;
+          if (n % 400 === 0) { await batch.commit(); batch = db.batch(); }
+        }
+        if (n % 400 !== 0) await batch.commit();
+
+        await db.collection('galleries').doc(g.id).update({
+          status: 'expired',
+          photoCount: 0,
+          coverThumb: null,
+          expiredAt: FieldValue.serverTimestamp()
+        });
+
+        console.log('[cleanup] expired gallery', g.id, '—', n, 'photos removed');
+      } catch (err) {
+        // One bad gallery must not stop the rest.
+        console.error('[cleanup] failed for gallery', g.id, describeError(err));
+      }
+    }
   }
 );

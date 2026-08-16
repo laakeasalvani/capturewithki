@@ -1,5 +1,9 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+// toMillis lives in gallery-expiry.js because the browser imports that file and
+// must never pull in node:crypto through it.
+import { toMillis } from './gallery-expiry.js';
+export { toMillis };
 
 const scrypt = promisify(scryptCb);
 
@@ -81,26 +85,6 @@ export function galleryOpenable(gallery, now) {
   return { ok: true, reason: 'ok' };
 }
 
-// Firestore hands back a Timestamp; tests and older records may hold a Date or
-// a number. Anything else is treated as absent rather than coerced, so a
-// malformed value fails closed instead of becoming NaN or 1970.
-export function toMillis(value) {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (value instanceof Date) {
-    const t = value.getTime();
-    return Number.isFinite(t) ? t : null;
-  }
-  if (typeof value.toMillis === 'function') {
-    const t = value.toMillis();
-    return Number.isFinite(t) ? t : null;
-  }
-  if (typeof value.toDate === 'function') {
-    const d = value.toDate();
-    return d instanceof Date && Number.isFinite(d.getTime()) ? d.getTime() : null;
-  }
-  return null;
-}
 
 // A gallery id arrives from a query string, so it is attacker-controlled. It
 // is used to build a Firestore path and is embedded in a token claim, so it is

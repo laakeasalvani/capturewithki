@@ -4,6 +4,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js';
 import { uploadGalleryPhoto, nextPhotoOrder } from './gallery-upload.js';
+import { defaultExpiry, validateExpiry, daysLeft, DEFAULT_DAYS } from '../functions/lib/gallery-expiry.js';
 
 const fns = getFunctions(app, 'us-west1');
 const createGalleryFn = httpsCallable(fns, 'createGallery');
@@ -22,6 +23,24 @@ function fmtDate(ts) {
   const d = typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
   if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// <input type="date"> speaks yyyy-mm-dd in LOCAL time. Converting through
+// toISOString() would shift the day for anyone west of UTC — which is everyone
+// here — so the parts are read and written explicitly.
+function toDateInput(ms) {
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+// End of the chosen day, so a gallery set to expire "on the 30th" is usable
+// all through the 30th rather than dying at midnight as it begins.
+function fromDateInput(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999);
+  return isNaN(d.getTime()) ? null : d.getTime();
 }
 
 function galleryLink(id) {
@@ -125,7 +144,10 @@ export function initGalleries(container) {
         '<div><dt>Photos</dt><dd class="g-count">' + (g.photoCount || 0) + '</dd></div>' +
         '<div><dt>Created</dt><dd>' + fmtDate(g.createdAt) + '</dd></div>' +
         '<div><dt>Sent</dt><dd>' + fmtDate(g.sentAt) + '</dd></div>' +
-        '<div><dt>Expires</dt><dd>' + fmtDate(g.expiresAt) + '</dd></div>' +
+        '<div><dt>Expires</dt><dd>' + fmtDate(g.expiresAt) +
+          (g.status === 'live' && g.expiresAt
+            ? ' <span class="g-days">(' + daysLeft(g.expiresAt, Date.now()) + ' days left)</span>'
+            : '') + '</dd></div>' +
       '</dl>' +
       '<p class="g-link"><code>' + esc(galleryLink(g.id)) + '</code></p>' +
       '<div class="s-actions">' +
@@ -133,6 +155,9 @@ export function initGalleries(container) {
           '<input type="file" class="g-upload" accept="image/*" multiple>' +
         '</label>' +
         '<button type="button" class="g-copy s-secondary">Copy link</button>' +
+        (g.status === 'live'
+          ? '<button type="button" class="g-extend s-secondary">Change end date</button>'
+          : '<button type="button" class="g-send">Send to couple</button>') +
         '<button type="button" class="g-newpw s-secondary">New password</button>' +
         '<button type="button" class="g-delete s-secondary">Delete</button>' +
         '<span class="s-status g-card-status" aria-live="polite"></span>' +
@@ -190,6 +215,55 @@ export function initGalleries(container) {
         await render();
       } catch (err) {
         flash(status, 'Could not delete it: ' + (err && (err.code || err.message)));
+      }
+    });
+
+    const sendBtn = card.querySelector('.g-send');
+    if (sendBtn) sendBtn.addEventListener('click', async function () {
+      if (!(g.photoCount > 0) &&
+          !confirm('This gallery has no photos yet. Send it anyway?')) return;
+
+      const suggested = toDateInput(defaultExpiry(Date.now()));
+      const answer = prompt(
+        'Sending starts the clock.\n\nLast day the couple can open it ' +
+        '(YYYY-MM-DD). Default is ' + DEFAULT_DAYS + ' days:', suggested);
+      if (answer === null) return;
+
+      const ms = fromDateInput(answer.trim());
+      const check = validateExpiry(ms, Date.now());
+      if (!check.valid) { flash(status, check.error); return; }
+
+      flash(status, 'Sending…', 30000);
+      try {
+        await updateDoc(doc(db, 'galleries', g.id), {
+          status: 'live',
+          sentAt: serverTimestamp(),
+          expiresAt: new Date(check.value)
+        });
+        await render();
+      } catch (err) {
+        flash(status, 'Could not send it: ' + (err && (err.code || err.message)));
+      }
+    });
+
+    const extendBtn = card.querySelector('.g-extend');
+    if (extendBtn) extendBtn.addEventListener('click', async function () {
+      const currentMs = g.expiresAt && g.expiresAt.toMillis ? g.expiresAt.toMillis() : Date.now();
+      const answer = prompt(
+        'Last day the couple can open it (YYYY-MM-DD).\n\n' +
+        'The photos are deleted after this date.', toDateInput(currentMs));
+      if (answer === null) return;
+
+      const ms = fromDateInput(answer.trim());
+      const check = validateExpiry(ms, Date.now());
+      if (!check.valid) { flash(status, check.error); return; }
+
+      try {
+        await updateDoc(doc(db, 'galleries', g.id), { expiresAt: new Date(check.value) });
+        await render();
+        flash(status, 'End date changed.');
+      } catch (err) {
+        flash(status, 'Could not change it: ' + (err && (err.code || err.message)));
       }
     });
 
