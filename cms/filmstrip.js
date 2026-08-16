@@ -2,6 +2,7 @@ import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem
 import { makeCollectionEditable } from './collection-ui.js';
 import { uploadImage } from './edit-image.js';
 import { onEditingChange } from './auth.js';
+import { showWhenLoaded } from './reveal.js';
 
 const COLLECTION = 'filmstripShots';
 const FALLBACK = [
@@ -41,7 +42,8 @@ function render() {
     const frame = document.createElement('div');
     frame.className = 'frame marked';
     if (isDup) frame.setAttribute('aria-hidden', 'true');
-    frame.innerHTML = '<img src="' + item.src + '" alt="">';
+    frame.innerHTML = '<img alt="">';
+    showWhenLoaded(frame.querySelector('img'), item.src);
     track.appendChild(frame);
     if (!usingFallback && !isDup) ui.attachTile(frame, item.id);
   });

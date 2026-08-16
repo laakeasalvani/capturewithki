@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20260815234307';
+    var BUILD = '20260815235930';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -505,6 +505,18 @@ p:last-child{margin-bottom:0;}
 .cms-pending #filmstripTrack .frame img,
 .cms-pending #llImg,
 .cms-pending [data-cms-type="image"]{visibility:hidden;}
+
+/* Per-image hiding, and the reason the flash is gone.
+   `cms-pending` above is ONE global flag, and it was dropped the moment the
+   HERO finished loading. Every other photo therefore became visible on the
+   hero's schedule rather than its own, and any whose real source had not
+   arrived yet painted the placeholder from this file first, then flipped to
+   Khiara's a moment later.
+   cms/reveal.js puts this class on each image individually and removes it only
+   when THAT image's own photo has painted. Nothing anywhere holds a list of
+   which images exist, so photos added in future are covered by the same rule.
+   visibility, not display: the space stays reserved and nothing jumps. */
+img.cms-img-pending{visibility:hidden;}
 </style>
 </head>
 <body>

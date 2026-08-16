@@ -2,6 +2,7 @@ import { loadCollection, seedCollection, addCollectionItem, deleteCollectionItem
 import { makeCollectionEditable } from './collection-ui.js';
 import { uploadImage } from './edit-image.js';
 import { onEditingChange } from './auth.js';
+import { showWhenLoaded } from './reveal.js';
 
 const COLLECTION = 'portfolioShots';
 const FALLBACK = [
@@ -62,7 +63,8 @@ function renderGrid() {
   items.forEach(function (item) {
     const tile = document.createElement('div');
     tile.className = 'shot' + (item.wide ? ' wide' : '');
-    tile.innerHTML = '<div class="frame marked"><img loading="lazy" alt="" src="' + item.src + '"></div>';
+    tile.innerHTML = '<div class="frame marked"><img loading="lazy" alt=""></div>';
+    showWhenLoaded(tile.querySelector('img'), item.src);
     grid.appendChild(tile);
     if (!usingFallback) ui.attachTile(tile, item.id);
   });
