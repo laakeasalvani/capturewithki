@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20260816112936';
+    var BUILD = '20260817214416';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -181,11 +181,17 @@ p:last-child{margin-bottom:0;}
 .link.on-dark{color:var(--white);border-color:rgba(255,255,255,.7);}
 
 /* ---------- intro curtain ---------- */
+/* The curtain used to lift itself on a 1.5s animation regardless of whether
+   Khiara's words had arrived. If Firestore took longer — which it does on a
+   cold first visit — the page underneath was still showing the ORIGINAL
+   wording baked into this file ("Hawai'i", not "Portland"), and a first-time
+   visitor read the old site for a moment. It now waits to be told. */
 .curtain{
   position:fixed;inset:0;z-index:90;background:var(--cream);
   display:flex;align-items:center;justify-content:center;
-  animation:lift 1.5s cubic-bezier(.7,0,.2,1) forwards;
 }
+.curtain.curtain-up{animation:liftNow .7s cubic-bezier(.7,0,.2,1) forwards;}
+@keyframes liftNow{to{transform:translateY(-101%);}}
 .curtain svg{width:78px;height:78px;animation:markIn 1s ease both;}
 @keyframes lift{0%,55%{transform:translateY(0);}100%{transform:translateY(-101%);}}
 @keyframes markIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:none;}}
@@ -434,7 +440,9 @@ p:last-child{margin-bottom:0;}
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important;transition-duration:.001ms !important;}
   html{scroll-behavior:auto;}
-  .curtain{display:none;}
+  /* The curtain deliberately still shows here. Hiding it would expose the
+     stale built-in wording to exactly the visitors who asked for less motion.
+     The animation is suppressed above; the script removes the element. */
 }
 
 /* ---------- responsive ---------- */
@@ -1107,7 +1115,36 @@ img.cms-img-pending{visibility:hidden;}
 
   /* ---------- curtain ---------- */
   var curtain = document.getElementById('curtain');
-  setTimeout(function(){ if(curtain) curtain.remove(); }, 1700);
+  if (curtain) (function(){
+    var MIN_MS = 600;    // never blink the curtain itself in and out
+    var CAP_MS = 8000;   // never hold the site hostage to a stalled load
+    var started = Date.now();
+    var lifted = false;
+
+    function lift() {
+      if (lifted) return;
+      lifted = true;
+      setTimeout(function () {
+        curtain.classList.add('curtain-up');
+        setTimeout(function () { if (curtain.parentNode) curtain.remove(); }, 800);
+      }, Math.max(0, MIN_MS - (Date.now() - started)));
+    }
+
+    // cms/main.js drops `cms-pending` once her text and photos have been
+    // applied. That, not a timer, is what "ready" means.
+    var root = document.documentElement;
+    if (!root.classList.contains('cms-pending')) {
+      lift();
+    } else {
+      // Watches `class` but never changes it, so it cannot retrigger itself.
+      new MutationObserver(function (recs, obs) {
+        if (!root.classList.contains('cms-pending')) { obs.disconnect(); lift(); }
+      }).observe(root, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // Blocked CDN, dead connection, script error: show the site anyway.
+    setTimeout(lift, CAP_MS);
+  })();
 
   /* ---------- routing ---------- */
   var pages = document.querySelectorAll('.page');
