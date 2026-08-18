@@ -97,7 +97,12 @@ export function initTextEditing() {
     adminActive = active;
 
     textFields.forEach(function (el) {
-      el.classList.toggle('cms-editable', active);
+      // Menu tabs are excluded: a tap on a tab must always navigate. They are
+      // edited through their own pencil in cms/edit-nav.js, which is
+      // unambiguous and does not fight the link. They still save through the
+      // focusout handler below like any other text field.
+      const isNavLabel = (el.getAttribute('data-cms-id') || '').indexOf('nav.') === 0;
+      el.classList.toggle('cms-editable', active && !isNavLabel);
       if (!active) {
         el.contentEditable = 'false';
         el.classList.remove('cms-editing');

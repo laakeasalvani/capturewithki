@@ -177,3 +177,16 @@
   color:var(--muted);margin:0;min-height:1.2em;max-width:none;text-align:center;
 }
 .cms-ll-status.cms-ll-error{color:#a4342a;}
+
+/* Rename a menu tab. Drawn small so it stays out of the way, but the tappable
+   box is a full 44px — the same approach as the gear, because a 12px target
+   inside a menu overlay on a phone is not a target. */
+.cms-nav-pencil{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:44px;min-height:44px;margin:-14px 0 -14px 2px;
+  padding:0;border:none;background:none;
+  color:var(--khaki);font-size:13px;line-height:1;cursor:pointer;
+  vertical-align:middle;
+}
+.cms-nav-pencil[hidden]{display:none;}
+.cms-nav-pencil:hover{opacity:.7;}

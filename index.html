@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20260818005343';
+    var BUILD = '20260818010316';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -1168,10 +1168,10 @@ img.cms-img-pending{visibility:hidden;}
     var a = e.target.closest('[data-go]');
     if(!a) return;
     e.preventDefault();
-    // While Khiara is editing, clicking a menu label must let her put the
-    // caret in it — not jump to that page and close the menu underneath her.
-    // cms-editable only exists in edit mode, so a visitor never hits this.
-    if (a.classList.contains('cms-editable')) return;
+    // A tab being typed into right now must not navigate. cms-editing is only
+    // set while the caret is actually in it, so a plain tap in edit mode still
+    // navigates exactly as a visitor's does.
+    if (a.classList.contains('cms-editing')) return;
     go(a.getAttribute('data-go'), {
       anchor: a.getAttribute('data-anchor')
     });
@@ -1202,9 +1202,9 @@ img.cms-img-pending{visibility:hidden;}
   });
 
   document.getElementById('invToggle').addEventListener('click', function(){
-    // Same reason as the nav links above: do not collapse the submenu out from
-    // under her while she is editing its label.
-    if (this.classList.contains('cms-editable')) return;
+    // Same reason as the nav links above: do not collapse the submenu while
+    // its own label is being typed into.
+    if (this.classList.contains('cms-editing')) return;
     document.getElementById('invMenu').classList.toggle('open');
   });
 

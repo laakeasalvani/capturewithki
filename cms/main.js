@@ -1,6 +1,7 @@
 import { initAuth, login, logout, isAdmin, onAdminChange, isEditing, setEditing, onEditingChange } from './auth.js';
 import { loadSiteContent } from './content-store.js';
 import { initTextEditing } from './edit-text.js';
+import { initNavEditing } from './edit-nav.js';
 import { initImageEditing } from './edit-image.js';
 import { initHero } from './hero.js';
 import { initPortfolio } from './portfolio.js';
@@ -11,6 +12,7 @@ import { initRetries } from './reveal.js';
 (async function () {
   await loadSiteContent();
   initTextEditing();
+  initNavEditing();
   initImageEditing();
   await initHero();
   await initPortfolio();
