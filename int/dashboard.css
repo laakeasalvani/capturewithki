@@ -161,3 +161,10 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 @media (max-width:768px){
   .g-photo-del{width:44px;height:44px;font-size:15px;}
 }
+
+/* A draft gallery's link cannot open yet. Without this she gets "that password
+   is not right", which is true for a stranger and useless to her. */
+.g-notsent{
+  margin:0 0 12px;padding:10px 12px;border-radius:8px;
+  background:#fdf6e8;border:1px solid #e3d3ab;color:#7a5c1e;font-size:13px;
+}

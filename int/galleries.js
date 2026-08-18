@@ -150,6 +150,15 @@ export function initGalleries(container) {
             : '') + '</dd></div>' +
       '</dl>' +
       '<p class="g-link"><code>' + esc(galleryLink(g.id)) + '</code></p>' +
+      // The password genuinely cannot work before Send: openGallery requires a
+      // live gallery. Every refusal is worded identically so a stranger cannot
+      // probe for real galleries — which also meant SHE got "that password is
+      // not right" when the real answer was "you have not sent it yet". Saying
+      // so here costs a stranger nothing, because they never see this page.
+      (g.status === 'draft'
+        ? '<p class="g-notsent">Not sent yet — this link and password will not work ' +
+          'until you press <strong>Send to couple</strong>.</p>'
+        : '') +
       '<div class="s-actions">' +
         '<label class="g-upload-label">Add photos' +
           '<input type="file" class="g-upload" accept="image/*" multiple>' +

@@ -179,7 +179,10 @@ export const openGallery = onCall(
   async (request) => {
     const data = request.data || {};
     const galleryId = typeof data.galleryId === 'string' ? data.galleryId.trim() : '';
-    const password = typeof data.password === 'string' ? data.password.trim() : '';
+    // Normalised here as well as in the page: generated passwords use only the
+    // uppercase alphabet, so folding case costs nothing and means a client that
+    // forgets to do it still works.
+    const password = typeof data.password === 'string' ? data.password.trim().toUpperCase() : '';
 
     // Checked before touching Firestore: the id becomes a document path and a
     // token claim, so its shape is not negotiable.

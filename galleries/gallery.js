@@ -50,7 +50,12 @@ if (!galleryId) {
 
 form.addEventListener('submit', async function (e) {
   e.preventDefault();
-  const password = passwordEl.value.trim();
+  // The field is styled text-transform:uppercase, so a password typed in
+  // lowercase LOOKED correct on screen while the lowercase text was what got
+  // sent — a correct password refused, with the screen insisting it was right.
+  // Generated passwords only ever use the uppercase alphabet in
+  // gallery-auth.js, so folding case here is safe and loses nothing.
+  const password = passwordEl.value.trim().toUpperCase();
   if (!password) {
     errorEl.textContent = 'Type the password Khiara gave you.';
     passwordEl.focus();

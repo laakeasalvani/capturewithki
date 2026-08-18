@@ -163,3 +163,24 @@ test('generation is not biased toward the earlier letters', () => {
   }
   assert.equal(counts.size, 31, 'expected all 31 letters to appear');
 });
+
+test('case is folded, because the password field displays uppercase', () => {
+  // The gallery page styles its input text-transform:uppercase. A password
+  // typed in lowercase therefore LOOKED right while lowercase text was sent,
+  // and a correct password was refused with the screen insisting otherwise.
+  // Both the page and openGallery now uppercase before verifying, which is
+  // lossless because generatePassword only ever emits this alphabet.
+  for (let i = 0; i < 100; i++) {
+    const p = generatePassword();
+    assert.equal(p, p.toUpperCase(), 'generated a password that is not uppercase: ' + p);
+  }
+});
+
+test('a lowercased password matches once folded', async () => {
+  const pw = generatePassword();
+  const { hash, salt } = await hashPassword(pw);
+  assert.equal(await verifyPassword(pw.toLowerCase(), salt, hash), false,
+    'unfolded lowercase should NOT match — folding is the caller\'s job');
+  assert.equal(await verifyPassword(pw.toLowerCase().toUpperCase(), salt, hash), true,
+    'folding case must recover the correct password');
+});
