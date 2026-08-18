@@ -117,6 +117,7 @@ async function loadPhotos(expiresAt) {
     return;
   }
   gridNote.textContent = '';
+  buildDownloadAll();
 
   grid.innerHTML = '';
   photos.forEach(function (p, i) {
@@ -124,6 +125,15 @@ async function loadPhotos(expiresAt) {
     tile.type = 'button';
     tile.className = 'g-tile';
     tile.setAttribute('aria-label', 'Open photo ' + (i + 1));
+    const dl = document.createElement('a');
+    dl.className = 'g-tile-dl';
+    dl.href = p.fullUrl;
+    dl.setAttribute('download', p.name || 'photo.jpg');
+    dl.setAttribute('aria-label', 'Download this photo');
+    dl.textContent = '\u2193';
+    // The tile is a button; without this the click would open the preview too.
+    dl.addEventListener('click', function (e) { e.stopPropagation(); });
+
     const img = document.createElement('img');
     img.loading = 'lazy';
     img.decoding = 'async';
@@ -135,6 +145,13 @@ async function loadPhotos(expiresAt) {
     tile.appendChild(img);
     tile.addEventListener('click', function () { openViewer(i); });
     grid.appendChild(tile);
+    // Outside the button, because a link inside a button is invalid markup and
+    // browsers handle it inconsistently. The wrapper positions it over the tile.
+    const wrap = document.createElement('div');
+    wrap.className = 'g-tile-wrap';
+    grid.replaceChild(wrap, tile);
+    wrap.appendChild(tile);
+    wrap.appendChild(dl);
   });
 }
 
@@ -172,3 +189,53 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'ArrowLeft') openViewer(current - 1);
   if (e.key === 'ArrowRight') openViewer(current + 1);
 });
+
+
+// "Download all", one photo at a time.
+//
+// Deliberately not a zip: a 500-photo wedding is well over a gigabyte, and
+// building that in a phone's memory is the single most likely thing to fail.
+// Saving them one after another is slower but it either works or tells you
+// which photo it stopped on.
+function buildDownloadAll() {
+  const head = document.querySelector('.g-gallery-head');
+  if (!head || document.getElementById('gDownloadAll')) return;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'gDownloadAll';
+  btn.className = 'g-btn g-download-all';
+  btn.textContent = 'Download all ' + photos.length + ' photos';
+
+  const note = document.createElement('p');
+  note.className = 'g-copy g-dl-note';
+  note.setAttribute('aria-live', 'polite');
+
+  btn.addEventListener('click', async function () {
+    btn.disabled = true;
+    // Browsers ask before saving many files at once. Say so first, or it looks
+    // like something has gone wrong.
+    note.textContent = 'Starting… your browser may ask permission to save several files. Please say yes.';
+
+    for (let i = 0; i < photos.length; i++) {
+      const p = photos[i];
+      const a = document.createElement('a');
+      a.href = p.fullUrl;
+      a.setAttribute('download', p.name || ('photo-' + (i + 1) + '.jpg'));
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      note.textContent = 'Saving ' + (i + 1) + ' of ' + photos.length + '…';
+      // A pause between each: firing hundreds at once makes a browser drop most
+      // of them silently.
+      await new Promise(function (r) { setTimeout(r, 700); });
+    }
+
+    note.textContent = 'All ' + photos.length + ' sent to your downloads. ' +
+      'If any are missing, use the arrow on that photo to save it again.';
+    btn.disabled = false;
+  });
+
+  head.appendChild(btn);
+  head.appendChild(note);
+}

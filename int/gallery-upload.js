@@ -75,7 +75,16 @@ export async function uploadGalleryPhoto(opts) {
 
   const fullPath = 'galleries/' + galleryId + '/full/' + photoId + '-' + safeName;
   const fullRef = ref(storage, fullPath);
-  await uploadBytes(fullRef, file);
+  // A browser refuses to force a save for a file on another domain, so the
+  // download button opened the photo in a new tab instead of saving it. Marking
+  // the FILE as an attachment is what actually makes it download, and it needs
+  // no CORS setup. Only the full-size copy is marked: <img> ignores this for
+  // ordinary image loads, but the preview stays untouched so the grid can never
+  // be affected by it.
+  await uploadBytes(fullRef, file, {
+    contentType: file.type || 'image/jpeg',
+    contentDisposition: 'attachment; filename="' + safeName.replace(/"/g, '') + '"'
+  });
   const fullUrl = await getDownloadURL(fullRef);
 
   let thumbPath = null;
