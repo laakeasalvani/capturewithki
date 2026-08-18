@@ -92,22 +92,24 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 80px;max-width:1400px;mar
    button is invalid and browsers disagree about what to do with it. */
 .g-tile-wrap{position:relative;}
 .g-tile-wrap .g-tile{width:100%;}
+/* Always visible, on every device. It was previously revealed on hover for
+   desktop, which meant it simply was not there until the pointer happened to
+   be over the right tile — and on a laptop trackpad that reads as missing.
+   A download control on a client's own photos is not something to hide. */
 .g-tile-dl{
   position:absolute;top:6px;right:6px;
   display:flex;align-items:center;justify-content:center;
-  width:36px;height:36px;border-radius:50%;
-  background:rgba(23,22,20,.6);color:#fff;
-  font-size:17px;line-height:1;text-decoration:none;
-  opacity:0;transition:opacity .18s ease;
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(23,22,20,.55);color:#fff;
+  font-size:18px;line-height:1;text-decoration:none;
+  opacity:1;transition:background .18s ease;
 }
-.g-tile-wrap:hover .g-tile-dl,
-.g-tile-dl:focus-visible{opacity:1;}
-.g-tile-dl:hover{background:var(--khaki);}
+.g-tile-dl:hover,
+.g-tile-dl:focus-visible{background:var(--khaki);}
 
-/* No hover on a touch screen, so it is always visible there — and a full 44px,
-   like every other control on this site. */
+/* 44px on a touch screen, like every other control on this site. */
 @media (hover:none),(max-width:768px){
-  .g-tile-dl{opacity:1;width:44px;height:44px;font-size:19px;}
+  .g-tile-dl{width:44px;height:44px;font-size:19px;}
 }
 
 .g-download-all{width:auto;margin-top:14px;}
