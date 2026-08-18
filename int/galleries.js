@@ -3,7 +3,7 @@ import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js';
-import { uploadGalleryPhoto, nextPhotoOrder } from './gallery-upload.js';
+import { uploadGalleryPhoto, nextPhotoOrder, deleteGalleryPhoto, loadGalleryPhotos } from './gallery-upload.js';
 import { defaultExpiry, validateExpiry, daysLeft, DEFAULT_DAYS } from '../functions/lib/gallery-expiry.js';
 
 const fns = getFunctions(app, 'us-west1');
@@ -154,6 +154,7 @@ export function initGalleries(container) {
         '<label class="g-upload-label">Add photos' +
           '<input type="file" class="g-upload" accept="image/*" multiple>' +
         '</label>' +
+        '<button type="button" class="g-show s-secondary">Show photos (' + (g.photoCount || 0) + ')</button>' +
         '<button type="button" class="g-copy s-secondary">Copy link</button>' +
         (g.status === 'live'
           ? '<button type="button" class="g-extend s-secondary">Change end date</button>'
@@ -163,6 +164,7 @@ export function initGalleries(container) {
         '<span class="s-status g-card-status" aria-live="polite"></span>' +
       '</div>' +
       '<div class="g-progress" hidden><div class="g-progress-bar"></div></div>' +
+      '<div class="g-photos" hidden></div>' +
     '</article>';
   }
 
@@ -265,6 +267,76 @@ export function initGalleries(container) {
       } catch (err) {
         flash(status, 'Could not change it: ' + (err && (err.code || err.message)));
       }
+    });
+
+    // Photos load only when she asks for them. Drawing hundreds of thumbnails
+    // for every gallery on the page would make the dashboard crawl, and she
+    // usually only wants to look at one.
+    const showBtn = card.querySelector('.g-show');
+    const photosBox = card.querySelector('.g-photos');
+
+    async function renderPhotos() {
+      photosBox.innerHTML = '<p class="s-help">Loading photos…</p>';
+      let photos;
+      try {
+        photos = await loadGalleryPhotos(db, g.id);
+      } catch (err) {
+        photosBox.innerHTML = '<p class="s-help">Could not load them: ' +
+          esc(err && (err.code || err.message)) + '</p>';
+        return;
+      }
+      if (!photos.length) {
+        photosBox.innerHTML = '<p class="s-help">No photos in this gallery yet.</p>';
+        return;
+      }
+      photosBox.innerHTML = photos.map(function (p, i) {
+        return '<div class="g-photo" data-photo="' + esc(p.id) + '">' +
+          '<img loading="lazy" alt="' + esc(p.name || ('Photo ' + (i + 1))) + '" src="' + esc(p.thumbUrl || p.fullUrl) + '">' +
+          '<button type="button" class="g-photo-del" aria-label="Delete this photo">&#10005;</button>' +
+        '</div>';
+      }).join('');
+
+      photosBox.querySelectorAll('.g-photo-del').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const tile = btn.closest('.g-photo');
+          const photo = photos.find(function (x) { return x.id === tile.getAttribute('data-photo'); });
+          if (!photo) return;
+          if (!confirm('Delete this photo from the gallery?\n\nThis cannot be undone.')) return;
+
+          btn.disabled = true;
+          tile.classList.add('g-photo-going');
+          try {
+            const wasCover = !!(g.coverThumb && photo.thumbUrl && g.coverThumb === photo.thumbUrl);
+            const remaining = photos.filter(function (x) { return x.id !== photo.id; });
+            await deleteGalleryPhoto({
+              db: db, galleryId: g.id, photo: photo,
+              wasCover: wasCover,
+              nextCover: remaining.length ? (remaining[0].thumbUrl || remaining[0].fullUrl) : null
+            });
+            flash(status, 'Photo deleted.');
+            await render();
+            // The card was rebuilt, so reopen the grid she was looking at.
+            const fresh = list.querySelector('.g-card[data-id="' + g.id + '"] .g-show');
+            if (fresh) fresh.click();
+          } catch (err) {
+            btn.disabled = false;
+            tile.classList.remove('g-photo-going');
+            flash(status, 'Could not delete it: ' + (err && (err.code || err.message)));
+          }
+        });
+      });
+    }
+
+    showBtn.addEventListener('click', async function () {
+      if (!photosBox.hidden) {
+        photosBox.hidden = true;
+        photosBox.innerHTML = '';
+        showBtn.textContent = 'Show photos (' + (g.photoCount || 0) + ')';
+        return;
+      }
+      photosBox.hidden = false;
+      showBtn.textContent = 'Hide photos';
+      await renderPhotos();
     });
 
     card.querySelector('.g-upload').addEventListener('change', async function (e) {

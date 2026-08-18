@@ -136,3 +136,28 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 .q-archive:hover{border-color:var(--khaki);color:var(--khaki);}
 .q-archive:disabled{opacity:.5;cursor:default;}
 @media (max-width:768px){ .q-toggle,.q-archive{min-height:44px;} }
+
+/* The photos inside a gallery card. Loaded only when she asks, because a few
+   galleries of a few hundred photos each would otherwise all render at once. */
+.g-photos{
+  display:grid;gap:8px;margin-top:14px;
+  grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+}
+.g-photos[hidden]{display:none;}
+.g-photo{position:relative;aspect-ratio:1;background:var(--cream);border-radius:6px;overflow:hidden;}
+.g-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.g-photo-going{opacity:.35;}
+
+/* Drawn small so it does not cover the photo, but the tappable box is 44px on
+   a phone — the same approach as the gear and the menu pencil. */
+.g-photo-del{
+  position:absolute;top:4px;right:4px;
+  width:26px;height:26px;padding:0;border:none;border-radius:50%;
+  background:rgba(23,22,20,.72);color:#fff;
+  font-size:13px;line-height:1;cursor:pointer;
+}
+.g-photo-del:hover{background:#a4342a;}
+.g-photo-del[disabled]{opacity:.5;cursor:default;}
+@media (max-width:768px){
+  .g-photo-del{width:44px;height:44px;font-size:15px;}
+}

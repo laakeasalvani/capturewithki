@@ -1,7 +1,7 @@
 import { storage } from '../cms/firebase.js';
-import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js';
 import {
-  collection, doc, setDoc, updateDoc, increment, getDocs, query, orderBy, limit
+  collection, doc, setDoc, updateDoc, deleteDoc, increment, getDocs, query, orderBy, limit
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 
 // Browsing a wedding gallery must not pull the originals. A 500-photo gallery
@@ -105,4 +105,43 @@ export async function uploadGalleryPhoto(opts) {
   await updateDoc(galleryRef, patch);
 
   return { photoId: photoId, thumbUrl: thumbUrl || fullUrl, fullUrl: fullUrl };
+}
+
+// Remove one photo: the original, its preview, and the record.
+//
+// The files go first. If a file delete fails we stop, leaving the record in
+// place — so she sees the photo is still there and can try again, rather than
+// the record vanishing while the file quietly keeps costing storage until the
+// gallery expires.
+//
+// A file that is already gone is not an error. Re-running a half-finished
+// delete should finish the job, not refuse.
+export async function deleteGalleryPhoto(opts) {
+  const db = opts.db;
+  const galleryId = opts.galleryId;
+  const photo = opts.photo;
+
+  for (const path of [photo.fullPath, photo.thumbPath]) {
+    if (!path) continue;
+    try {
+      await deleteObject(ref(storage, path));
+    } catch (err) {
+      if (err && err.code === 'storage/object-not-found') continue;
+      throw err;
+    }
+  }
+
+  await deleteDoc(doc(db, 'galleries', galleryId, 'photos', photo.id));
+
+  const patch = { photoCount: increment(-1) };
+  // The cover pointed at the photo just removed, so it would render broken.
+  if (opts.wasCover) patch.coverThumb = opts.nextCover || null;
+  await updateDoc(doc(db, 'galleries', galleryId), patch);
+}
+
+export async function loadGalleryPhotos(db, galleryId) {
+  const snap = await getDocs(query(collection(db, 'galleries', galleryId, 'photos'), orderBy('order')));
+  const out = [];
+  snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+  return out;
 }
