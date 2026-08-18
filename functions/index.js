@@ -190,21 +190,19 @@ export const openGallery = onCall(
       throw new HttpsError('permission-denied', GALLERY_DENIED);
     }
 
-    // Rate limited on a bucket of its own. Sharing the contact form's bucket
-    // would mean a couple fumbling their password could block a real inquiry,
-    // and a spammer hitting the form could lock a couple out of their photos.
+    // No rate limit here, by the owner's decision after it locked her out of
+    // her own gallery: five tries an hour counted EVERY attempt, so once the
+    // count was spent even the correct password was refused, and the lockout
+    // hid the real fault underneath it.
+    //
+    // The trade is real and was stated: nothing now slows an automated attempt
+    // to guess a gallery password. What still stands in the way is the password
+    // itself — 8 characters from a 31-letter alphabet is about 8.5e11
+    // combinations — and the gallery id, which is 20 random characters and must
+    // also be known. Restoring a limit is a few lines here if abuse ever shows
+    // up in the logs; counting only FAILED attempts would keep a correct
+    // password working while still slowing a guesser.
     const now = Date.now();
-    const ipHash = hashIp('gallery:' + (request.rawRequest && request.rawRequest.ip));
-    try {
-      const limit = await checkRateLimit(db, ipHash, now);
-      if (!limit.allowed) {
-        throw new HttpsError('resource-exhausted', 'Too many tries. Please wait an hour and try again.');
-      }
-    } catch (err) {
-      if (err instanceof HttpsError) throw err;
-      // A rate-limiter failure must not lock a couple out of their own photos.
-      console.warn('[openGallery] rate limit check failed, allowing:', describeError(err));
-    }
 
     let snap;
     try {
