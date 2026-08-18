@@ -32,7 +32,7 @@ DOC = f"https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(defaul
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "index.html"
 
-EXPECTED_MARKERS = 114
+EXPECTED_MARKERS = 131  # 114 + 17 menu labels (9 ids, shared between the top menu and footer)
 FORM_IDS = ["n1", "n2", "em", "ph", "dt", "cl", "ms", "send", "sent"]
 
 

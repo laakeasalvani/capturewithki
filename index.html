@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20260817214416';
+    var BUILD = '20260818005343';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -543,19 +543,19 @@ img.cms-img-pending{visibility:hidden;}
 </header>
 
 <div class="mobile" id="mobile">
-  <a href="#" data-go="home">Home</a>
-  <a href="#" data-go="about">About</a>
-  <a href="#" data-go="portfolio">Portfolio</a>
+  <a href="#" data-go="home" data-cms-id="nav.home" data-cms-type="text">Home</a>
+  <a href="#" data-go="about" data-cms-id="nav.about" data-cms-type="text">About</a>
+  <a href="#" data-go="portfolio" data-cms-id="nav.portfolio" data-cms-type="text">Portfolio</a>
   <div class="mob-drop">
-    <button class="mob-drop-toggle" id="invToggle" type="button">Investments</button>
+    <button class="mob-drop-toggle" id="invToggle" type="button" data-cms-id="nav.investments" data-cms-type="text">Investments</button>
     <div class="mob-drop-menu" id="invMenu">
-      <a href="#" data-go="portraits">Portraits</a>
-      <a href="#" data-go="elopements">Elopements</a>
-      <a href="#" data-go="weddings">Weddings</a>
+      <a href="#" data-go="portraits" data-cms-id="nav.portraits" data-cms-type="text">Portraits</a>
+      <a href="#" data-go="elopements" data-cms-id="nav.elopements" data-cms-type="text">Elopements</a>
+      <a href="#" data-go="weddings" data-cms-id="nav.weddings" data-cms-type="text">Weddings</a>
     </div>
   </div>
-  <a href="#" data-go="testimonials">Testimonials</a>
-  <a href="#" data-go="contact">Contact</a>
+  <a href="#" data-go="testimonials" data-cms-id="nav.testimonials" data-cms-type="text">Testimonials</a>
+  <a href="#" data-go="contact" data-cms-id="nav.contact" data-cms-type="text">Contact</a>
 </div>
 
 <main>
@@ -1074,14 +1074,14 @@ img.cms-img-pending{visibility:hidden;}
     </a>
   </div>
   <nav>
-    <a href="#" data-go="home">Home</a>
-    <a href="#" data-go="about">About</a>
-    <a href="#" data-go="portfolio">Portfolio</a>
-    <a href="#" data-go="portraits">Portraits</a>
-    <a href="#" data-go="elopements">Elopements</a>
-    <a href="#" data-go="weddings">Weddings</a>
-    <a href="#" data-go="testimonials">Testimonials</a>
-    <a href="#" data-go="contact">Contact</a>
+    <a href="#" data-go="home" data-cms-id="nav.home" data-cms-type="text">Home</a>
+    <a href="#" data-go="about" data-cms-id="nav.about" data-cms-type="text">About</a>
+    <a href="#" data-go="portfolio" data-cms-id="nav.portfolio" data-cms-type="text">Portfolio</a>
+    <a href="#" data-go="portraits" data-cms-id="nav.portraits" data-cms-type="text">Portraits</a>
+    <a href="#" data-go="elopements" data-cms-id="nav.elopements" data-cms-type="text">Elopements</a>
+    <a href="#" data-go="weddings" data-cms-id="nav.weddings" data-cms-type="text">Weddings</a>
+    <a href="#" data-go="testimonials" data-cms-id="nav.testimonials" data-cms-type="text">Testimonials</a>
+    <a href="#" data-go="contact" data-cms-id="nav.contact" data-cms-type="text">Contact</a>
   </nav>
   <div class="fine">&copy; 2026 CaptureWithKi &mdash; Khiara Salvani<button class="cms-gear" id="cmsGear" aria-label="Site settings">&#9881;</button></div>
   <div class="credit">Made by Kea Web Creations</div>
@@ -1168,6 +1168,10 @@ img.cms-img-pending{visibility:hidden;}
     var a = e.target.closest('[data-go]');
     if(!a) return;
     e.preventDefault();
+    // While Khiara is editing, clicking a menu label must let her put the
+    // caret in it — not jump to that page and close the menu underneath her.
+    // cms-editable only exists in edit mode, so a visitor never hits this.
+    if (a.classList.contains('cms-editable')) return;
     go(a.getAttribute('data-go'), {
       anchor: a.getAttribute('data-anchor')
     });
@@ -1198,6 +1202,9 @@ img.cms-img-pending{visibility:hidden;}
   });
 
   document.getElementById('invToggle').addEventListener('click', function(){
+    // Same reason as the nav links above: do not collapse the submenu out from
+    // under her while she is editing its label.
+    if (this.classList.contains('cms-editable')) return;
     document.getElementById('invMenu').classList.toggle('open');
   });
 

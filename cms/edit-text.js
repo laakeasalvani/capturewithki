@@ -223,6 +223,14 @@ export function initTextEditing() {
       // immediately rather than on the next load.
       const clean = sanitizeHtml(el.innerHTML);
       if (clean !== el.innerHTML) el.innerHTML = clean;
+
+      // A few labels appear twice — the menu tabs are in the top menu AND the
+      // footer, sharing one data-cms-id so they are one label with one value.
+      // Without this, editing in one place left the other showing the old
+      // wording until the next reload, which reads as a bug.
+      document.querySelectorAll('[data-cms-id="' + id + '"][data-cms-type="text"]')
+        .forEach(function (twin) { if (twin !== el) twin.innerHTML = clean; });
+
       setField(id, clean)
         .then(function () {
           showToast('Saved');
