@@ -41,8 +41,20 @@ export function initNavEditing() {
       sel.addRange(range);
     });
 
-    // Straight after the label, so it reads as belonging to it.
-    if (label.parentNode) label.parentNode.insertBefore(pencil, label.nextSibling);
+    // The menu is a vertical stack, so a pencil added as a plain sibling became
+    // a row of its own — doubling the menu's height and pushing "Home" off the
+    // top of the screen. Wrapping the pair keeps them on one line.
+    //
+    // The wrapper is display:contents while not editing, which means it has no
+    // layout effect at all and a visitor's menu is byte-for-byte as it was.
+    // It only becomes a flex row when the pencils are showing.
+    const row = document.createElement('span');
+    row.className = 'cms-nav-row';
+    if (label.parentNode) {
+      label.parentNode.insertBefore(row, label);
+      row.appendChild(label);
+      row.appendChild(pencil);
+    }
   });
 
   onEditingChange(function (active) {
@@ -54,6 +66,9 @@ export function initNavEditing() {
     });
     document.querySelectorAll('.cms-nav-pencil').forEach(function (p) {
       p.hidden = !active;
+    });
+    document.querySelectorAll('.cms-nav-row').forEach(function (row) {
+      row.classList.toggle('cms-nav-row-on', active);
     });
   });
 }

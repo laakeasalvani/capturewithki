@@ -181,12 +181,22 @@
 /* Rename a menu tab. Drawn small so it stays out of the way, but the tappable
    box is a full 44px — the same approach as the gear, because a 12px target
    inside a menu overlay on a phone is not a target. */
+/* display:contents means this wrapper has NO layout effect, so a visitor's menu
+   is exactly as it was. It becomes a real row only while the pencils show. */
+.cms-nav-row{display:contents;}
+.cms-nav-row-on{
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;
+}
+
 .cms-nav-pencil{
   display:inline-flex;align-items:center;justify-content:center;
-  min-width:44px;min-height:44px;margin:-14px 0 -14px 2px;
+  /* 44px wide for the finger, but NOT 44px tall: inside the menu that added a
+     row's worth of height to every tab and pushed "Home" off the screen. The
+     negative vertical margin keeps the row the height of the text itself. */
+  min-width:44px;height:44px;margin:-14px 0;
   padding:0;border:none;background:none;
   color:var(--khaki);font-size:13px;line-height:1;cursor:pointer;
-  vertical-align:middle;
+  flex:0 0 auto;
 }
 .cms-nav-pencil[hidden]{display:none;}
 .cms-nav-pencil:hover{opacity:.7;}
