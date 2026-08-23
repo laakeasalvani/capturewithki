@@ -23,7 +23,7 @@ import { verifyPassword, galleryOpenable, isValidGalleryId, generatePassword, ha
 import { dueGalleries } from './lib/gallery-expiry.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
-const OWNER_EMAIL = 'netherlyk23@gmail.com';
+const OWNER_EMAIL = 'capturewithki@gmail.com';
 
 initializeApp();
 const db = getFirestore();
@@ -73,7 +73,7 @@ export const submitInquiry = onCall(
       if (!limit.allowed) {
         throw new HttpsError(
           'resource-exhausted',
-          'That is a lot of inquiries in a short time. Please try again later, or email netherlyk23@gmail.com directly.'
+          'That is a lot of inquiries in a short time. Please try again later, or email capturewithki@gmail.com directly.'
         );
       }
     } else {
@@ -95,7 +95,7 @@ export const submitInquiry = onCall(
     } catch (err) {
       throw new HttpsError(
         'internal',
-        'Something went wrong saving your inquiry. Please email netherlyk23@gmail.com directly.'
+        'Something went wrong saving your inquiry. Please email capturewithki@gmail.com directly.'
       );
     }
 

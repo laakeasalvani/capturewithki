@@ -6,7 +6,7 @@ test('accepts a complete valid submission', () => {
   const r = validateInquiry({
     name: ' Sarah ', partnerName: 'Michael', email: 'sarah@example.com',
     phone: '8085550123', eventDate: '2026-09-12',
-    sessionType: 'Engagement — $175', message: 'Hello!'
+    sessionType: 'Engagement', message: 'Hello!'
   });
   assert.equal(r.valid, true);
   assert.equal(r.value.name, 'Sarah');

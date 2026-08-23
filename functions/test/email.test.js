@@ -5,7 +5,7 @@ import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, safeImageUrl 
 const full = {
   name: 'Sarah', partnerName: 'Michael', email: 'sarah@example.com',
   phone: '8085550123', eventDate: '2026-09-12',
-  sessionType: 'Engagement — $175', message: 'We met hiking.'
+  sessionType: 'Engagement', message: 'We met hiking.'
 };
 
 test('owner subject names both people when a partner is given', () => {
@@ -20,7 +20,7 @@ test('owner subject names one person when no partner', () => {
 test('owner body contains every submitted field', () => {
   const t = ownerEmail(full).text;
   for (const v of ['Sarah', 'Michael', 'sarah@example.com', '8085550123',
-                   '2026-09-12', 'Engagement — $175', 'We met hiking.']) {
+                   '2026-09-12', 'Engagement', 'We met hiking.']) {
     assert.ok(t.includes(v), 'missing ' + v);
   }
 });

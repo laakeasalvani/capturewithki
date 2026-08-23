@@ -6,7 +6,7 @@ photographer who actually uses it.
 **Live site:** https://capturewithki.com (GitHub Pages, `main` branch, repo root, custom domain + HTTPS)
 **Admin dashboard:** https://capturewithki.com/int/
 **Firebase project:** `capturewithki-69dd3` — Blaze plan
-**Owner's inbox:** netherlyk23@gmail.com
+**Owner's inbox:** capturewithki@gmail.com
 
 ---
 
