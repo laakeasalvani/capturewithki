@@ -8,7 +8,7 @@
 // unchanged, so a runtime-only change deploys as "Skipped (No changes
 // detected)" and silently does nothing. Verify with `firebase functions:list`
 // after any runtime change rather than trusting the deploy output.
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
@@ -21,6 +21,9 @@ import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
 import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
 import { verifyPassword, galleryOpenable, isValidGalleryId, generatePassword, hashPassword } from './lib/gallery-auth.js';
 import { dueGalleries } from './lib/gallery-expiry.js';
+import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
+         keaOwnerEmailHtml, keaClientEmailHtml, sendKeaEmail,
+         KEA_OWNER_EMAIL } from './lib/kea.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
@@ -153,6 +156,148 @@ export const submitInquiry = onCall(
 
     // The inquiry is safely recorded either way, so the visitor sees success.
     return { ok: true };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Kea Web Creations contact form
+//
+// A different website belonging to the same owner: a static single-file site
+// on GitHub Pages with nowhere safe to keep a Resend key. It lives here only
+// because this project already has Blaze billing and the RESEND_API_KEY
+// secret; see lib/kea.js for what is and is not shared.
+//
+// onRequest, not onCall: submitInquiry is called from a page that already
+// loads the Firebase JS SDK, but the Kea site is one hand-written HTML file
+// with no build step and no SDK. A plain HTTP endpoint lets it use fetch().
+// That also means CORS is enforced by an explicit origin list rather than by
+// the SDK, and that this handler must do its own method and JSON checks.
+// ---------------------------------------------------------------------------
+
+const KEA_ORIGINS = [
+  'https://laakeasalvani.github.io',
+  // The GitHub Pages URL is the only live one today. The custom domain goes
+  // here as a second entry the day it is bought — an origin that is missing
+  // from this list fails in the browser with a CORS error and never reaches
+  // the code below, so it cannot be diagnosed from the function logs.
+  'http://localhost:4321',
+  'http://127.0.0.1:4321',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000'
+];
+
+export const keaInquiry = onRequest(
+  { region: 'us-west1', secrets: [RESEND_API_KEY], cors: KEA_ORIGINS },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ ok: false, error: 'Method not allowed.' });
+      return;
+    }
+
+    // express parses a JSON body for us, but a request with the wrong
+    // content-type arrives as a Buffer or a string and would sail past a
+    // plain truthiness check straight into the validator.
+    const data = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body))
+      ? req.body : {};
+    const now = Date.now();
+
+    // Bots get a cheerful success and nothing else. An error would just teach
+    // them to retry without the tell.
+    if (isBotSubmission({ honeypot: data.honeypot, renderedAt: data.renderedAt, now: now })) {
+      res.json({ ok: true });
+      return;
+    }
+
+    const check = validateKeaInquiry(data);
+    if (!check.valid) {
+      res.status(400).json({ ok: false, error: check.error });
+      return;
+    }
+    const inquiry = check.value;
+
+    // Only validated, guaranteed-scalar data ever reaches the templates or
+    // Firestore below — never req.body or any raw field.
+    const ip = req.ip;
+    if (ip) {
+      // Prefixed so Kea and CaptureWithKi never share a bucket: without it,
+      // one visitor filling in both forms would spend a single allowance.
+      const limit = await checkRateLimit(db, hashIp('kea:' + ip), now);
+      if (!limit.allowed) {
+        res.status(429).json({
+          ok: false,
+          error: 'That is a lot of messages in a short time. Please try again later, or email ' +
+                 KEA_OWNER_EMAIL + ' directly.'
+        });
+        return;
+      }
+    } else {
+      // Pooling IP-less callers into one bucket would block real visitors once
+      // five of them submitted in an hour. The honeypot, timing check and
+      // validation still apply.
+      console.warn('[keaInquiry] no caller IP; skipping rate limit');
+    }
+
+    // Record FIRST. A failed email is recoverable; a lost enquiry is not.
+    // Separate collection from `inquiries`, which is CaptureWithKi's and is
+    // read by that site's admin dashboard.
+    let ref;
+    try {
+      ref = await db.collection('keaInquiries').add(Object.assign({}, inquiry, {
+        createdAt: FieldValue.serverTimestamp(),
+        status: 'new',
+        emailToOwnerSent: false,
+        emailToClientSent: false
+      }));
+    } catch (err) {
+      console.error('[keaInquiry] could not save enquiry:', describeError(err));
+      res.status(500).json({
+        ok: false,
+        error: 'Something went wrong saving your message. Please email ' +
+               KEA_OWNER_EMAIL + ' directly.'
+      });
+      return;
+    }
+
+    const key = RESEND_API_KEY.value();
+    const errors = [];
+    let ownerSent = false;
+    let clientSent = false;
+
+    try {
+      const m = keaOwnerEmail(inquiry);
+      await sendKeaEmail({ apiKey: key, to: KEA_OWNER_EMAIL, replyTo: inquiry.email,
+                           subject: m.subject, text: m.text, html: keaOwnerEmailHtml(inquiry) });
+      ownerSent = true;
+      console.log('[keaInquiry] owner email accepted by Resend');
+    } catch (err) {
+      errors.push('owner: ' + describeError(err));
+      console.warn('[keaInquiry] owner email FAILED:', describeError(err));
+    }
+
+    try {
+      const m = keaClientEmail(inquiry);
+      await sendKeaEmail({ apiKey: key, to: inquiry.email,
+                           subject: m.subject, text: m.text, html: keaClientEmailHtml(inquiry) });
+      clientSent = true;
+      console.log('[keaInquiry] auto-reply accepted by Resend');
+    } catch (err) {
+      errors.push('client: ' + describeError(err));
+      console.warn('[keaInquiry] auto-reply FAILED:', describeError(err));
+    }
+
+    // One bookkeeping write, recording what actually happened. It must never
+    // fail the request: the enquiry is already safely in Firestore, and
+    // telling the visitor it failed would have them submit all over again.
+    try {
+      const patch = { emailToOwnerSent: ownerSent, emailToClientSent: clientSent };
+      if (errors.length) patch.emailError = errors.join('; ');
+      await ref.update(patch);
+    } catch (err) {
+      console.warn('[keaInquiry] could not record email status:', describeError(err));
+    }
+
+    // The enquiry is safely recorded either way, so the visitor sees success.
+    res.json({ ok: true });
   }
 );
 

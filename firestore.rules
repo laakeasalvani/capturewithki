@@ -85,6 +85,17 @@ service cloud.firestore {
                 && request.resource.data.notes.size() <= 5000));
     }
 
+    // Kea Web Creations enquiries — a different site belonging to the same
+    // owner, whose contact form posts to the keaInquiry function. Written
+    // only by that function through the Admin SDK, which bypasses these
+    // rules. Nothing reads them from a browser: the CaptureWithKi dashboard
+    // does not know about them, and they are read in the Firebase console.
+    // Closed both ways, deliberately and explicitly — an unmatched path is
+    // already denied, but saying so here stops a future wildcard opening it.
+    match /keaInquiries/{id} {
+      allow read, write: if false;
+    }
+
     // Dashboard-owned settings, e.g. the auto-reply email template.
     // Admin-only both ways — there is no reason for the public to read it.
     match /settings/{docId} {

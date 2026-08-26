@@ -262,7 +262,10 @@ export function clientEmail(i, template) {
 
 export async function sendEmail(opts) {
   const body = {
-    from: FROM,
+    // Defaults to the CaptureWithKi sender. lib/kea.js passes its own so the
+    // Kea Web Creations form does not mail web-design prospects from the
+    // photography brand — every existing caller omits it and is unaffected.
+    from: opts.from || FROM,
     to: [opts.to],
     subject: opts.subject,
     text: opts.text
