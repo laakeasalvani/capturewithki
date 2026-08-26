@@ -175,11 +175,19 @@ export const submitInquiry = onCall(
 // ---------------------------------------------------------------------------
 
 const KEA_ORIGINS = [
+  // The live site. Both spellings are listed because an origin is matched
+  // exactly: keawebcreations.com and www.keawebcreations.com are different
+  // origins to a browser even when one redirects to the other, and a visitor
+  // who lands on the www form would otherwise be refused.
+  'https://keawebcreations.com',
+  'https://www.keawebcreations.com',
+  // Kept: github.io still serves the site and redirects here, so a stale link
+  // or a cached page can still be the origin of a real submission.
   'https://laakeasalvani.github.io',
-  // The GitHub Pages URL is the only live one today. The custom domain goes
-  // here as a second entry the day it is bought — an origin that is missing
-  // from this list fails in the browser with a CORS error and never reaches
-  // the code below, so it cannot be diagnosed from the function logs.
+  // Any FURTHER domain must be added here too. An origin missing from this
+  // list fails in the browser with a CORS error and never reaches the code
+  // below, so it cannot be diagnosed from the function logs — it looks like
+  // the form silently doing nothing.
   'http://localhost:4321',
   'http://127.0.0.1:4321',
   'http://localhost:8000',
