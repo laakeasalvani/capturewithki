@@ -113,6 +113,11 @@ nameEl.addEventListener('input', updateSignBtn);
 
 form.addEventListener('submit', function (e) {
   e.preventDefault();
+  // A disabled button still permits Enter-key form submission, and the name field
+  // is focused on load, so Enter is how many clients will submit. Without this,
+  // a second Enter while the first call is in flight fires signContract twice and
+  // writes two 'signed' rows into what is meant to be the legal audit trail.
+  if (signBtn.disabled) return;
   const typedName = nameEl.value.trim();
   if (!consentEl.checked || !typedName) {
     updateSignBtn();
