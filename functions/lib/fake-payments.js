@@ -81,17 +81,22 @@ export async function completeFakeSession(sessionId) {
   });
 }
 
-// Matches lib/stripe.js's (future) retrieveSession shape exactly: same two
-// fields, same 'paid'|'unpaid' vocabulary. Reads the document createRetainerSession
-// wrote — this is the read-back the brief calls out as exercising Task 6's
-// reconciliation path today rather than the day real money is involved.
+// Matches lib/payments.js's stripeRetrieveSession shape exactly: same three
+// fields (payment_status, payment_intent, amount_total), same 'paid'|'unpaid'
+// vocabulary. Reads the document createRetainerSession wrote — this is the
+// read-back the brief calls out as exercising Task 6's reconciliation path
+// today rather than the day real money is involved.
 export async function retrieveSession(sessionId) {
   const db = getFirestore();
   const snap = await db.collection('fakeSessions').doc(sessionId).get();
-  if (!snap.exists) return { payment_status: 'unpaid', payment_intent: null };
+  if (!snap.exists) return { payment_status: 'unpaid', payment_intent: null, amount_total: null };
   const data = snap.data();
   return {
     payment_status: data.status === 'paid' ? 'paid' : 'unpaid',
-    payment_intent: typeof data.paymentIntent === 'string' ? data.paymentIntent : null
+    payment_intent: typeof data.paymentIntent === 'string' ? data.paymentIntent : null,
+    // Same field name as the Stripe implementation's amount_total, carrying
+    // the amount this session was created for — recorded once, at creation,
+    // in createRetainerSession above.
+    amount_total: typeof data.amountCents === 'number' ? data.amountCents : null
   };
 }

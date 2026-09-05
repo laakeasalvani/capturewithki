@@ -42,7 +42,12 @@ async function stripeRetrieveSession(sessionId) {
     payment_status: session.payment_status === 'paid' ? 'paid' : 'unpaid',
     payment_intent: typeof intent === 'string'
       ? intent
-      : (intent && typeof intent.id === 'string' ? intent.id : null)
+      : (intent && typeof intent.id === 'string' ? intent.id : null),
+    // Already on the Checkout Session object, in cents, at no extra API
+    // call. Must line up with the fake provider's amount_total field so a
+    // caller (chaseContracts' reconciliation) can check the amount paid
+    // against retainerCents the same way regardless of provider.
+    amount_total: typeof session.amount_total === 'number' ? session.amount_total : null
   };
 }
 

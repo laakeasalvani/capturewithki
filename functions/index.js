@@ -36,7 +36,7 @@ import {
   signReminderEmail, payReminderEmail, neverOpenedAlertEmail, unpaidEscalationEmail
 } from './lib/contract-email.js';
 import { dueActions } from './lib/chase.js';
-import { fakePayAllowed, markContractPaid, getProvider } from './lib/payments.js';
+import { fakePayAllowed, markContractPaid, getProvider, providerName } from './lib/payments.js';
 import { completeFakeSession, retrieveSession as retrieveFakeSession } from './lib/fake-payments.js';
 import { getStripe } from './lib/stripe.js';
 
@@ -1428,7 +1428,16 @@ export const chaseContracts = onSchedule(
   {
     region: 'us-west1',
     schedule: 'every 1 hours',
-    secrets: [RESEND_API_KEY]
+    // STRIPE_SECRET_KEY is required here even though this function never
+    // touches Stripe directly: Functions v2 only injects a declared secret
+    // into the runtime environment for functions that list it, so when
+    // PAYMENT_PROVIDER=stripe the reconciliation loop below calls
+    // getProvider().retrieveSession() -> getStripe() -> new
+    // Stripe(process.env.STRIPE_SECRET_KEY, ...) with that key undefined.
+    // Without this line that throw is swallowed by the per-contract
+    // try/catch below as a console.warn, so reconciliation would silently
+    // fail for every contract, every hour, forever.
+    secrets: [RESEND_API_KEY, STRIPE_SECRET_KEY]
   },
   async () => {
     const now = Date.now();
@@ -1464,22 +1473,53 @@ export const chaseContracts = onSchedule(
         // wrote at checkout, so this path is exercised for real today
         // rather than first running the day real money is involved.
         const session = await getProvider().retrieveSession(c.paymentSessionId);
-        if (session.payment_status === 'paid') {
-          console.warn('[chaseContracts] webhook was missed, repairing:', c.id);
-          await db.collection('contracts').doc(c.id).update({
-            status: 'paid',
-            paidAt: FieldValue.serverTimestamp(),
-            paymentIntent: session.payment_intent || null
-          });
-          await db.collection('contracts').doc(c.id).collection('audit').add({
-            event: 'paid-reconciled',
-            at: FieldValue.serverTimestamp(),
-            paymentIntent: session.payment_intent || null
-          });
-          // Patched in memory too, so dueActions below — which only ever
-          // sees this array, never Firestore again — skips it this run.
-          c.status = 'paid';
+        if (session.payment_status !== 'paid') continue;
+
+        console.warn('[chaseContracts] webhook was missed, repairing:', c.id);
+
+        // Routed through the SAME shared decision stripeWebhook and
+        // fakeCheckoutComplete use — not a hand-rolled update. This is what
+        // gets reconciliation the amount check (session.amount_total is
+        // compared against retainerCents inside markContractPaid) and a
+        // fresh ref.get() at decision time, which closes the race where this
+        // loop's stale in-memory `contracts` array could otherwise stomp a
+        // paidAt the webhook had already written moments earlier.
+        const decision = await markContractPaid(db, c.id, { amountCents: session.amount_total });
+        if (!decision.ok) {
+          console.warn('[chaseContracts] not reconciled:', decision.reason, c.id);
+          continue;
         }
+
+        // provider/isTestPayment are derived, never hard-coded — reconciliation
+        // runs under whichever provider is currently configured, and a
+        // hard-coded 'fake'/false here would mislabel a real Stripe repair.
+        const provider = providerName();
+        const isTestPayment = provider === 'fake';
+
+        // Same shared shape stripeWebhook writes, field for field, so a
+        // reconciled payment is indistinguishable from one the webhook
+        // recorded directly except for the audit event name.
+        const auditRef = decision.ref.collection('audit').doc();
+        const batch = db.batch();
+        batch.update(decision.ref, {
+          status: 'paid',
+          paidAt: FieldValue.serverTimestamp(),
+          paymentIntent: session.payment_intent || null,
+          isTestPayment: isTestPayment
+        });
+        batch.set(auditRef, {
+          event: 'paid-reconciled',
+          at: FieldValue.serverTimestamp(),
+          amountCents: session.amount_total,
+          paymentIntent: session.payment_intent || null,
+          provider: provider,
+          isTestPayment: isTestPayment
+        });
+        await batch.commit();
+
+        // Patched in memory too, so dueActions below — which only ever
+        // sees this array, never Firestore again — skips it this run.
+        c.status = 'paid';
       } catch (err) {
         console.warn('[chaseContracts] could not reconcile', c.id, describeError(err));
       }
