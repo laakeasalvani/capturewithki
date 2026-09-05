@@ -155,6 +155,28 @@ test('errors are reported as a list, not a single message', () => {
   assert.ok(result.errors.length >= 3);
 });
 
+test('a retainer percentage outside 0-100 is refused, not silently zeroed', () => {
+  assert.equal(validateContractInput(goodInput({ retainerPercent: 150 })).ok, false);
+  assert.equal(validateContractInput(goodInput({ retainerPercent: -5 })).ok, false);
+  assert.equal(validateContractInput(goodInput({ retainerPercent: NaN })).ok, false);
+  assert.equal(validateContractInput(goodInput({ retainerPercent: Infinity })).ok, false);
+  assert.equal(validateContractInput(goodInput({ retainerPercent: '30' })).ok, false);
+});
+
+test('a sensible retainer percentage is accepted, and omitting it is fine', () => {
+  assert.equal(validateContractInput(goodInput({ retainerPercent: 30 })).ok, true);
+  assert.equal(validateContractInput(goodInput({ retainerPercent: 0 })).ok, true);
+  assert.equal(validateContractInput(goodInput({ retainerPercent: 100 })).ok, true);
+  assert.equal(validateContractInput(goodInput()).ok, true);
+});
+
+test('an over-long phone or event date is refused rather than truncated', () => {
+  assert.equal(validateContractInput(goodInput({ clientPhone: '5'.repeat(41) })).ok, false);
+  assert.equal(validateContractInput(goodInput({ eventDate: 'x'.repeat(41) })).ok, false);
+  assert.equal(validateContractInput(goodInput({ clientPhone: '5'.repeat(40) })).ok, true);
+  assert.equal(validateContractInput(goodInput({ eventDate: 'x'.repeat(40) })).ok, true);
+});
+
 test('a placeholder is replaced with its value', () => {
   assert.equal(
     renderTemplate('<p>For {{client_name}}</p>', { client_name: 'Jordan' }),

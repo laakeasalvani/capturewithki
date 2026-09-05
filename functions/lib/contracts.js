@@ -43,6 +43,8 @@ export const MAX_LOCATION = 300;
 export const MAX_LINE_LABEL = 120;
 export const MAX_LINE_ITEMS = 20;
 export const MAX_TOTAL_CENTS = 10000000; // $100,000 — far above her top package
+export const MAX_PHONE = 40;
+export const MAX_EVENT_DATE = 40;
 
 // A contract id arrives from a query string, becomes a Firestore path, and is
 // embedded in an email link. Its shape is not negotiable. Same reasoning, and
@@ -72,6 +74,27 @@ export function validateContractInput(input) {
 
   if (trimmedString(d.eventLocation).length > MAX_LOCATION) {
     errors.push('That location is too long.');
+  }
+
+  // Optional, but if it is given it must be usable. Without this, a typo of 150
+  // (meaning "$150") is stored as retainerPercent:150 while computeRetainerCents's
+  // own out-of-range guard quietly returns 0 — a real, sendable contract with no
+  // retainer collected and nothing anywhere reporting a problem.
+  const pct = d.retainerPercent;
+  if (pct !== undefined && pct !== null) {
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+      errors.push('The retainer percentage must be a number between 0 and 100.');
+    }
+  }
+
+  // Both are sliced to these same caps in createContract. Validating against the
+  // identical numbers is what makes the slice a no-op rather than silent data
+  // loss on a field that gets rendered into a legal document.
+  if (trimmedString(d.clientPhone).length > MAX_PHONE) {
+    errors.push('That phone number is too long.');
+  }
+  if (trimmedString(d.eventDate).length > MAX_EVENT_DATE) {
+    errors.push('That event date is too long.');
   }
 
   const items = Array.isArray(d.lineItems) ? d.lineItems : null;

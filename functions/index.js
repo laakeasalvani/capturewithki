@@ -27,7 +27,8 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
 import {
   validateContractInput, sumLineItems, computeRetainerCents,
-  computeBalanceCents, DEFAULT_RETAINER_PERCENT, isValidContractId
+  computeBalanceCents, DEFAULT_RETAINER_PERCENT, isValidContractId,
+  MAX_PHONE, MAX_EVENT_DATE
 } from './lib/contracts.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
@@ -483,10 +484,7 @@ export const regenerateGalleryPassword = onCall(
 // Contracts
 //
 // createContract drafts a contract from an inquiry (or from scratch) for
-// Khiara's own dashboard. Unlike the client-facing functions above, she is
-// the ONLY caller — there is no id to probe for by trying different error
-// messages, so this one is allowed to say exactly what is wrong with her
-// input rather than hiding behind a generic message.
+// Khiara's own dashboard.
 // ---------------------------------------------------------------------------
 
 export const createContract = onCall(
@@ -514,8 +512,8 @@ export const createContract = onCall(
       inquiryId: typeof d.inquiryId === 'string' && d.inquiryId ? d.inquiryId : null,
       clientName: String(d.clientName).trim().slice(0, 200),
       clientEmail: String(d.clientEmail).trim().slice(0, 254),
-      clientPhone: typeof d.clientPhone === 'string' ? d.clientPhone.trim().slice(0, 40) : '',
-      eventDate: typeof d.eventDate === 'string' ? d.eventDate.trim().slice(0, 40) : '',
+      clientPhone: typeof d.clientPhone === 'string' ? d.clientPhone.trim().slice(0, MAX_PHONE) : '',
+      eventDate: typeof d.eventDate === 'string' ? d.eventDate.trim().slice(0, MAX_EVENT_DATE) : '',
       eventLocation: typeof d.eventLocation === 'string' ? d.eventLocation.trim().slice(0, 300) : '',
       lineItems: lineItems,
       totalCents: totalCents,
@@ -537,9 +535,20 @@ export const createContract = onCall(
       throw new HttpsError('internal', 'Something went wrong. Please try again.');
     }
 
-    await ref.collection('audit').add({
-      event: 'created', at: FieldValue.serverTimestamp(), by: request.auth.uid
-    });
+    try {
+      await ref.collection('audit').add({
+        event: 'created', at: FieldValue.serverTimestamp(), by: request.auth.uid
+      });
+    } catch (err) {
+      // Logged, not thrown. The contract IS created by this point. Throwing would
+      // tell her it failed, and her retry would create a SECOND draft for the same
+      // booking. A missing audit row on CREATION is recoverable — the document's own
+      // timestamps survive. A duplicate contract is a conversation with a client.
+      //
+      // This leniency is specific to creation. Do NOT copy it to signing, where the
+      // audit row is the legal evidence.
+      console.warn('[createContract] contract created but audit row failed:', describeError(err));
+    }
 
     console.log('[createContract] drafted:', ref.id);
     return { contractId: ref.id };
