@@ -28,11 +28,19 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
 import {
   validateContractInput, sumLineItems, computeRetainerCents,
   computeBalanceCents, DEFAULT_RETAINER_PERCENT, isValidContractId,
-  MAX_PHONE, MAX_EVENT_DATE
+  MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition
 } from './lib/contracts.js';
+import { generateToken, hashToken, hashDocument } from './lib/contract-crypto.js';
+import { readyToSignEmail, formatCents } from './lib/contract-email.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
+
+// Hard-coded, and never taken from request.data. The sign link emailed below
+// is built ONLY from this origin plus the freshly minted token — nothing a
+// caller supplies can reach it, which is what makes it safe to drop into an
+// href after nothing more than escaping.
+const SITE_ORIGIN = 'https://capturewithki.com';
 
 initializeApp();
 const db = getFirestore();
@@ -552,6 +560,138 @@ export const createContract = onCall(
 
     console.log('[createContract] drafted:', ref.id);
     return { contractId: ref.id };
+  }
+);
+
+// sendContract freezes the contract's exact wording, hashes it, mints a
+// signing token, and emails the client a link. From the moment this returns,
+// the live template is irrelevant to this contract: editing a clause later
+// cannot change what this client agreed to, and documentHash is what proves
+// the signed version was not swapped.
+export const sendContract = onCall(
+  { region: 'us-west1', cors: true, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    await requireAdmin(request);
+
+    const d = request.data || {};
+    const contractId = typeof d.contractId === 'string' ? d.contractId.trim() : '';
+    if (!isValidContractId(contractId)) {
+      throw new HttpsError('invalid-argument', 'That contract id is not valid.');
+    }
+
+    const ref = db.collection('contracts').doc(contractId);
+    let snap;
+    try {
+      snap = await ref.get();
+    } catch (err) {
+      console.warn('[sendContract] could not read contract:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (!snap.exists) throw new HttpsError('not-found', 'No such contract.');
+    const contract = snap.data();
+
+    if (!canTransition(contract.status, 'sent')) {
+      throw new HttpsError('failed-precondition', 'That contract cannot be sent from its current state.');
+    }
+
+    const templateId = typeof d.templateId === 'string' ? d.templateId.trim() : '';
+    let tplSnap;
+    try {
+      tplSnap = await db.collection('contractTemplates').doc(templateId).get();
+    } catch (err) {
+      console.warn('[sendContract] could not read template:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (!tplSnap.exists) throw new HttpsError('not-found', 'No such contract template.');
+    const tpl = tplSnap.data();
+
+    // A placeholder contract reaching a real client would be worse than no system at
+    // all — she would believe she had an agreement and have nothing. functions/seed/
+    // ships a placeholder template marked isDraft, and this is what keeps it unsendable.
+    if (tpl.isDraft === true) {
+      throw new HttpsError('failed-precondition',
+        'That contract template is still marked a draft. Replace it with the real agreement first.');
+    }
+
+    // Rendered ONCE, here, and stored. From this moment the live template is
+    // irrelevant to this contract: editing a clause later cannot change what
+    // this client agreed to, and the hash is what proves it.
+    const documentSnapshot = renderTemplate(tpl.html, {
+      client_name: contract.clientName,
+      client_email: contract.clientEmail,
+      event_date: contract.eventDate,
+      event_location: contract.eventLocation,
+      total: formatCents(contract.totalCents),
+      retainer: formatCents(contract.retainerCents),
+      balance: formatCents(contract.balanceCents),
+      line_items: contract.lineItems
+        .map(function (i) { return i.label + ' — ' + formatCents(i.amountCents); })
+        .join('; ')
+    });
+
+    // A placeholder the template asked for and the data could not fill would
+    // ship a contract with a visible hole in it. Refuse instead.
+    const unfilled = documentSnapshot.match(/\{\{\s*[a-z_][a-z0-9_]*\s*\}\}/gi);
+    if (unfilled) {
+      throw new HttpsError('failed-precondition',
+        'The template has placeholders nothing filled in: ' + unfilled.join(', '));
+    }
+
+    const token = generateToken();
+    // Built ONLY from the hard-coded origin above and the token just minted —
+    // never from request.data or anything else caller-supplied.
+    const signUrl = SITE_ORIGIN + '/sign/?t=' + token;
+
+    try {
+      await ref.update({
+        status: 'sent',
+        templateId: templateId,
+        templateVersion: tpl.version || 1,
+        documentSnapshot: documentSnapshot,
+        documentHash: hashDocument(documentSnapshot),
+        // Only the hash. The token itself exists in exactly one place after
+        // this line returns: the client's email.
+        tokenHash: hashToken(token),
+        sentAt: FieldValue.serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('[sendContract] could not update:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    const mail = readyToSignEmail({
+      clientName: contract.clientName,
+      signUrl: signUrl,
+      eventDate: contract.eventDate,
+      totalCents: contract.totalCents,
+      retainerCents: contract.retainerCents
+    });
+    const key = RESEND_API_KEY.value();
+    await sendEmail({
+      apiKey: key,
+      to: contract.clientEmail,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html
+    });
+
+    try {
+      await ref.collection('audit').add({
+        event: 'sent', at: FieldValue.serverTimestamp(), by: request.auth.uid
+      });
+    } catch (err) {
+      // Logged, not thrown. The contract IS sent by this point — the email is
+      // away and status already updated. Throwing here would tell her the send
+      // failed when it did not, and a retry would mint and mail a SECOND token
+      // for the same contract.
+      console.warn('[sendContract] contract sent but audit row failed:', describeError(err));
+    }
+
+    console.log('[sendContract] sent:', contractId);
+    // Returned so she can copy the link and text it to them as well. Resend
+    // returning 200 means queued, not delivered — this project already learned
+    // that the hard way.
+    return { ok: true, signUrl: signUrl };
   }
 );
 
