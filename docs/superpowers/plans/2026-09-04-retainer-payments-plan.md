@@ -12,7 +12,9 @@
 
 **This is plan 2 of 2.** Plan 1 (`2026-09-04-contracts-and-signing-plan.md`) must be complete first — this plan modifies `signContract`, which Plan 1 creates.
 
-**Blocked on:** Khiara creating a Stripe account. Test-mode keys work the moment the account exists, so only Task 8 needs verification to have finished.
+**Blocked on:** almost nothing. **Task 2a introduces a payment-provider seam with a fake payer**, so the entire flow — send, sign, pay, chase, dashboard — runs and is verified today. Only Task 3 (Stripe keys) and Task 8 (go live) need her account, and switching over is one environment variable.
+
+**Build order without a Stripe account:** Tasks 1, 2, 2a, 6, 7 fully. Tasks 4 and 5 written, with their failure paths verified. Tasks 3 and 8 wait.
 
 ## Global Constraints
 
@@ -464,6 +466,198 @@ git commit -m "Build a Checkout session from the stored contract, never the brow
 
 ---
 
+### Task 2a: The payment provider seam
+
+**Files:**
+- Create: `functions/lib/payments.js`
+- Create: `functions/lib/fake-payments.js`
+- Create: `sign/fake-pay/index.html`, `sign/fake-pay/fake-pay.js`
+- Test: `functions/test/payments.test.js`
+
+**Interfaces:**
+- Consumes: `createRetainerSession`, `checkoutLineItems` (Task 2); `canTransition` (Plan 1 Task 4)
+- Produces: `providerName() → 'fake'|'stripe'`, `getProvider() → Provider`, `markContractPaid(db, contractId, payment) → { ok, reason, contract?, ref? }`, `fakePayAllowed(contract) → bool`, `FAKE_ALLOWLIST: string[]`
+
+`Provider` is exactly two methods, and both implementations must match these signatures or the swap will not be a swap:
+
+```
+createRetainerSession(contract, contractId, successUrl, cancelUrl)
+  → Promise<{ id: string, url: string }>
+
+retrieveSession(sessionId)
+  → Promise<{ payment_status: 'paid'|'unpaid', payment_intent: string|null }>
+```
+
+The Stripe implementation wraps `lib/stripe.js`. The fake implementation writes a document to a `fakeSessions` collection and returns a URL to `/sign/fake-pay/`, then reads that same document back in `retrieveSession` — so the reconciliation path in Task 6 is genuinely exercised today, rather than first running on the day real money is involved.
+
+**Why this task exists:** Khiara has no Stripe account yet, and code that has never run is where bugs hide. This makes the entire flow — send, sign, pay, chase, dashboard — runnable today against a fake payer, so that switching to Stripe later is configuration rather than surgery.
+
+**The key insight:** do not fake Stripe. Share the part that matters — recording a payment — and vary only *how we learn a payment happened*. `markContractPaid` is written once, tested once, and used by both the real webhook and the fake checkout. That is the difference between a seam and a mock.
+
+#### The production-safety problem, and the guard
+
+There is **no staging Firebase project.** `capturewithki-69dd3` is production, and the fake payer will live inside it. An environment check therefore cannot protect anything, and a config flag left in the wrong position would let a real client "pay" for a real wedding with a button that moves no money.
+
+So the guard is not environmental. **The fake provider refuses any contract whose client email is not on a hard-coded allowlist.** Even if the provider is left set to `fake` on the day a real client signs, that client cannot fake-pay — the only addresses that can are Laakea's and Khiara's own.
+
+Every fake payment is also written with `isTestPayment: true`, so test data can be found and deleted later. This project already carries *"test inquiries from backend development are still in Firestore and need deleting"* as outstanding work. Do not create that problem a second time.
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// functions/test/payments.test.js
+import { test } from 'node:test';
+import assert from 'node:assert';
+import { fakePayAllowed, FAKE_ALLOWLIST, providerName } from '../lib/payments.js';
+
+test('the allowlist is small and explicit', () => {
+  assert.ok(Array.isArray(FAKE_ALLOWLIST));
+  assert.ok(FAKE_ALLOWLIST.length > 0);
+  assert.ok(FAKE_ALLOWLIST.length <= 4);
+  for (const a of FAKE_ALLOWLIST) assert.match(a, /^[^\s@]+@[^\s@]+$/);
+});
+
+test('only an allowlisted address may fake-pay', () => {
+  assert.equal(fakePayAllowed({ clientEmail: FAKE_ALLOWLIST[0] }), true);
+  assert.equal(fakePayAllowed({ clientEmail: 'realbride@example.com' }), false);
+});
+
+// If the allowlist were case- or whitespace-sensitive, a real address that
+// merely differed in case could slip through. It must not.
+test('the allowlist match is case and whitespace insensitive', () => {
+  assert.equal(fakePayAllowed({ clientEmail: '  ' + FAKE_ALLOWLIST[0].toUpperCase() + ' ' }), true);
+});
+
+test('a missing or malformed email can never fake-pay', () => {
+  assert.equal(fakePayAllowed({ clientEmail: '' }), false);
+  assert.equal(fakePayAllowed({ clientEmail: null }), false);
+  assert.equal(fakePayAllowed({}), false);
+  assert.equal(fakePayAllowed(null), false);
+});
+
+// A near-miss must not pass. Substring matching here would be a disaster.
+test('an address merely containing an allowlisted one is refused', () => {
+  assert.equal(fakePayAllowed({ clientEmail: FAKE_ALLOWLIST[0] + '.evil.com' }), false);
+  assert.equal(fakePayAllowed({ clientEmail: 'x' + FAKE_ALLOWLIST[0] }), false);
+});
+
+test('the provider defaults to fake and is switched by env alone', () => {
+  delete process.env.PAYMENT_PROVIDER;
+  assert.equal(providerName(), 'fake');
+  process.env.PAYMENT_PROVIDER = 'stripe';
+  assert.equal(providerName(), 'stripe');
+  process.env.PAYMENT_PROVIDER = 'nonsense';
+  // An unrecognised value must NOT silently fall through to fake, or a typo
+  // in configuration becomes a payment system that takes no money.
+  assert.throws(() => providerName());
+  delete process.env.PAYMENT_PROVIDER;
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd functions && node --test test/payments.test.js`
+Expected: FAIL — cannot find module `../lib/payments.js`
+
+- [ ] **Step 3: Write the seam**
+
+```js
+// functions/lib/payments.js
+//
+// One interface, two implementations. Which one runs is decided by
+// PAYMENT_PROVIDER alone, so moving to real money is configuration.
+//
+// The important part is what is NOT varied: markContractPaid is shared. The
+// real webhook and the fake checkout both call it, so the logic that decides
+// a contract is paid is written once and tested once.
+import { canTransition } from './contracts.js';
+
+// The ONLY addresses that may complete a fake payment. There is no staging
+// project — the fake payer lives in production — so this list, not an
+// environment check, is what stands between a real client and a button that
+// pretends to take their money.
+export const FAKE_ALLOWLIST = [
+  'laakeasalvani@gmail.com',
+  'capturewithki@gmail.com'
+];
+
+export function fakePayAllowed(contract) {
+  const email = contract && typeof contract.clientEmail === 'string'
+    ? contract.clientEmail.trim().toLowerCase()
+    : '';
+  if (!email) return false;
+  // Exact match on the whole address. indexOf/includes here would let
+  // "laakeasalvani@gmail.com.attacker.example" through.
+  return FAKE_ALLOWLIST.some((a) => a.toLowerCase() === email);
+}
+
+export function providerName() {
+  const name = process.env.PAYMENT_PROVIDER || 'fake';
+  if (name !== 'fake' && name !== 'stripe') {
+    // Loud, not silent. A typo that quietly selected the fake provider would
+    // be a live payment system that never takes any money.
+    throw new Error('Unknown PAYMENT_PROVIDER: ' + name);
+  }
+  return name;
+}
+
+// Shared by both providers. Everything that decides whether a contract
+// becomes paid lives here and nowhere else.
+export async function markContractPaid(db, contractId, payment) {
+  const ref = db.collection('contracts').doc(contractId);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, reason: 'unknown-contract' };
+  const contract = snap.data();
+
+  // Idempotent. Stripe retries, and a client can double-tap a fake pay button.
+  if (contract.status === 'paid') return { ok: false, reason: 'already-paid' };
+
+  // Defence in depth. The session was built server-side from this document,
+  // so a mismatch means something is wrong enough that recording a payment
+  // would be worse than refusing one.
+  if (payment.amountCents !== contract.retainerCents) {
+    return { ok: false, reason: 'amount-mismatch' };
+  }
+
+  // Out-of-order arrival is real: a webhook can land before signContract has
+  // finished writing. Refusing here is correct — reconciliation picks it up.
+  if (!canTransition(contract.status, 'paid')) {
+    return { ok: false, reason: 'not-payable-from-' + contract.status };
+  }
+
+  return { ok: true, reason: 'ok', contract: contract, ref: ref };
+}
+```
+
+`markContractPaid` deliberately **decides** but does not **write** — the caller performs the update and the audit row, so the decision stays testable without Firestore.
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd functions && node --test test/payments.test.js`
+Expected: PASS
+
+- [ ] **Step 5: Build the fake checkout page**
+
+`sign/fake-pay/index.html` must be **impossible to mistake for a real payment page**: a red border, the words **"TEST PAYMENT — NO MONEY MOVES"** at the top in large text, the contract id, the amount, and a single button reading **"Pretend to pay"**. No branding, no styling that resembles her site.
+
+It calls a new `fakeCheckoutComplete` callable, which checks `fakePayAllowed`, calls `markContractPaid`, and writes the update with `isTestPayment: true`.
+
+- [ ] **Step 6: Verify the guard actually holds**
+
+Create a contract with a **non-allowlisted** email, sign it, and try to complete the fake payment.
+
+Expected: **refused.** The contract stays `signed`. If it flips to `paid`, stop everything — that guard is the only thing protecting a real client from a fake payment, and it is load-bearing in production.
+
+- [ ] **Step 7: Commit**
+
+```bash
+cd functions && npm test
+git add functions/lib/payments.js functions/test/payments.test.js sign/fake-pay/ functions/index.js
+git commit -m "Let the whole flow run against a fake payer that real clients cannot reach"
+```
+
+---
+
 ### Task 3: Store the Stripe secrets
 
 **Files:** none — this is configuration
@@ -574,26 +768,19 @@ export const stripeWebhook = onRequest(
       return;
     }
 
-    // Idempotent. Stripe retries on any non-2xx and can deliver the same
-    // event more than once even on success.
-    if (contract.status === 'paid') { res.status(200).send('already paid'); return; }
-
-    // Defence in depth: the session was built server-side from this document,
-    // so this should always match. If it ever does not, something is wrong
-    // enough that recording it as paid would be worse than failing loudly.
-    if (object.amount_total !== contract.retainerCents) {
-      console.error('[stripeWebhook] AMOUNT MISMATCH on', contractId,
-        'expected', contract.retainerCents, 'got', object.amount_total);
-      res.status(200).send('amount mismatch');
-      return;
-    }
-
-    // Out-of-order delivery is real: a webhook can arrive before signContract
-    // has finished writing. Refusing here means the reconciliation sweep in
-    // Task 6 picks it up moments later, which is correct.
-    if (!canTransition(contract.status, 'paid')) {
-      console.warn('[stripeWebhook] cannot pay from status:', contract.status, contractId);
-      res.status(200).send('not payable yet');
+    // Every decision about whether this counts as a payment lives in
+    // markContractPaid (Task 2a) — idempotency, the amount check, and the
+    // out-of-order guard. The fake payer calls exactly the same function, so
+    // there is one implementation of "is this really paid" and one set of
+    // tests for it.
+    const decision = await markContractPaid(db, contractId, {
+      amountCents: object.amount_total
+    });
+    if (!decision.ok) {
+      // 200, always. Anything else makes Stripe retry an event whose outcome
+      // will never change.
+      console.warn('[stripeWebhook] not recorded:', decision.reason, contractId);
+      res.status(200).send(decision.reason);
       return;
     }
 
@@ -674,7 +861,10 @@ Insert into `signContract`, **after** the signature write succeeds and **before*
 const back = SITE_ORIGIN + '/sign/?t=' + token;
 let checkoutUrl = null;
 try {
-  const session = await createRetainerSession(
+  // Dispatched through the seam, so this line is identical whether the fake
+  // payer or Stripe is configured. Switching between them is PAYMENT_PROVIDER
+  // and nothing else.
+  const session = await getProvider().createRetainerSession(
     contract, ref.id, back + '&paid=1', back
   );
   checkoutUrl = session.url;
@@ -688,7 +878,7 @@ try {
 
 Then change the return to `return { ok: true, signedAt: Date.now(), checkoutUrl: checkoutUrl };`
 
-Add the import alongside the others: `import { createRetainerSession } from './lib/stripe.js';`
+Add the import alongside the others: `import { getProvider } from './lib/payments.js';`
 
 - [ ] **Step 2: Redirect from the signing page**
 
@@ -826,7 +1016,10 @@ export const chaseContracts = onSchedule(
       const signedAt = c.signedAt && c.signedAt.toMillis ? c.signedAt.toMillis() : null;
       if (signedAt === null || now - signedAt < 15 * 60000) continue;
       try {
-        const session = await getStripe().checkout.sessions.retrieve(c.stripeSessionId);
+        // Through the seam. The fake provider's retrieveSession reads the
+        // fakeSessions collection, so reconciliation is exercised for real
+        // today rather than first running on the day money is involved.
+        const session = await getProvider().retrieveSession(c.stripeSessionId);
         if (session.payment_status === 'paid') {
           console.warn('[chaseContracts] webhook was missed, repairing:', c.id);
           await db.collection('contracts').doc(c.id).update({
@@ -945,6 +1138,19 @@ git commit -m "Never let a signed but unpaid contract look like a booking"
 - [ ] **Step 1: Confirm the account is genuinely ready**
 
 In her Stripe dashboard: payouts enabled, bank account attached, and the statement descriptor reading `CAPTUREWITHKI`. An unrecognisable descriptor gets charges reported as fraud.
+
+- [ ] **Step 1a: Switch the provider, and prove the fake payer is gone**
+
+```bash
+firebase functions:config:set   # or set PAYMENT_PROVIDER=stripe in the function env
+```
+
+Then confirm two things:
+
+1. `providerName()` returns `stripe` in the deployed functions — check a log line.
+2. **Delete every fake-paid contract.** Run a query for `isTestPayment == true` and remove them. Leaving them behind repeats the *"test inquiries still in Firestore"* problem already sitting in `CLAUDE.md` as outstanding work — except these ones say a booking was paid for.
+
+Also delete `sign/fake-pay/` from the repo, or leave it and confirm the allowlist guard still refuses everyone. Deleting is safer.
 
 - [ ] **Step 2: Swap in live keys**
 
