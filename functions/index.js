@@ -30,7 +30,7 @@ import {
   computeBalanceCents, DEFAULT_RETAINER_PERCENT, isValidContractId,
   MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition
 } from './lib/contracts.js';
-import { generateToken, hashToken, hashDocument } from './lib/contract-crypto.js';
+import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import { readyToSignEmail, formatCents } from './lib/contract-email.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
@@ -723,6 +723,84 @@ export const sendContract = onCall(
     // returning 200 means queued, not delivered — this project already learned
     // that the hard way.
     return { ok: true, signUrl: signUrl };
+  }
+);
+
+// openContract is the first client-facing (unauthenticated) function in this
+// feature. It is what runs when the client clicks the link in the email
+// sendContract sent them. Modelled directly on openGallery above — same
+// uniform-denial message, same deliberate absence of a rate limit — read
+// openGallery's comments first if either choice looks wrong here.
+
+// One message for every refusal. Saying "expired" rather than "not found"
+// confirms a token is real, which is exactly what a probing attempt is
+// looking for. Same reasoning as GALLERY_DENIED.
+const CONTRACT_DENIED = 'That link is not valid. Please check the email again.';
+
+export const openContract = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    const d = request.data || {};
+    const token = typeof d.token === 'string' ? d.token.trim() : '';
+
+    // Checked before touching Firestore.
+    if (!isValidTokenShape(token)) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+
+    // No rate limit here, deliberately, and for a different reason than the
+    // galleries. A gallery password is 8 characters from a 31-letter alphabet;
+    // this token is 256 bits. Guessing is not a threat, and the limiter that
+    // was removed from openGallery had already refused a correct password once.
+    const hash = hashToken(token);
+    let found = null;
+    try {
+      const q = await db.collection('contracts').where('tokenHash', '==', hash).limit(1).get();
+      if (!q.empty) found = q.docs[0];
+    } catch (err) {
+      console.warn('[openContract] lookup failed:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    if (!found) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    const contract = found.data();
+
+    // Verified again in constant time even though the query already matched,
+    // so this path does not depend on Firestore's comparison semantics.
+    if (!verifyToken(token, contract.tokenHash)) {
+      throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    }
+    if (['void', 'cancelled'].indexOf(contract.status) !== -1) {
+      console.log('[openContract] refused, state:', contract.status);
+      throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    }
+
+    // Stamped before returning. This is the ONLY signal that survives a
+    // spam-filed email — escalateUnreadInquiries exists because no signal the
+    // sending side produces can detect that failure.
+    const update = { openCount: (contract.openCount || 0) + 1 };
+    if (!contract.firstOpenedAt) update.firstOpenedAt = FieldValue.serverTimestamp();
+    if (contract.status === 'sent') update.status = 'opened';
+    try {
+      await found.ref.update(update);
+      await found.ref.collection('audit').add({
+        event: 'opened', at: FieldValue.serverTimestamp()
+      });
+    } catch (err) {
+      // Logged, not thrown. Failing to record the open must never stop a
+      // client reading the agreement they were sent.
+      console.warn('[openContract] could not stamp open:', describeError(err));
+    }
+
+    console.log('[openContract] opened:', found.id);
+    return {
+      contractId: found.id,
+      clientName: contract.clientName,
+      documentSnapshot: contract.documentSnapshot,
+      totalCents: contract.totalCents,
+      retainerCents: contract.retainerCents,
+      eventDate: contract.eventDate,
+      status: contract.status,
+      signedAt: contract.signedAt ? contract.signedAt.toMillis() : null
+    };
   }
 );
 
