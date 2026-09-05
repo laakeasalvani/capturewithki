@@ -1,3 +1,9 @@
+import { escapeHtml } from './html.js';
+// email.js is not the only importer: lib/kea.js pulls escapeHtml from here
+// too, for a second site's contact-form emails that share nothing else with
+// CaptureWithKi. Re-export so that import keeps resolving after the move.
+export { escapeHtml };
+
 // Resend's shared "onboarding" sandbox sender is test-only: it can deliver
 // ONLY to the email address on the Resend account, and any other recipient
 // gets a 403. The client thank-you email must reach real couples, so this
@@ -51,17 +57,6 @@ const C = {
 };
 const SERIF = "Georgia, 'Times New Roman', Times, serif";
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
-
-// The plain-text emails could pass a stranger's name and message through
-// untouched, because text cannot be markup. In HTML it can.
-export function escapeHtml(v) {
-  return String(v === undefined || v === null ? '' : v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // Only a Storage URL belonging to this project may be embedded. The value
 // comes from Firestore and only an admin can write it, but an <img src>

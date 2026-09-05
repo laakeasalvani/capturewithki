@@ -6,6 +6,8 @@
 //
 // All money is integer cents. Dollars-as-floats put 0.1 + 0.2 into an invoice.
 
+import { escapeHtml } from './html.js';
+
 export const DEFAULT_RETAINER_PERCENT = 30;
 
 export function sumLineItems(lineItems) {
@@ -94,4 +96,21 @@ export function validateContractInput(input) {
   if (total > MAX_TOTAL_CENTS) errors.push('That total looks wrong — is it in cents?');
 
   return { ok: errors.length === 0, errors: errors };
+}
+
+const FIELD = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi;
+
+export function renderTemplate(templateHtml, fields) {
+  if (typeof templateHtml !== 'string') return '';
+  const f = fields && typeof fields === 'object' ? fields : {};
+  // String.replace with a function makes exactly one pass, which is the whole
+  // defence against a client named "{{total}}" reading a field they should
+  // not see. Do not reach for a while-loop that re-renders until stable.
+  return templateHtml.replace(FIELD, function (whole, name) {
+    const key = String(name).toLowerCase();
+    // hasOwnProperty, not `key in f` — otherwise {{constructor}} resolves
+    // through the prototype chain and renders something absurd.
+    if (!Object.prototype.hasOwnProperty.call(f, key)) return whole;
+    return escapeHtml(f[key]);
+  });
 }

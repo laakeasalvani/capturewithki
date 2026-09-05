@@ -3,7 +3,8 @@ import assert from 'node:assert';
 import {
   DEFAULT_RETAINER_PERCENT, sumLineItems,
   computeRetainerCents, computeBalanceCents,
-  isValidContractId, validateContractInput, MAX_TOTAL_CENTS
+  isValidContractId, validateContractInput, MAX_TOTAL_CENTS,
+  renderTemplate
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -152,4 +153,45 @@ test('errors are reported as a list, not a single message', () => {
   const result = validateContractInput({ clientName: '', clientEmail: 'nope', lineItems: [] });
   assert.equal(result.ok, false);
   assert.ok(result.errors.length >= 3);
+});
+
+test('a placeholder is replaced with its value', () => {
+  assert.equal(
+    renderTemplate('<p>For {{client_name}}</p>', { client_name: 'Jordan' }),
+    '<p>For Jordan</p>'
+  );
+});
+
+test('whitespace inside the braces is tolerated', () => {
+  assert.equal(renderTemplate('{{ client_name }}', { client_name: 'Jordan' }), 'Jordan');
+});
+
+// The client's own name goes into the contract HTML. email.js already
+// documents why this matters: text cannot be markup, but HTML can.
+test('values are escaped', () => {
+  assert.equal(
+    renderTemplate('{{client_name}}', { client_name: '<script>alert(1)</script>' }),
+    '&lt;script&gt;alert(1)&lt;/script&gt;'
+  );
+});
+
+// A client named "{{total}}" must not be able to read another field. One
+// substitution pass, never recursive.
+test('a value containing a placeholder is not expanded again', () => {
+  assert.equal(
+    renderTemplate('{{client_name}}', { client_name: '{{total}}', total: '$1,200' }),
+    '{{total}}'
+  );
+});
+
+// Blanking an unknown placeholder would ship a contract with a silent hole
+// where a clause used to be. Leaving it visible makes the mistake loud.
+test('an unknown placeholder is left visible, not blanked', () => {
+  assert.equal(renderTemplate('<p>{{mystery}}</p>', {}), '<p>{{mystery}}</p>');
+});
+
+test('rendering survives nonsense input', () => {
+  assert.equal(renderTemplate(null, {}), '');
+  assert.equal(renderTemplate('<p>hi</p>', null), '<p>hi</p>');
+  assert.equal(renderTemplate('{{client_name}}', { client_name: null }), '');
 });
