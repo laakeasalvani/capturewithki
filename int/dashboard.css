@@ -168,3 +168,94 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
   margin:0 0 12px;padding:10px 12px;border-radius:8px;
   background:#fdf6e8;border:1px solid #e3d3ab;color:#7a5c1e;font-size:13px;
 }
+
+/* ---------- contracts ---------- */
+.c-block{margin:0 0 26px;}
+.c-block-title{font-family:var(--display);font-weight:400;font-size:19px;margin:0 0 12px;}
+
+.c-inquiry-list{display:flex;flex-direction:column;gap:8px;margin:0 0 14px;}
+.c-inquiry-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 14px;
+}
+.c-inquiry-who{display:flex;flex-direction:column;gap:2px;}
+.c-inquiry-name{font-size:14px;}
+.c-inquiry-meta{font-size:12px;color:var(--muted);}
+.c-send-from{
+  background:var(--khaki);color:#fff;border:none;border-radius:16px;
+  padding:7px 16px;font-family:inherit;font-size:13px;cursor:pointer;
+}
+
+.c-composer{
+  background:var(--paper);border:1px solid var(--line);border-radius:10px;
+  padding:20px;
+}
+
+.c-line-items{display:flex;flex-direction:column;gap:10px;margin:0 0 4px;}
+.c-line-item-wrap{display:flex;flex-direction:column;gap:4px;}
+.c-line-item{display:flex;align-items:center;gap:8px;}
+.c-li-error{margin:0 0 0 4px;font-size:12px;color:#a33;}
+.c-li-label{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:14px;}
+.c-li-dollar{color:var(--muted);}
+.c-li-amount{width:96px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:14px;}
+.c-li-remove{
+  width:28px;height:28px;padding:0;border:none;border-radius:50%;
+  background:rgba(23,22,20,.72);color:#fff;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;
+}
+.c-li-remove:hover{background:#a4342a;}
+
+.c-totals{
+  background:var(--cream);border-radius:8px;padding:14px 16px;margin:14px 0 18px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.c-totals-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.c-totals-row strong{font-family:var(--display);font-size:19px;font-weight:400;}
+.c-retainer-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.c-retainer-label input{width:80px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:14px;}
+.c-inline-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.c-inline-label select{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13px;}
+
+.c-preview{
+  background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:16px;margin-top:16px;font-size:14px;max-height:480px;overflow:auto;
+}
+.c-result{margin-top:16px;}
+.c-sent-ok{color:var(--khaki);font-size:14px;margin:0 0 8px;}
+.c-sent-link code{font-size:12px;background:var(--cream);padding:4px 8px;border-radius:5px;word-break:break-all;}
+
+/* The one alert this screen must not let her miss: an email that may never
+   have arrived. Same red palette as q-warn / q-failed elsewhere, deliberately
+   — this is the same severity of problem. */
+.c-alert-loud{
+  background:#fdf3f3;border:1px solid #e6c3c3;color:#7a2e2e;
+  padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;margin:10px 0;
+}
+
+.c-list{display:flex;flex-direction:column;gap:16px;}
+.c-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;}
+.c-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.c-card-name{font-family:var(--display);font-weight:400;font-size:19px;margin:0;}
+
+.c-status-badge{font-size:11px;letter-spacing:.06em;padding:4px 12px;border-radius:12px;white-space:nowrap;}
+.c-status-draft{background:var(--cream);color:var(--muted);}
+.c-status-sent{background:none;border:1px solid var(--khaki);color:var(--khaki);}
+.c-status-opened{background:#fdf6e8;border:1px solid #e3d3ab;color:#7a5c1e;}
+/* Signed-but-unpaid must never read as success: no green, no checkmark tone.
+   This is the state that double-books a date if it is ever mistaken for
+   booked, so it gets the same insistent amber as "not opened" gets red. */
+.c-status-signed{background:#f7e2c9;border:1px solid #e3b877;color:#8a4b12;font-weight:600;}
+.c-status-paid{background:var(--khaki);color:#fff;}
+.c-status-void{background:#e6d9d6;color:#8a3a2e;}
+/* Reuses the loud red palette, and additionally forces the badge to full
+   width so it cannot be skimmed past the way a small pill can. */
+.c-status-loud{background:#fdf3f3;border:1px solid #e6c3c3;color:#7a2e2e;font-weight:700;}
+
+.c-meta{display:flex;flex-wrap:wrap;gap:14px 22px;margin:14px 0 0;}
+.c-meta div{min-width:110px;}
+.c-meta dt{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0;}
+.c-meta dd{margin:2px 0 0;font-size:14px;}
+
+@media (max-width:768px){
+  .c-send-from,.c-resend{min-height:44px;}
+  .c-li-remove{width:44px;height:44px;font-size:15px;}
+}

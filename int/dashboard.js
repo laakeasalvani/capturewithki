@@ -4,6 +4,7 @@ import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.0/f
 import { initInquiries } from './inquiries.js';
 import { initSettings } from './settings.js';
 import { initGalleries } from './galleries.js';
+import { initContracts } from './contracts.js';
 
 const loading = document.getElementById('dashLoading');
 const loginView = document.getElementById('dashLogin');
@@ -17,11 +18,13 @@ const submitBtn = form.querySelector('button[type="submit"]');
 const screens = {
   inquiries: document.getElementById('screenInquiries'),
   galleries: document.getElementById('screenGalleries'),
+  contracts: document.getElementById('screenContracts'),
   settings: document.getElementById('screenSettings')
 };
 const tabs = {
   inquiries: document.getElementById('tabInquiries'),
   galleries: document.getElementById('tabGalleries'),
+  contracts: document.getElementById('tabContracts'),
   settings: document.getElementById('tabSettings')
 };
 
@@ -41,6 +44,7 @@ function selectTab(name) {
 
 tabs.inquiries.addEventListener('click', function () { selectTab('inquiries'); });
 tabs.galleries.addEventListener('click', function () { selectTab('galleries'); });
+tabs.contracts.addEventListener('click', function () { selectTab('contracts'); });
 tabs.settings.addEventListener('click', function () { selectTab('settings'); });
 
 form.addEventListener('submit', function (e) {
@@ -82,6 +86,7 @@ function paint() {
       started = true;
       initInquiries(screens.inquiries);
       initGalleries(screens.galleries);
+      initContracts(screens.contracts);
       initSettings(screens.settings);
     }
     return;
