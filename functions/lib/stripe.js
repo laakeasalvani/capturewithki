@@ -22,7 +22,14 @@ export function checkoutLineItems(contract) {
   if (!Number.isInteger(cents) || cents <= 0) {
     throw new Error('checkoutLineItems: retainerCents must be a positive whole number of cents');
   }
-  if (Number.isInteger(c.totalCents) && cents > c.totalCents) {
+  // Required, not optional. Gating this comparison on Number.isInteger(totalCents)
+  // meant a missing or malformed total silently removed the ceiling entirely, and
+  // any retainer at all would pass. The total is how we know the retainer is sane,
+  // so its absence is itself a refusal.
+  if (!Number.isInteger(c.totalCents) || c.totalCents <= 0) {
+    throw new Error('checkoutLineItems: totalCents must be a positive whole number of cents');
+  }
+  if (cents > c.totalCents) {
     throw new Error('checkoutLineItems: retainer exceeds the total');
   }
 

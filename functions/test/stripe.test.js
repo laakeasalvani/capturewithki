@@ -44,3 +44,22 @@ test('a nonsense retainer throws rather than creating a $0 session', () => {
 test('the retainer can never exceed the total', () => {
   assert.throws(() => checkoutLineItems(contract({ retainerCents: 200000, totalCents: 120000 })));
 });
+
+test('a missing or malformed total is refused, not treated as no ceiling at all', () => {
+  // The old guard skipped the whole ceiling check when totalCents was not an
+  // integer, so this exact input produced a $9,999.99 line item with nothing
+  // checking it.
+  assert.throws(() => checkoutLineItems({ retainerCents: 999999, totalCents: undefined }));
+  assert.throws(() => checkoutLineItems({ retainerCents: 999999, totalCents: null }));
+  assert.throws(() => checkoutLineItems({ retainerCents: 36000, totalCents: '120000' }));
+  assert.throws(() => checkoutLineItems({ retainerCents: 36000, totalCents: 120000.5 }));
+  assert.throws(() => checkoutLineItems({ retainerCents: 36000, totalCents: 0 }));
+  assert.throws(() => checkoutLineItems({ retainerCents: 36000, totalCents: -1 }));
+});
+
+test('a retainer equal to the whole total is allowed', () => {
+  // Paying in full up front is legitimate — the ceiling is "not more than",
+  // not "strictly less than".
+  const items = checkoutLineItems({ retainerCents: 120000, totalCents: 120000 });
+  assert.equal(items[0].price_data.unit_amount, 120000);
+});
