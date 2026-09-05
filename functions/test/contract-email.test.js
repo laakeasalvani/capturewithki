@@ -106,6 +106,27 @@ test('the pay reminder names the client, the retainer amount, the date, and says
   assert.ok(/not yet held/i.test(mail.html));
 });
 
+// The reminder cannot carry a link of its own (no raw token is stored), so it
+// sends the client to an email that has one. It must name the RIGHT email: the
+// signed-copy email has no payment link in it at all, and telling a client to
+// look there for one sends them hunting for something that does not exist —
+// three times, at +1h, +24h and +72h.
+test('the pay reminder points at the ready-to-sign email, which is the one that reaches a page with a pay button', () => {
+  const mail = payReminderEmail({
+    clientName: 'Jordan Rivera', eventDate: '2027-06-12', retainerCents: 36000
+  });
+  assert.ok(mail.text.includes('Your CaptureWithKi agreement is ready to sign'));
+  assert.ok(mail.html.includes('Your CaptureWithKi agreement is ready to sign'));
+  assert.equal(/signed CaptureWithKi agreement/i.test(mail.text), false);
+  assert.equal(/signed CaptureWithKi agreement/i.test(mail.html), false);
+  // Still no fabricated link, for the same reason as the sign reminder.
+  assert.equal(mail.text.includes('/sign/?t='), false);
+  assert.equal(mail.html.includes('/sign/?t='), false);
+  // And it still offers the human fallback.
+  assert.ok(/reply to this one/i.test(mail.text));
+  assert.ok(/reply to this one/i.test(mail.html));
+});
+
 test('the never-opened alert names the client, gives contact details and when it was sent, and tells Khiara to consider texting', () => {
   const sentAt = fakeTimestamp(new Date(Date.UTC(2026, 8, 1, 12, 0)));
   const mail = neverOpenedAlertEmail({

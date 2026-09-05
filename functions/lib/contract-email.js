@@ -189,6 +189,14 @@ export function signedCopyEmail(o) {
 // instead point the client back to that original email and offer a human
 // fallback (reply, or call) if they cannot find it — true today, and never
 // wrong in a way that costs Khiara a client who says "I never got a link."
+//
+// BOTH now name the SAME email: "Your CaptureWithKi agreement is ready to
+// sign." payReminderEmail used to name the signed-copy email as the one
+// holding the payment link, which was simply false — that email has no
+// payment link in it. The sign page reached from the ready-to-sign link is
+// the one surface that carries a working pay button (openContract returns
+// needsPayment; sign.js calls startRetainerPayment), so it is the only
+// honest thing to point an unpaid client at.
 // ---------------------------------------------------------------------------
 
 export function signReminderEmail(c) {
@@ -256,9 +264,10 @@ export function payReminderEmail(c) {
     'Your agreement for ' + date + ' is signed, but the retainer of ' + retainer +
       ' has not come through yet.',
     '',
-    'The payment link is on the same page you signed from — the email titled ' +
-      '"Your signed CaptureWithKi agreement" has the link. If you can\'t find it, ' +
-      'just reply to this email and we will send it right over.',
+    'You can pay it on the same page you signed from. That link is in the email ' +
+      'titled "Your CaptureWithKi agreement is ready to sign" — open it again and ' +
+      'the page will have a button to pay the retainer. If you can\'t find that ' +
+      'email, just reply to this one and we will send it right over.',
     '',
     'Your date is not yet held.',
     '',
@@ -280,9 +289,10 @@ export function payReminderEmail(c) {
             ' is signed, but the retainer of ' + escapeHtml(retainer) + ' has not come through yet.' +
           '</td></tr>' +
           '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
-            'The payment link is on the same page you signed from &mdash; the email titled ' +
-            '&ldquo;Your signed CaptureWithKi agreement&rdquo; has the link. If you can&rsquo;t find it, ' +
-            'just reply to this email and we will send it right over.' +
+            'You can pay it on the same page you signed from. That link is in the email titled ' +
+            '&ldquo;Your CaptureWithKi agreement is ready to sign&rdquo; &mdash; open it again and the ' +
+            'page will have a button to pay the retainer. If you can&rsquo;t find that email, ' +
+            'just reply to this one and we will send it right over.' +
           '</td></tr>' +
           '<tr><td style="font-family:' + SANS + ';font-size:14px;font-weight:bold;color:' + C.ink + ';padding-top:16px;">' +
             'Your date is not yet held.' +

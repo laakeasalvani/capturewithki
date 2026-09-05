@@ -4,6 +4,9 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 const functions = getFunctions(app, 'us-west1');
 const openContract = httpsCallable(functions, 'openContract');
 const signContract = httpsCallable(functions, 'signContract');
+// Called only from a click on the pay button below — never on page load. It
+// mints a checkout session, and openContract runs on every load.
+const startRetainerPayment = httpsCallable(functions, 'startRetainerPayment');
 
 const noLink = document.getElementById('sNoLink');
 const loading = document.getElementById('sLoading');
@@ -20,7 +23,22 @@ const consentEl = document.getElementById('sConsent');
 const nameEl = document.getElementById('sName');
 const signBtn = document.getElementById('sSignBtn');
 const signErrorEl = document.getElementById('sSignError');
+const confirmTitleEl = document.getElementById('sConfirmTitle');
 const confirmTextEl = document.getElementById('sConfirmText');
+const payBox = document.getElementById('sPay');
+const payNoteEl = document.getElementById('sPayNote');
+const payBtn = document.getElementById('sPayBtn');
+const payErrorEl = document.getElementById('sPayError');
+
+// The retainer, as openContract read it off the document. Kept so the confirm
+// panel can name the amount — a signed-unpaid client must be told what is
+// owed, not just that something is.
+let retainerCents = null;
+
+// One calm sentence for every failure to open checkout, whether the provider
+// refused, the network died, or the function threw. The error code never
+// reaches the client.
+const PAY_FAILED = 'We couldn’t open the payment page just now. Please try again in a moment.';
 
 function show(which) {
   noLink.hidden = which !== 'nolink';
@@ -74,9 +92,17 @@ function formatSignedAt(ms) {
 function signedMessage(status, signedAt, opts) {
   const o = opts || {};
   const signedLine = 'You signed this agreement on ' + formatSignedAt(signedAt) + '.';
+  // Named in the message itself, not only on the button, so the amount owed
+  // and the fact that the date is not held survive even if the pay block is
+  // hidden. Every other surface in this system says this; this page is the
+  // one that used to say "You're all set" instead.
+  const amount = formatCents(retainerCents);
+  const owed = amount
+    ? ' The retainer of ' + amount + ' has not been paid yet, and your date is not held until it is.'
+    : ' The retainer has not been paid yet, and your date is not held until it is.';
   if (o.checkoutFailed) {
-    return 'Your agreement is signed. We couldn’t open the payment page just now — ' +
-      'Khiara will email you a link to pay the retainer shortly.';
+    return 'Your agreement is signed.' + owed +
+      ' We couldn’t open the payment page just now — you can try again below.';
   }
   if (status === 'paid') {
     return signedLine + ' Your retainer has been received — your date is held.';
@@ -85,11 +111,39 @@ function signedMessage(status, signedAt, opts) {
     return signedLine + ' Thanks — we’re confirming your payment now. ' +
       'This can take a minute; refresh this page to check.';
   }
-  return signedLine;
+  return signedLine + owed;
 }
 
 function showConfirmed(status, signedAt, opts) {
-  confirmTextEl.textContent = signedMessage(status, signedAt, opts);
+  const o = opts || {};
+  confirmTextEl.textContent = signedMessage(status, signedAt, o);
+
+  // "You're all set" is true of exactly one state: paid. Every other way this
+  // panel is reached is a signed contract with the retainer still owed, where
+  // the date is not held and saying otherwise is how a date gets given away.
+  confirmTitleEl.textContent = status === 'paid'
+    ? 'You’re all set'
+    : 'Signed — retainer still due';
+
+  const amount = formatCents(retainerCents);
+
+  // The button is offered only when the document itself says signed-and-unpaid,
+  // and NOT when the client has just come back from a successful checkout with
+  // ?paid=1: the webhook can be seconds behind, and putting a pay button in
+  // front of someone who has already paid invites a second payment.
+  if (o.needsPayment && !o.paidHint) {
+    payNoteEl.textContent = amount
+      ? 'Your retainer of ' + amount + ' has not been paid yet. Your date is not ' +
+        'held until it is.'
+      : 'Your retainer has not been paid yet. Your date is not held until it is.';
+    payBtn.textContent = amount ? 'Pay the retainer — ' + amount : 'Pay the retainer';
+    payBtn.disabled = false;
+    payErrorEl.textContent = '';
+    payBox.hidden = false;
+  } else {
+    payBox.hidden = true;
+  }
+
   show('confirm');
 }
 
@@ -104,6 +158,10 @@ if (!token) {
     clientNameEl.textContent = data.clientName
       ? 'Your agreement, ' + data.clientName
       : 'Your agreement';
+
+    // Kept for the confirm panel, which has to be able to name the amount
+    // still owed on a signed-but-unpaid contract.
+    retainerCents = data.retainerCents;
 
     const metaParts = [];
     if (data.eventDate) metaParts.push('Event date: ' + data.eventDate);
@@ -123,7 +181,13 @@ if (!token) {
       // The real status, read from the document, decides the message —
       // the ?paid=1 the client may have arrived with is only a hint that
       // gets consulted when the document itself doesn't yet say 'paid'.
-      showConfirmed(data.status, data.signedAt, { paidHint: paidHintFromUrl() });
+      // needsPayment comes from the document too (signed, and no paidAt), and
+      // is what puts the pay button on the panel. Without it, a client whose
+      // checkout was abandoned had no route back to paying at all.
+      showConfirmed(data.status, data.signedAt, {
+        paidHint: paidHintFromUrl(),
+        needsPayment: data.needsPayment === true
+      });
       return;
     }
 
@@ -174,10 +238,44 @@ form.addEventListener('submit', function (e) {
     }
     // The provider was unreachable (or, on a replay, no new session was
     // made). Say something true rather than something reassuring: the
-    // agreement IS signed, and do not imply the date is held.
-    showConfirmed(null, data.signedAt, { checkoutFailed: true });
+    // agreement IS signed, and do not imply the date is held. needsPayment is
+    // true because we have just this second signed and nothing has been paid,
+    // so the pay button is offered as the retry.
+    showConfirmed(null, data.signedAt, { checkoutFailed: true, needsPayment: true });
   }).catch(function () {
     signErrorEl.textContent = 'Something went wrong sending your signature. Please try again.';
     updateSignBtn();
+  });
+});
+
+// The pay button. Same guard the sign button carries: a disabled button still
+// permits an Enter-key activation, and re-entering here while a call is in
+// flight would mint a second checkout session.
+payBtn.addEventListener('click', function () {
+  if (payBtn.disabled) return;
+  payBtn.disabled = true;
+  payErrorEl.textContent = 'Opening the payment page…';
+
+  startRetainerPayment({ token: token }).then(function (res) {
+    const data = res.data || {};
+    if (data.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+    if (data.alreadyPaid) {
+      // The webhook landed while this page was open. Reload rather than
+      // patch the panel by hand, so what is shown comes from a fresh read of
+      // the document — the only thing this page trusts as proof of payment.
+      window.location.reload();
+      return;
+    }
+    payErrorEl.textContent = PAY_FAILED;
+    payBtn.disabled = false;
+  }).catch(function () {
+    // One calm message. startRetainerPayment refuses a bad or cancelled token
+    // with the same words as every other refusal, and nothing more specific
+    // than that may reach the page.
+    payErrorEl.textContent = PAY_FAILED;
+    payBtn.disabled = false;
   });
 });

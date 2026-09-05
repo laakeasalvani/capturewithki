@@ -236,7 +236,12 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 .c-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}
 .c-card-name{font-family:var(--display);font-weight:400;font-size:19px;margin:0;}
 
-.c-status-badge{font-size:11px;letter-spacing:.06em;padding:4px 12px;border-radius:12px;white-space:nowrap;}
+/* No white-space:nowrap. These labels are sentences, not words — the
+   signed-but-unpaid one is "Signed — retainer NOT paid. The date is not
+   held." — and a nowrap badge clips or overflows it on a 375px phone.
+   The most safety-critical string on this screen must be the LAST one
+   allowed to get cut off. */
+.c-status-badge{font-size:11px;letter-spacing:.06em;padding:4px 12px;border-radius:12px;}
 .c-status-draft{background:var(--cream);color:var(--muted);}
 .c-status-sent{background:none;border:1px solid var(--khaki);color:var(--khaki);}
 .c-status-opened{background:#fdf6e8;border:1px solid #e3d3ab;color:#7a5c1e;}
@@ -246,8 +251,9 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 .c-status-signed{background:#f7e2c9;border:1px solid #e3b877;color:#8a4b12;font-weight:600;}
 .c-status-paid{background:var(--khaki);color:#fff;}
 .c-status-void{background:#e6d9d6;color:#8a3a2e;}
-/* Reuses the loud red palette, and additionally forces the badge to full
-   width so it cannot be skimmed past the way a small pill can. */
+/* Reuses the loud red palette. The badge itself is just a pill; the
+   full-width emphasis that makes this state impossible to skim past
+   comes from the .c-alert-loud paragraph cardHtml renders alongside it. */
 .c-status-loud{background:#fdf3f3;border:1px solid #e6c3c3;color:#7a2e2e;font-weight:700;}
 
 .c-meta{display:flex;flex-wrap:wrap;gap:14px 22px;margin:14px 0 0;}

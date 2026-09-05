@@ -464,7 +464,17 @@ export function initContracts(container) {
     }
     if (status === 'opened') return { cls: 'c-status-opened', label: 'Read, not signed yet' };
     if (status === 'signed') return { cls: 'c-status-signed', label: 'Signed — retainer NOT paid. The date is not held.' };
-    if (status === 'paid') return { cls: 'c-status-paid', label: 'Booked — retainer paid' };
+    // A fake payment is not a booking. sign/fake-pay/ exists so Khiara can
+    // walk the whole flow herself, and isTestPayment is written by all three
+    // paid-writers (fakeCheckoutComplete, stripeWebhook, chaseContracts'
+    // reconciliation) — until now nothing read it, so her own test payment
+    // rendered on this screen as a genuine booking, in the same green badge,
+    // against a date nobody had paid for.
+    if (status === 'paid') {
+      return c.isTestPayment
+        ? { cls: 'c-status-loud', label: 'TEST payment — no money was taken' }
+        : { cls: 'c-status-paid', label: 'Booked — retainer paid' };
+    }
     if (status === 'void') return { cls: 'c-status-void', label: 'Voided' };
     if (status === 'cancelled') return { cls: 'c-status-void', label: 'Cancelled' };
     return { cls: 'c-status-draft', label: 'Draft — not sent yet' };
@@ -478,6 +488,17 @@ export function initContracts(container) {
         '<span class="c-status-badge ' + info.cls + '">' + esc(info.label) + '</span>' +
       '</header>' +
       (info.cls === 'c-status-loud' ? '<p class="c-alert-loud">' + esc(info.label) + '</p>' : '') +
+      // An amount mismatch is the one refusal where money has already moved
+      // and the system declined to record it — and the chase ladder will keep
+      // dunning a client who has paid. stripeWebhook stamps the contract so
+      // the problem is visible HERE, rather than only as a console.error in
+      // Cloud Logging that nobody opens. The string is written by the webhook
+      // from two amounts, never by a client, and is escaped anyway.
+      (c.paymentAnomaly
+        ? '<p class="c-alert-loud">PAYMENT PROBLEM: a payment arrived for the wrong amount (' +
+            esc(c.paymentAnomaly) + ') and was NOT recorded. Money may already have moved — ' +
+            'check Stripe before chasing this client.</p>'
+        : '') +
       '<dl class="c-meta">' +
         '<div><dt>Event date</dt><dd>' + esc(c.eventDate || 'Not given') + '</dd></div>' +
         '<div><dt>Total</dt><dd>' + esc(formatCents(c.totalCents)) + '</dd></div>' +

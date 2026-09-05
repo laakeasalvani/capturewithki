@@ -694,6 +694,13 @@ export const sendContract = onCall(
       });
     } catch (err) {
       console.warn('[sendContract] email failed, rolling back to draft:', describeError(err));
+      // Whether the rollback itself worked decides which message she gets. The
+      // throw below used to sit outside this catch and always said "It is still
+      // a draft — please try sending again", which was emitted precisely when
+      // the rollback had FAILED and it was NOT a draft: the one case where
+      // trying again is refused (canTransition has no sent -> sent) and where
+      // the advice sent her round a loop instead of telling her the truth.
+      let stranded = false;
       try {
         await ref.update({
           status: 'draft',
@@ -708,8 +715,19 @@ export const sendContract = onCall(
         // Deliberately console.error and deliberately greppable. If this line ever
         // appears, a contract IS stranded in 'sent' with no email behind it, and a
         // human has to free it by hand. It is the only remaining route to that state.
+        stranded = true;
         console.error('[sendContract] STRANDED: send failed AND rollback failed for',
           contractId, describeError(rollbackErr));
+      }
+      if (stranded) {
+        // Names the id because a human has to go find this exact document in the
+        // Firebase console and set its status back to 'draft' by hand. Safe to
+        // interpolate: contractId passed isValidContractId above, and only an
+        // authenticated admin ever reads this message.
+        throw new HttpsError('internal',
+          'The contract could not be emailed, AND it could not be put back to a draft. ' +
+          'Contract ' + contractId + ' is stuck as "sent" with no email behind it — ' +
+          'sending it again will be refused. It has to be fixed by hand before it can go out.');
       }
       throw new HttpsError('unavailable',
         'The contract could not be emailed. It is still a draft — please try sending again.');
@@ -808,7 +826,15 @@ export const openContract = onCall(
       retainerCents: contract.retainerCents,
       eventDate: contract.eventDate,
       status: contract.status,
-      signedAt: contract.signedAt ? contract.signedAt.toMillis() : null
+      signedAt: contract.signedAt ? contract.signedAt.toMillis() : null,
+      // Signed, and no payment recorded. This is what puts a pay button on the
+      // page after an abandoned checkout — the client's only remaining route
+      // back to Stripe, since no reminder email can carry a signing link.
+      //
+      // Read from the document, never from the ?paid=1 hint on the URL. No
+      // session is created here: openContract runs on every page load, and the
+      // session is minted by startRetainerPayment on an actual click.
+      needsPayment: contract.status === 'signed' && !contract.paidAt
     };
   }
 );
@@ -980,6 +1006,104 @@ export const signContract = onCall(
 
     console.log('[signContract] signed:', ref.id);
     return { ok: true, signedAt: Date.now(), checkoutUrl: checkoutUrl };
+  }
+);
+
+// startRetainerPayment — the way BACK to checkout after an abandoned one.
+//
+// Without this, an abandoned checkout was a dead end. signContract redirects
+// to the payment page with cancel_url pointing at /sign/?t=<token>, so a
+// client who closes the tab, has a card declined, or simply hits back lands
+// on this page again — signed, unpaid, and with nothing to click. The pay
+// reminders that follow cannot carry a link either (no raw token is ever
+// stored), so the only remaining route to paying was emailing Khiara.
+//
+// Modelled directly on openContract above: same token authentication, same
+// uniform CONTRACT_DENIED refusal, same region/cors. The one thing it does
+// differently is mint a checkout session — which is exactly why it is a
+// separate callable and not part of openContract. openContract runs on every
+// page load; creating a Stripe session there would mint one per refresh.
+//
+// STRIPE_SECRET_KEY is declared for the same reason signContract and
+// chaseContracts declare it: a function that does not DECLARE a secret never
+// receives it, and this one reaches getStripe() through getProvider(). That
+// exact omission has already been found twice on this branch.
+export const startRetainerPayment = onCall(
+  { region: 'us-west1', cors: true, secrets: [STRIPE_SECRET_KEY] },
+  async (request) => {
+    const d = request.data || {};
+    const token = typeof d.token === 'string' ? d.token.trim() : '';
+
+    // Checked before touching Firestore, same as openContract.
+    if (!isValidTokenShape(token)) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+
+    const hash = hashToken(token);
+    let found = null;
+    try {
+      const q = await db.collection('contracts').where('tokenHash', '==', hash).limit(1).get();
+      if (!q.empty) found = q.docs[0];
+    } catch (err) {
+      console.warn('[startRetainerPayment] lookup failed:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    if (!found) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    const contract = found.data();
+
+    // Verified again in constant time even though the query already matched,
+    // same reasoning as openContract.
+    if (!verifyToken(token, contract.tokenHash)) {
+      throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    }
+    if (['void', 'cancelled'].indexOf(contract.status) !== -1) {
+      console.log('[startRetainerPayment] refused, state:', contract.status);
+      throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    }
+
+    // Already paid. Said plainly rather than refused, so the page can stop
+    // offering a button that would take a second payment — and checked BEFORE
+    // the signed check, because 'paid' is not 'signed'.
+    if (contract.status === 'paid') return { alreadyPaid: true };
+
+    // Nothing to pay for yet. A contract that is only 'sent' or 'opened' has
+    // no signature behind it, and the retainer is due ON signing.
+    if (contract.status !== 'signed') {
+      console.log('[startRetainerPayment] refused, nothing to pay for yet:', contract.status);
+      throw new HttpsError('failed-precondition', CONTRACT_DENIED);
+    }
+
+    // Identical to the pair signContract passes, so a session minted here and
+    // a session minted at signing land the client back in the same two places.
+    const back = SITE_ORIGIN + '/sign/?t=' + token;
+    let session;
+    try {
+      // Through the seam, never Stripe directly — the fake payer serves this
+      // path today exactly as it serves signContract's.
+      session = await getProvider().createRetainerSession(
+        contract, found.id, back + '&paid=1', back
+      );
+    } catch (err) {
+      console.warn('[startRetainerPayment] could not create checkout session:', describeError(err));
+      // Generic on purpose: the page shows one calm sentence and the provider's
+      // own error code never reaches a client.
+      throw new HttpsError('unavailable',
+        'We could not open the payment page just now. Please try again in a moment.');
+    }
+
+    try {
+      // Same provider-agnostic field signContract writes. Overwriting the
+      // previous id is correct: this newer session is the one the client is
+      // about to use, and it is the one chaseContracts should reconcile.
+      await found.ref.update({ paymentSessionId: session.id });
+    } catch (err) {
+      // Logged, not thrown. The session exists and the client can pay through
+      // it; losing our record of the id costs reconciliation, not the payment,
+      // and refusing here would strand them for a bookkeeping failure.
+      console.warn('[startRetainerPayment] could not record session id:', describeError(err));
+    }
+
+    console.log('[startRetainerPayment] checkout opened:', found.id);
+    return { checkoutUrl: session.url };
   }
 );
 
@@ -1205,9 +1329,26 @@ export const stripeWebhook = onRequest(
       return;
     }
 
-    // checkout.session.completed. amount_total is what the client actually
-    // paid, compared inside markContractPaid against the contract's own
-    // retainerCents — not trusted on its own.
+    // checkout.session.completed does NOT mean money moved. It means the
+    // session finished. Today lib/stripe.js sets payment_method_types:['card'],
+    // where completion does imply payment — but the day an asynchronous method
+    // (ACH, Klarna, bank debit) is switched on in the Stripe dashboard, this
+    // event fires with payment_status 'unpaid' while the funds are still days
+    // away, and the contract would read "Booked — retainer paid" with nothing
+    // taken. That is a dashboard toggle away, not a code change, so the guard
+    // lives here rather than in a comment.
+    //
+    // 200 and stop: this is not an error and Stripe must not retry it. The
+    // later checkout.session.async_payment_succeeded (or chaseContracts'
+    // reconciliation, which re-reads payment_status) is what records it.
+    if (object.payment_status !== 'paid') {
+      console.warn('[stripeWebhook] session completed but not paid:', contractId, object.payment_status);
+      res.status(200).send('not paid'); return;
+    }
+
+    // amount_total is what the client actually paid, compared inside
+    // markContractPaid against the contract's own retainerCents — not
+    // trusted on its own.
     const decision = await markContractPaid(db, contractId, {
       amountCents: object.amount_total
     });
@@ -1220,6 +1361,28 @@ export const stripeWebhook = onRequest(
       // else is a routine, expected refusal.
       if (decision.reason === 'amount-mismatch') {
         console.error('[stripeWebhook] amount mismatch, refusing to record payment:', contractId, event.id);
+        // A console.error in Cloud Logging is a signal nobody will ever see.
+        // This is the one refusal where MONEY HAS ALREADY MOVED and the system
+        // is declining to record it — and the chase ladder will go on dunning
+        // a client who has paid. So it is stamped onto the contract itself,
+        // where int/contracts.js renders it as a loud alert on the card.
+        //
+        // Wrapped, and deliberately not allowed to change anything: status is
+        // untouched, a failure here is logged rather than thrown, and Stripe
+        // still gets its 200 below. Turning a bookkeeping flag into a 500
+        // would buy retries that cannot change the outcome.
+        try {
+          const anomalySnap = await ref.get();
+          const expected = anomalySnap.exists ? anomalySnap.data().retainerCents : null;
+          await ref.update({
+            paymentAnomalyAt: FieldValue.serverTimestamp(),
+            paymentAnomaly: 'expected ' + formatCents(expected) +
+              ' vs received ' + formatCents(object.amount_total)
+          });
+        } catch (err) {
+          console.error('[stripeWebhook] could not flag amount mismatch on the contract:',
+            contractId, describeError(err));
+        }
       } else {
         console.warn('[stripeWebhook] not recorded:', decision.reason, contractId);
       }
@@ -1233,13 +1396,21 @@ export const stripeWebhook = onRequest(
     // already-paid, and the audit row could never be recreated. A single
     // batch makes the two writes atomic, so a retry after a failed commit
     // can genuinely redo the whole thing.
+    // Derived from the event, never hard-coded. Stripe test mode has its own
+    // endpoint and its own signing secret, so a test-mode event verifies just
+    // as cleanly as a live one and arrives here indistinguishable from a real
+    // booking — permanently, since nothing downstream ever revisits the flag.
+    // livemode !== true rather than === false, so a missing field is treated
+    // as "not proven live" instead of silently recorded as real money.
+    const isTestPayment = event.livemode !== true;
+
     const auditRef = decision.ref.collection('audit').doc();
     const batch = db.batch();
     batch.update(decision.ref, {
       status: 'paid',
       paidAt: FieldValue.serverTimestamp(),
       paymentIntent: object.payment_intent || null,
-      isTestPayment: false
+      isTestPayment: isTestPayment
     });
     batch.set(auditRef, {
       event: 'paid',
@@ -1247,7 +1418,7 @@ export const stripeWebhook = onRequest(
       amountCents: object.amount_total,
       paymentIntent: object.payment_intent || null,
       provider: 'stripe',
-      isTestPayment: false,
+      isTestPayment: isTestPayment,
       stripeEventId: event.id
     });
     try {

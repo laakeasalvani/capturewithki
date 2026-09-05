@@ -77,11 +77,30 @@
   </section>
 
   <!-- Shown after signing just now, and shown instead of the form again if a
-       client returns to a link they already signed. -->
+       client returns to a link they already signed.
+
+       The heading and the pay block are BOTH filled in by sign.js, because
+       this panel is shown in two very different states: paid (booked, done)
+       and signed-but-unpaid (the date is NOT held). A fixed "You're all set"
+       told an unpaid client the opposite of the truth, on the same screen
+       every other surface in this system uses to say the date is not held.
+
+       The emailed-copy line is deliberately not absolute either: signContract
+       swallows a failed confirmation email by design, so this page cannot
+       promise one arrived. -->
   <section id="sConfirm" class="s-panel" hidden>
-    <h1 class="s-title">You're all set</h1>
+    <h1 class="s-title" id="sConfirmTitle">You're all set</h1>
     <p class="s-copy" id="sConfirmText"></p>
-    <p class="s-copy">A copy of the signed agreement has been emailed to you.</p>
+    <p class="s-copy">A copy is on its way to your email.</p>
+
+    <!-- The way back to checkout after an abandoned one: a closed tab, a
+         declined card, a dead phone, a tap on back. Shown only when
+         openContract says the contract is signed and unpaid. -->
+    <div id="sPay" hidden>
+      <p class="s-copy" id="sPayNote"></p>
+      <button type="button" id="sPayBtn" class="s-btn">Pay the retainer</button>
+      <p class="s-note" id="sPayError" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
 </main>
