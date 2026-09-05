@@ -667,13 +667,44 @@ export const sendContract = onCall(
       retainerCents: contract.retainerCents
     });
     const key = RESEND_API_KEY.value();
-    await sendEmail({
-      apiKey: key,
-      to: contract.clientEmail,
-      subject: mail.subject,
-      text: mail.text,
-      html: mail.html
-    });
+    // Recorded first, then sent — the ordering submitInquiry uses, because a lost
+    // record is worse than a failed email.
+    //
+    // But a contract is not an inquiry. A contract marked 'sent' whose email never
+    // left is not merely un-actioned, it is UNREACHABLE: canTransition allows only
+    // sent -> opened|void, so 'sent' -> 'sent' is refused and there is no path back
+    // through the dashboard. So a failed send undoes the update rather than leaving
+    // her with a contract nobody can send and nobody can fix.
+    try {
+      await sendEmail({
+        apiKey: key,
+        to: contract.clientEmail,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html
+      });
+    } catch (err) {
+      console.warn('[sendContract] email failed, rolling back to draft:', describeError(err));
+      try {
+        await ref.update({
+          status: 'draft',
+          tokenHash: FieldValue.delete(),
+          sentAt: FieldValue.delete(),
+          documentSnapshot: FieldValue.delete(),
+          documentHash: FieldValue.delete(),
+          templateId: FieldValue.delete(),
+          templateVersion: FieldValue.delete()
+        });
+      } catch (rollbackErr) {
+        // Deliberately console.error and deliberately greppable. If this line ever
+        // appears, a contract IS stranded in 'sent' with no email behind it, and a
+        // human has to free it by hand. It is the only remaining route to that state.
+        console.error('[sendContract] STRANDED: send failed AND rollback failed for',
+          contractId, describeError(rollbackErr));
+      }
+      throw new HttpsError('unavailable',
+        'The contract could not be emailed. It is still a draft — please try sending again.');
+    }
 
     try {
       await ref.collection('audit').add({
