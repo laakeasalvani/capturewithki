@@ -4,7 +4,7 @@ import {
   DEFAULT_RETAINER_PERCENT, sumLineItems,
   computeRetainerCents, computeBalanceCents,
   isValidContractId, validateContractInput, MAX_TOTAL_CENTS,
-  renderTemplate
+  renderTemplate, STATUSES, canTransition
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -194,4 +194,52 @@ test('rendering survives nonsense input', () => {
   assert.equal(renderTemplate(null, {}), '');
   assert.equal(renderTemplate('<p>hi</p>', null), '<p>hi</p>');
   assert.equal(renderTemplate('{{client_name}}', { client_name: null }), '');
+});
+
+test('every status is accounted for', () => {
+  assert.deepEqual(
+    STATUSES,
+    ['draft', 'sent', 'opened', 'signed', 'paid', 'void', 'cancelled']
+  );
+});
+
+test('a contract moves forward through the normal path', () => {
+  assert.equal(canTransition('draft', 'sent'), true);
+  assert.equal(canTransition('sent', 'opened'), true);
+  assert.equal(canTransition('opened', 'signed'), true);
+  assert.equal(canTransition('signed', 'paid'), true);
+});
+
+test('a contract never moves backwards', () => {
+  assert.equal(canTransition('signed', 'opened'), false);
+  assert.equal(canTransition('paid', 'signed'), false);
+  assert.equal(canTransition('opened', 'draft'), false);
+});
+
+// The spec is explicit: auto-voiding something a client actually signed is
+// legally awkward and would burn a slow-but-real client. A signed agreement
+// can only be CANCELLED, which is a decision she makes and a record that keeps.
+test('a signed contract can never be voided, only cancelled', () => {
+  assert.equal(canTransition('signed', 'void'), false);
+  assert.equal(canTransition('paid', 'void'), false);
+  assert.equal(canTransition('signed', 'cancelled'), true);
+  assert.equal(canTransition('paid', 'cancelled'), true);
+});
+
+test('an unsigned contract can be voided', () => {
+  assert.equal(canTransition('draft', 'void'), true);
+  assert.equal(canTransition('sent', 'void'), true);
+  assert.equal(canTransition('opened', 'void'), true);
+});
+
+test('terminal states are terminal', () => {
+  assert.equal(canTransition('void', 'sent'), false);
+  assert.equal(canTransition('cancelled', 'paid'), false);
+});
+
+test('an unknown status transitions nowhere', () => {
+  assert.equal(canTransition('nonsense', 'sent'), false);
+  assert.equal(canTransition(null, 'sent'), false);
+  assert.equal(canTransition('draft', 'nonsense'), false);
+  assert.equal(canTransition('constructor', 'sent'), false);
 });

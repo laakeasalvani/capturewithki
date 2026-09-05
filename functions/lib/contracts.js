@@ -114,3 +114,24 @@ export function renderTemplate(templateHtml, fields) {
     return escapeHtml(f[key]);
   });
 }
+
+export const STATUSES = ['draft', 'sent', 'opened', 'signed', 'paid', 'void', 'cancelled'];
+
+// `void` means never signed and killed off. `cancelled` means signed and then
+// called off — a different event with different consequences, which is why
+// signed can never reach `void`.
+const TRANSITIONS = {
+  draft:     ['sent', 'void'],
+  sent:      ['opened', 'void'],
+  opened:    ['signed', 'void'],
+  signed:    ['paid', 'cancelled'],
+  paid:      ['cancelled'],
+  void:      [],
+  cancelled: []
+};
+
+export function canTransition(from, to) {
+  // hasOwnProperty, so 'constructor' and 'toString' are not statuses.
+  if (!Object.prototype.hasOwnProperty.call(TRANSITIONS, from)) return false;
+  return TRANSITIONS[from].indexOf(to) !== -1;
+}
