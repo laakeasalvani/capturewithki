@@ -1,6 +1,6 @@
 import { db } from '../cms/firebase.js';
 import {
-  collection, query, orderBy, limit, getDocs, doc, updateDoc
+  collection, query, orderBy, limit, getDocs, doc, updateDoc, writeBatch, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 
 let root = null;
@@ -109,9 +109,50 @@ async function load() {
     items = [];
     snap.forEach(function (d) { items.push(Object.assign({ id: d.id }, d.data())); });
     render();
+    // Deliberately after render() and deliberately not awaited: the stamp must
+    // follow the inquiry actually being on her screen, and nothing about the
+    // list should wait on it. markSeen swallows its own failures.
+    markSeen();
   } catch (err) {
     root.innerHTML = '<p class="q-warn">Could not load inquiries: ' +
       esc(err && (err.code || err.message)) + '</p>';
+  }
+}
+
+// Records that these inquiries were put in front of her.
+//
+// This is the evidence the unseen-inquiry alarm runs on
+// (functions/lib/escalate.js). It exists because an email that Gmail files
+// into spam is still reported as delivered by every other part of the system,
+// so "did the send succeed" is not a question worth asking — "did she ever see
+// it" is.
+//
+// Note what this deliberately is NOT: it is not `status`. Status only flips to
+// 'replied' when she presses the button, so an inquiry read at 11pm and
+// answered at 9am would raise a false alarm every time.
+async function markSeen() {
+  const unseen = items.filter(function (i) {
+    // Archived ones are not displayed by default, and the alarm skips them.
+    return !i.seenAt && i.archived !== true;
+  });
+  if (!unseen.length) return;
+
+  try {
+    // One batch, not a write per card — the first time she opens this after a
+    // busy week that would otherwise be a hundred separate requests. The list
+    // is capped at 100 above, well inside Firestore's 500-write batch limit.
+    const batch = writeBatch(db);
+    unseen.forEach(function (i) {
+      batch.update(doc(db, 'inquiries', i.id), { seenAt: serverTimestamp() });
+    });
+    await batch.commit();
+    unseen.forEach(function (i) { i.seenAt = true; });
+  } catch (err) {
+    // Never shown and never allowed to break the list. A missed stamp costs at
+    // worst one spurious alarm to a maintainer inbox; an error message about a
+    // field she has never heard of costs her trust in the dashboard.
+    console.warn('could not record which inquiries were seen:',
+                 err && (err.code || err.message));
   }
 }
 

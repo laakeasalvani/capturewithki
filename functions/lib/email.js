@@ -266,7 +266,11 @@ export async function sendEmail(opts) {
     // Kea Web Creations form does not mail web-design prospects from the
     // photography brand — every existing caller omits it and is unaffected.
     from: opts.from || FROM,
-    to: [opts.to],
+    // A single address stays a single address; the alarm in lib/escalate.js
+    // needs several, and Resend takes an array either way. Wrapping an array
+    // that arrived already-wrapped would nest it and Resend would reject the
+    // whole send.
+    to: Array.isArray(opts.to) ? opts.to : [opts.to],
     subject: opts.subject,
     text: opts.text
   };

@@ -71,7 +71,7 @@ service cloud.firestore {
       allow create, delete: if false;
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data)
-             .affectedKeys().hasOnly(['status', 'notes', 'archived'])
+             .affectedKeys().hasOnly(['status', 'notes', 'archived', 'seenAt'])
         && (!('status' in request.resource.data)
             || request.resource.data.status in ['new', 'replied'])
         // Archiving is a separate flag, not a third status: an inquiry can be
@@ -82,7 +82,19 @@ service cloud.firestore {
             || request.resource.data.archived is bool)
         && (!('notes' in request.resource.data)
             || (request.resource.data.notes is string
-                && request.resource.data.notes.size() <= 5000));
+                && request.resource.data.notes.size() <= 5000))
+        // `seenAt` records that an inquiry was actually put in front of her in
+        // the dashboard. It is the only evidence the unseen-inquiry alarm has
+        // (functions/lib/escalate.js), because a spam-filed email still reports
+        // itself as delivered.
+        //
+        // Pinning it to request.time means it can only ever be written as a
+        // real server timestamp at the moment of the write. It cannot be
+        // backdated, and the clause is guarded by affectedKeys so that a later
+        // status or notes edit, which carries the existing seenAt along
+        // untouched, is not refused for failing to equal request.time.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['seenAt'])
+            || request.resource.data.seenAt == request.time);
     }
 
     // Kea Web Creations enquiries — a different site belonging to the same

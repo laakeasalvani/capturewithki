@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, safeImageUrl } from '../lib/email.js';
+import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, safeImageUrl, sendEmail } from '../lib/email.js';
 
 const full = {
   name: 'Sarah', partnerName: 'Michael', email: 'sarah@example.com',
@@ -234,4 +234,57 @@ test('the banner scales down with the card', () => {
 test('the banner carries alt text for readers who block images', () => {
   const ours = 'https://firebasestorage.googleapis.com/v0/b/capturewithki-69dd3.firebasestorage.app/o/uploads%2Fx.jpg?alt=media&token=abc';
   assert.match(clientEmailHtml(full, null, ours), /alt="A photograph by Khiara Salvani"/);
+});
+
+// --------------------------------------------------------------------------
+// Recipients
+//
+// The unseen-inquiry alarm mails two maintainer inboxes at once. Resend takes
+// an array, but wrapping one that is already an array nests it and the whole
+// send is refused — so both shapes are pinned here.
+// --------------------------------------------------------------------------
+
+async function captureSend(opts) {
+  const original = globalThis.fetch;
+  let body = null;
+  globalThis.fetch = async function (url, init) {
+    body = JSON.parse(init.body);
+    return { ok: true, status: 200, text: async function () { return '{}'; } };
+  };
+  try {
+    await sendEmail(Object.assign({ apiKey: 'test-key', subject: 's', text: 't' }, opts));
+  } finally {
+    globalThis.fetch = original;
+  }
+  return body;
+}
+
+test('a single recipient is sent as a one-item list, exactly as before', async () => {
+  const body = await captureSend({ to: 'her@example.com' });
+  assert.deepEqual(body.to, ['her@example.com']);
+});
+
+test('several recipients are passed through without being nested', async () => {
+  const body = await captureSend({ to: ['one@example.com', 'two@example.com'] });
+  assert.deepEqual(body.to, ['one@example.com', 'two@example.com']);
+});
+
+test('the API key never appears in the request body', async () => {
+  const body = await captureSend({ to: 'her@example.com' });
+  assert.ok(!JSON.stringify(body).includes('test-key'));
+});
+
+test('a refusal from Resend is thrown, not swallowed', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async function () {
+    return { ok: false, status: 422, text: async function () { return 'bad recipient'; } };
+  };
+  try {
+    await assert.rejects(
+      sendEmail({ apiKey: 'k', to: 'x@example.com', subject: 's', text: 't' }),
+      /Resend responded 422/
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
 });

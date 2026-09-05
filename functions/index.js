@@ -21,6 +21,7 @@ import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
 import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
 import { verifyPassword, galleryOpenable, isValidGalleryId, generatePassword, hashPassword } from './lib/gallery-auth.js';
 import { dueGalleries } from './lib/gallery-expiry.js';
+import { dueEscalations, escalationEmail, BACKLOG_MS } from './lib/escalate.js';
 import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          keaOwnerEmailHtml, keaClientEmailHtml, sendKeaEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
@@ -539,6 +540,80 @@ export const cleanupExpiredGalleries = onSchedule(
       } catch (err) {
         // One bad gallery must not stop the rest.
         console.error('[cleanup] failed for gallery', g.id, describeError(err));
+      }
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// The unseen-inquiry alarm
+//
+// Background: an inquiry was accepted by Resend, logged as sent, and filed
+// into the owner's Gmail spam folder. Nothing in this system could tell.
+// "Accepted by Resend" only means the API queued the message, and a
+// spam-filed message is reported by Gmail as delivered — so every signal the
+// send path produces was green while she saw nothing.
+//
+// The one signal that survives ANY delivery failure is whether the inquiry
+// was ever displayed in the dashboard. That is what this watches, and it is
+// why the dashboard stamps `seenAt` (int/inquiries.js).
+//
+// It mails maintainer inboxes, NOT capturewithki@gmail.com. An alarm about a
+// broken inbox that is delivered to the broken inbox is not an alarm.
+// ---------------------------------------------------------------------------
+const ALARM_EMAILS = ['laakeasalvani@gmail.com', 'netherlyk23@gmail.com'];
+
+// A bound on how many alarms one run may send. A systemic fault should ring
+// the bell, not empty the Resend quota into two mailboxes.
+const MAX_ALARMS_PER_RUN = 10;
+
+export const escalateUnreadInquiries = onSchedule(
+  {
+    region: 'us-west1',
+    schedule: 'every 60 minutes',
+    timeZone: 'Pacific/Honolulu',
+    secrets: [RESEND_API_KEY]
+  },
+  async () => {
+    const now = Date.now();
+
+    let snap;
+    try {
+      // Ranged on createdAt alone. Adding `status == 'new'` here would make it
+      // a composite query needing an index, and the week's worth of documents
+      // this returns is small enough to finish filtering in code.
+      snap = await db.collection('inquiries')
+        .where('createdAt', '>=', new Date(now - BACKLOG_MS))
+        .get();
+    } catch (err) {
+      console.error('[alarm] could not list recent inquiries:', describeError(err));
+      return;
+    }
+
+    const recent = [];
+    snap.forEach(function (d) { recent.push(Object.assign({ id: d.id }, d.data())); });
+    const due = dueEscalations(recent, now);
+
+    console.log('[alarm] recent inquiries:', recent.length, 'unseen past the window:', due.length);
+    if (!due.length) return;
+
+    const key = RESEND_API_KEY.value();
+
+    for (const inquiry of due.slice(0, MAX_ALARMS_PER_RUN)) {
+      try {
+        const m = escalationEmail(inquiry, now);
+        await sendEmail({ apiKey: key, to: ALARM_EMAILS, subject: m.subject, text: m.text });
+
+        // Stamped only once the alarm is genuinely away. If the send throws we
+        // leave the mark off so the next run tries again — a duplicate alarm
+        // is a nuisance, a silently swallowed one is the original bug.
+        await db.collection('inquiries').doc(inquiry.id)
+          .update({ escalatedAt: FieldValue.serverTimestamp() });
+
+        console.log('[alarm] raised for inquiry', inquiry.id);
+      } catch (err) {
+        // One failure must not stop the rest.
+        console.error('[alarm] could not raise for inquiry', inquiry.id, describeError(err));
       }
     }
   }
