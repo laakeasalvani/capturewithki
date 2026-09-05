@@ -3,13 +3,16 @@
   "description": "Cloud Functions for CaptureWithKi",
   "type": "module",
   "main": "index.js",
-  "engines": { "node": "24" },
+  "engines": {
+    "node": "24"
+  },
   "scripts": {
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",
-    "firebase-functions": "^6.1.0"
+    "firebase-functions": "^6.1.0",
+    "stripe": "^22.6.1"
   },
   "private": true
 }
