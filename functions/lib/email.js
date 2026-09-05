@@ -46,8 +46,11 @@ function orNoneMultiline(v) {
 //     depend on the banner and it carries alt text.
 // ---------------------------------------------------------------------------
 
-// Site tokens, copied from index.html :root.
-const C = {
+// Site tokens, copied from index.html :root. Exported so contract-email.js
+// can reuse the exact same palette instead of keeping its own copy — a
+// second copy already exists in lib/kea.js, and a third would make drift
+// near-certain.
+export const C = {
   bg: '#F2ECE0',
   paper: '#FAF6EE',
   ink: '#171614',
@@ -55,8 +58,8 @@ const C = {
   line: '#DCD0BC',
   khaki: '#6E7C5C'
 };
-const SERIF = "Georgia, 'Times New Roman', Times, serif";
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+export const SERIF = "Georgia, 'Times New Roman', Times, serif";
+export const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 // Only a Storage URL belonging to this project may be embedded. The value
 // comes from Firestore and only an admin can write it, but an <img src>
