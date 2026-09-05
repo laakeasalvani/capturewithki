@@ -25,6 +25,10 @@ import { dueEscalations, escalationEmail, BACKLOG_MS } from './lib/escalate.js';
 import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          keaOwnerEmailHtml, keaClientEmailHtml, sendKeaEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
+import {
+  validateContractInput, sumLineItems, computeRetainerCents,
+  computeBalanceCents, DEFAULT_RETAINER_PERCENT, isValidContractId
+} from './lib/contracts.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
@@ -472,6 +476,73 @@ export const regenerateGalleryPassword = onCall(
     // Anyone already inside keeps their session until it lapses. Say so rather
     // than implying the old password is instantly dead everywhere.
     return { password: password };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Contracts
+//
+// createContract drafts a contract from an inquiry (or from scratch) for
+// Khiara's own dashboard. Unlike the client-facing functions above, she is
+// the ONLY caller — there is no id to probe for by trying different error
+// messages, so this one is allowed to say exactly what is wrong with her
+// input rather than hiding behind a generic message.
+// ---------------------------------------------------------------------------
+
+export const createContract = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    await requireAdmin(request);
+
+    const d = request.data || {};
+    const check = validateContractInput(d);
+    if (!check.ok) {
+      // She is the only caller, so unlike the client-facing paths this one
+      // says exactly what is wrong. There is no id to probe for here.
+      throw new HttpsError('invalid-argument', check.errors.join(' '));
+    }
+
+    const lineItems = d.lineItems.map(function (item) {
+      return { label: String(item.label).trim().slice(0, 120), amountCents: item.amountCents };
+    });
+    const totalCents = sumLineItems(lineItems);
+    const percent = Number.isFinite(d.retainerPercent) ? d.retainerPercent : DEFAULT_RETAINER_PERCENT;
+    const retainerCents = computeRetainerCents(totalCents, percent);
+
+    const doc = {
+      status: 'draft',
+      inquiryId: typeof d.inquiryId === 'string' && d.inquiryId ? d.inquiryId : null,
+      clientName: String(d.clientName).trim().slice(0, 200),
+      clientEmail: String(d.clientEmail).trim().slice(0, 254),
+      clientPhone: typeof d.clientPhone === 'string' ? d.clientPhone.trim().slice(0, 40) : '',
+      eventDate: typeof d.eventDate === 'string' ? d.eventDate.trim().slice(0, 40) : '',
+      eventLocation: typeof d.eventLocation === 'string' ? d.eventLocation.trim().slice(0, 300) : '',
+      lineItems: lineItems,
+      totalCents: totalCents,
+      retainerCents: retainerCents,
+      // By subtraction. Never recomputed as a second percentage.
+      balanceCents: computeBalanceCents(totalCents, retainerCents),
+      retainerPercent: percent,
+      openCount: 0,
+      signReminderCount: 0,
+      payReminderCount: 0,
+      createdAt: FieldValue.serverTimestamp()
+    };
+
+    let ref;
+    try {
+      ref = await db.collection('contracts').add(doc);
+    } catch (err) {
+      console.warn('[createContract] could not write:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    await ref.collection('audit').add({
+      event: 'created', at: FieldValue.serverTimestamp(), by: request.auth.uid
+    });
+
+    console.log('[createContract] drafted:', ref.id);
+    return { contractId: ref.id };
   }
 );
 
