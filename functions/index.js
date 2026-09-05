@@ -1036,23 +1036,34 @@ export const fakeCheckoutComplete = onCall(
       throw new HttpsError('failed-precondition', decision.reason);
     }
 
+    // Contract update and audit row commit together, same reasoning as
+    // signContract above: once markContractPaid has said this event is
+    // good, a lost audit row can never be rewritten, because a retry of
+    // this same session would just see status: 'paid' and refuse as
+    // already-paid. A single batch removes the possibility of the two
+    // writes splitting.
+    const auditRef = decision.ref.collection('audit').doc();
+    const batch = db.batch();
+    batch.update(decision.ref, {
+      status: 'paid',
+      paidAt: FieldValue.serverTimestamp(),
+      paymentIntent: result.payment_intent,
+      // Written on every fake payment without exception, so test data can
+      // be found and deleted later — this project already has one pile of
+      // undeleted test data from backend development; this must not
+      // become a second.
+      isTestPayment: true
+    });
+    batch.set(auditRef, {
+      event: 'paid',
+      at: FieldValue.serverTimestamp(),
+      amountCents: session.amountCents,
+      paymentIntent: result.payment_intent,
+      provider: 'fake',
+      isTestPayment: true
+    });
     try {
-      await decision.ref.update({
-        status: 'paid',
-        // Written on every fake payment without exception, so test data can
-        // be found and deleted later — this project already has one pile of
-        // undeleted test data from backend development; this must not
-        // become a second.
-        isTestPayment: true,
-        paymentIntent: result.payment_intent,
-        paidAt: FieldValue.serverTimestamp()
-      });
-      await decision.ref.collection('audit').add({
-        event: 'paid',
-        at: FieldValue.serverTimestamp(),
-        isTestPayment: true,
-        paymentIntent: result.payment_intent
-      });
+      await batch.commit();
     } catch (err) {
       console.warn('[fakeCheckoutComplete] could not record payment:', describeError(err));
       throw new HttpsError('internal', 'Something went wrong. Please try again.');
@@ -1177,24 +1188,38 @@ export const stripeWebhook = onRequest(
       return;
     }
 
+    // Contract update and audit row commit together, same reasoning as
+    // signContract above: if the update landed but the audit add then threw,
+    // a retry of this same event would see status: 'paid' and refuse as
+    // already-paid, and the audit row could never be recreated. A single
+    // batch makes the two writes atomic, so a retry after a failed commit
+    // can genuinely redo the whole thing.
+    const auditRef = decision.ref.collection('audit').doc();
+    const batch = db.batch();
+    batch.update(decision.ref, {
+      status: 'paid',
+      paidAt: FieldValue.serverTimestamp(),
+      paymentIntent: object.payment_intent || null,
+      isTestPayment: false
+    });
+    batch.set(auditRef, {
+      event: 'paid',
+      at: FieldValue.serverTimestamp(),
+      amountCents: object.amount_total,
+      paymentIntent: object.payment_intent || null,
+      provider: 'stripe',
+      isTestPayment: false,
+      stripeEventId: event.id
+    });
     try {
-      await decision.ref.update({
-        status: 'paid',
-        paymentIntent: object.payment_intent || null,
-        paidAt: FieldValue.serverTimestamp()
-      });
-      await decision.ref.collection('audit').add({
-        event: 'paid',
-        at: FieldValue.serverTimestamp(),
-        stripeEventId: event.id,
-        amountCents: object.amount_total
-      });
+      await batch.commit();
     } catch (err) {
-      // The write itself failed after markContractPaid said this event is
+      // The commit itself failed after markContractPaid said this event is
       // good — a transient Firestore error, not a refusal. Unlike the 200s
       // above, this outcome CAN change on retry, and markContractPaid's own
-      // idempotency check makes a retry safe even if the first write partly
-      // landed. So: a real error status, on purpose, so Stripe retries.
+      // idempotency check makes a retry safe: since the batch is atomic,
+      // either nothing landed (and the retry redoes both writes) or nothing
+      // failed. So: a real error status, on purpose, so Stripe retries.
       console.error('[stripeWebhook] could not record payment:', contractId, describeError(err));
       res.status(500).send('write failed');
       return;
