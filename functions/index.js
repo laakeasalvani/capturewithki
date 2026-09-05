@@ -819,8 +819,13 @@ export const openContract = onCall(
 // directly on openContract above — same token-authentication shape, same
 // uniform-denial rule — read that function's comments first if either choice
 // here looks wrong.
+// STRIPE_SECRET_KEY is bound even though the fake provider never needs it:
+// getProvider() resolves at call time, and a function that does not DECLARE a
+// secret never receives it. Without this, switching PAYMENT_PROVIDER to stripe
+// would make every real client sign successfully and silently never reach a
+// payment page, because the resulting throw is swallowed below by design.
 export const signContract = onCall(
-  { region: 'us-west1', cors: true, secrets: [RESEND_API_KEY] },
+  { region: 'us-west1', cors: true, secrets: [RESEND_API_KEY, STRIPE_SECRET_KEY] },
   async (request) => {
     const d = request.data || {};
     const token = typeof d.token === 'string' ? d.token.trim() : '';
