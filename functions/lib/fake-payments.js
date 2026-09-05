@@ -8,7 +8,25 @@
 // handled — the same reasoning lib/stripe.js uses for building its client
 // lazily.
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { fakePayAllowed } from './payments.js';
+
+// The ONLY addresses that may complete a fake payment. There is no staging
+// project — the fake payer lives in production — so this list, not an
+// environment check, is what stands between a real client and a button that
+// pretends to take their money.
+export const FAKE_ALLOWLIST = [
+  'laakeasalvani@gmail.com',
+  'capturewithki@gmail.com'
+];
+
+export function fakePayAllowed(contract) {
+  const email = contract && typeof contract.clientEmail === 'string'
+    ? contract.clientEmail.trim().toLowerCase()
+    : '';
+  if (!email) return false;
+  // Exact match on the whole address. indexOf/includes here would let
+  // "laakeasalvani@gmail.com.attacker.example" through.
+  return FAKE_ALLOWLIST.some((a) => a.toLowerCase() === email);
+}
 
 // Matches lib/stripe.js's createRetainerSession signature exactly. contract
 // and contractId decide the amount and the mapping back to a contract;

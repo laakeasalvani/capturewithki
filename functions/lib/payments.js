@@ -12,24 +12,11 @@ import {
   retrieveSession as fakeRetrieveSession
 } from './fake-payments.js';
 
-// The ONLY addresses that may complete a fake payment. There is no staging
-// project — the fake payer lives in production — so this list, not an
-// environment check, is what stands between a real client and a button that
-// pretends to take their money.
-export const FAKE_ALLOWLIST = [
-  'laakeasalvani@gmail.com',
-  'capturewithki@gmail.com'
-];
-
-export function fakePayAllowed(contract) {
-  const email = contract && typeof contract.clientEmail === 'string'
-    ? contract.clientEmail.trim().toLowerCase()
-    : '';
-  if (!email) return false;
-  // Exact match on the whole address. indexOf/includes here would let
-  // "laakeasalvani@gmail.com.attacker.example" through.
-  return FAKE_ALLOWLIST.some((a) => a.toLowerCase() === email);
-}
+// Re-exported so existing importers keep working. These live in fake-payments.js
+// because they describe the fake payer; importing them back from there would make
+// payments.js and fake-payments.js mutually dependent, and that cycle only appeared
+// to work because ESM hoists function declarations.
+export { FAKE_ALLOWLIST, fakePayAllowed } from './fake-payments.js';
 
 export function providerName() {
   const name = process.env.PAYMENT_PROVIDER || 'fake';
