@@ -129,5 +129,54 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+
+    // Contracts. Clients never read Firestore directly — the signing page talks
+    // only to Cloud Functions, which use the Admin SDK and bypass these rules
+    // entirely. So these constrain the DASHBOARD, and the dashboard alone.
+    match /contracts/{contractId} {
+
+      // Everything that must be identical to what the client actually signed.
+      function frozenFields() {
+        return [
+          'clientName', 'clientEmail', 'eventDate', 'eventLocation',
+          'lineItems', 'totalCents', 'retainerCents', 'balanceCents',
+          'templateId', 'templateVersion',
+          'documentSnapshot', 'documentHash', 'tokenHash', 'signedAt'
+        ];
+      }
+
+      // Once signed, the frozen list is untouchable. Everything else — status,
+      // paidAt, openCount, the reminder counters — must STILL be writable, or
+      // the payment could never be recorded and every contract would strand at
+      // 'signed' while the money had already moved.
+      //
+      // The affectedKeys() guard is load-bearing. Without it, an update that
+      // merely CARRIES an unchanged frozen field is refused, which is the exact
+      // bug this project already hit when seenAt was pinned to request.time.
+      function frozenFieldsUnchanged() {
+        return !('signedAt' in resource.data)
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(frozenFields());
+      }
+
+      allow read:   if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && frozenFieldsUnchanged();
+      // A contract is a legal record. It is cancelled, never deleted.
+      allow delete: if false;
+
+      // Append-only, and only ever written by the Admin SDK.
+      match /audit/{eventId} {
+        allow read: if isAdmin();
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /contractTemplates/{templateId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /packages/{packageId} {
+      allow read, write: if isAdmin();
+    }
   }
 }
