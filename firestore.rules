@@ -141,7 +141,8 @@ service cloud.firestore {
           'clientName', 'clientEmail', 'eventDate', 'eventLocation',
           'lineItems', 'totalCents', 'retainerCents', 'balanceCents',
           'templateId', 'templateVersion',
-          'documentSnapshot', 'documentHash', 'tokenHash', 'signedAt'
+          'documentSnapshot', 'documentHash', 'tokenHash', 'signedAt',
+          'signature'
         ];
       }
 
