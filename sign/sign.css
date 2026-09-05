@@ -1,0 +1,93 @@
+/* The client's signing page. Same palette and type as the rest of the site,
+   kept deliberately plain: this page exists to be read carefully and signed
+   with intent, not to be admired. */
+:root{
+  --cream:#E8DFCE; --bg:#F2ECE0; --paper:#FAF6EE; --ink:#171614;
+  --muted:#6B6560; --line:#DCD0BC; --khaki:#6E7C5C;
+  --display:"Cormorant Garamond","Times New Roman",serif;
+  --sans:"Jost","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-weight:300;font-size:15px;line-height:1.8;
+  -webkit-font-smoothing:antialiased;
+}
+img{display:block;max-width:100%;}
+
+.s-head{padding:20px var(--gutter,22px);border-bottom:1px solid var(--line);}
+.s-wordmark{
+  font-family:var(--display);font-style:italic;font-size:24px;
+  color:var(--khaki);text-decoration:none;
+}
+
+main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 100px;max-width:760px;margin:0 auto;}
+
+.s-panel{max-width:460px;margin:clamp(20px,8vh,90px) auto;text-align:center;}
+.s-title{font-family:var(--display);font-weight:300;font-size:clamp(28px,4vw,40px);margin:0 0 10px;}
+.s-subtitle{font-family:var(--display);font-weight:400;font-size:clamp(19px,2.6vw,23px);margin:26px 0 8px;}
+.s-copy{color:var(--muted);margin:0 0 16px;}
+
+.s-contract-head{margin-bottom:22px;}
+.s-contract-head .s-title{text-align:left;}
+.s-contract-head .s-copy{margin-bottom:0;font-size:14px;}
+
+/* The agreement itself. This wraps admin-authored, server-rendered HTML — see
+   the innerHTML assignment in sign.js for why that's safe here specifically. */
+.s-contract{
+  background:var(--paper);border:1px solid var(--line);border-radius:10px;
+  padding:clamp(18px,4vw,36px);margin-bottom:34px;
+  overflow-wrap:break-word;word-break:break-word;
+}
+.s-contract h1,.s-contract h2,.s-contract h3{font-family:var(--display);font-weight:400;line-height:1.3;}
+.s-contract p{margin:0 0 1em;}
+.s-contract table{width:100%;border-collapse:collapse;font-size:14px;}
+.s-contract table, .s-contract th, .s-contract td{border:1px solid var(--line);}
+.s-contract th,.s-contract td{padding:8px 10px;text-align:left;}
+.s-contract ul,.s-contract ol{padding-left:1.3em;}
+/* Nothing in the template's own markup should ever force horizontal scroll
+   on a phone, even if it contains a wide table or a long unbroken token. */
+.s-contract, .s-contract *{max-width:100%;}
+.s-contract{overflow-x:auto;}
+
+.s-signform{border-top:1px solid var(--line);padding-top:6px;}
+
+.s-consent{
+  background:var(--cream);border-radius:10px;
+  padding:clamp(16px,3.5vw,24px);margin-bottom:24px;
+}
+.s-consent .s-copy{font-size:13.5px;margin-bottom:14px;}
+
+/* A real tap target, not just a checkbox. The whole row is the control, at
+   least 44px tall, because this project has already shipped 18px tap targets
+   once and heard about it. */
+.s-check{
+  display:flex;align-items:flex-start;gap:12px;cursor:pointer;
+  min-height:44px;padding:6px 2px;
+}
+.s-check input{
+  width:24px;height:24px;min-width:24px;margin:2px 0 0;
+  accent-color:var(--khaki);cursor:pointer;
+}
+.s-check span{font-size:14.5px;}
+
+.s-field{margin-bottom:20px;}
+.s-label{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+#sName{
+  width:100%;padding:12px 14px;min-height:48px;
+  border:1px solid var(--khaki);border-radius:8px;background:#fff;
+  font-family:var(--sans);font-size:16px;color:var(--ink);
+}
+
+.s-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:100%;min-height:48px;padding:12px 22px;
+  background:var(--khaki);color:#fff;border:none;border-radius:24px;
+  font-family:inherit;font-size:16px;cursor:pointer;text-decoration:none;
+}
+.s-btn:disabled{opacity:.5;cursor:default;}
+.s-note{min-height:1.4em;margin:12px 0 0;font-size:13px;color:#a4342a;text-align:center;}
+
+@media (max-width:480px){
+  .s-contract-head .s-title{text-align:left;}
+}

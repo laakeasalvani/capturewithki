@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your agreement — CaptureWithKi</title>
+<!-- A private page. Keep it out of search results entirely, same as /galleries/. -->
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%236E7C5C'/%3E%3Ctext x='32' y='46' font-family='Georgia,serif' font-style='italic' font-size='40' fill='%23F2ECE0' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sign.css">
+</head>
+<body>
+
+<header class="s-head">
+  <a class="s-wordmark" href="/">CaptureWithKi</a>
+</header>
+
+<main id="sMain">
+
+  <!-- No token at all: someone typed the address by hand. -->
+  <section id="sNoLink" class="s-panel" hidden>
+    <h1 class="s-title">Your agreement</h1>
+    <p class="s-copy">This page needs the private link Khiara emailed you. If
+      you cannot find it, reply to that email and she will send it again.</p>
+  </section>
+
+  <section id="sLoading" class="s-panel" hidden>
+    <p class="s-copy">Opening your agreement&hellip;</p>
+  </section>
+
+  <!-- One identical message for every refusal: a bad token, an expired one, a
+       cancelled one, or a genuine server error. Never anything that would let
+       someone learn which. -->
+  <section id="sError" class="s-panel" hidden>
+    <h1 class="s-title">We couldn't open that link</h1>
+    <p class="s-copy">That link is not valid. Please check the email again,
+      or reply to it if you keep seeing this.</p>
+  </section>
+
+  <!-- The contract and, unless already signed, the signing form. -->
+  <section id="sContract" hidden>
+    <div class="s-contract-head">
+      <h1 class="s-title" id="sClientName">Your agreement</h1>
+      <p class="s-copy" id="sMeta"></p>
+    </div>
+
+    <div id="contract-body" class="s-contract"></div>
+
+    <form id="sSignForm" class="s-signform" novalidate>
+
+      <div class="s-consent">
+        <h2 class="s-subtitle">Signing this electronically</h2>
+        <p class="s-copy">By checking the box below, you agree to sign this
+          agreement electronically, and you agree that your electronic
+          signature is as legally binding as a signature on paper. You may
+          request a paper copy of this agreement at any time — just reply to
+          the email that brought you here. You may also withdraw this consent
+          at any point before you sign, the same way.</p>
+        <label class="s-check" for="sConsent">
+          <input type="checkbox" id="sConsent">
+          <span>I agree to sign this document electronically, as described
+            above.</span>
+        </label>
+      </div>
+
+      <div class="s-field">
+        <label class="s-label" for="sName">Type your full legal name</label>
+        <input id="sName" type="text" autocomplete="name" spellcheck="false" maxlength="200">
+      </div>
+
+      <button type="submit" id="sSignBtn" class="s-btn" disabled>I agree and sign</button>
+      <p class="s-note" id="sSignError" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <!-- Shown after signing just now, and shown instead of the form again if a
+       client returns to a link they already signed. -->
+  <section id="sConfirm" class="s-panel" hidden>
+    <h1 class="s-title">You're all set</h1>
+    <p class="s-copy" id="sConfirmText"></p>
+    <p class="s-copy">A copy of the signed agreement has been emailed to you.</p>
+  </section>
+
+</main>
+
+<script type="module" src="sign.js"></script>
+</body>
+</html>
