@@ -31,7 +31,7 @@ import {
   MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition
 } from './lib/contracts.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
-import { readyToSignEmail, formatCents } from './lib/contract-email.js';
+import { readyToSignEmail, signedCopyEmail, formatCents } from './lib/contract-email.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
@@ -801,6 +801,141 @@ export const openContract = onCall(
       status: contract.status,
       signedAt: contract.signedAt ? contract.signedAt.toMillis() : null
     };
+  }
+);
+
+// signContract records the client's electronic signature: the typed name and
+// consent that show intent to sign, plus the server-observed IP and user
+// agent that attribute the signature to whoever held the link. Modelled
+// directly on openContract above — same token-authentication shape, same
+// uniform-denial rule — read that function's comments first if either choice
+// here looks wrong.
+export const signContract = onCall(
+  { region: 'us-west1', cors: true, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const d = request.data || {};
+    const token = typeof d.token === 'string' ? d.token.trim() : '';
+    const typedName = typeof d.typedName === 'string' ? d.typedName.trim().slice(0, 200) : '';
+    const consent = d.consent === true;
+
+    // Checked before touching Firestore, same as openContract.
+    if (!isValidTokenShape(token)) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+
+    // These get their own specific messages rather than CONTRACT_DENIED,
+    // because this point is reachable only by someone who already holds a
+    // token of the right shape — unlike the lookup below, refusing here
+    // does not confirm or deny that any particular token is real.
+    if (!typedName) throw new HttpsError('invalid-argument', 'Please type your full legal name.');
+    if (!consent) {
+      throw new HttpsError('invalid-argument', 'Please agree to sign electronically first.');
+    }
+
+    const hash = hashToken(token);
+    let found = null;
+    try {
+      const q = await db.collection('contracts').where('tokenHash', '==', hash).limit(1).get();
+      if (!q.empty) found = q.docs[0];
+    } catch (err) {
+      console.warn('[signContract] lookup failed:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    if (!found) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    const ref = found.ref;
+    const contract = found.data();
+
+    // Verified again in constant time even though the query already matched,
+    // same reasoning as openContract.
+    if (!verifyToken(token, contract.tokenHash)) {
+      throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    }
+
+    // Idempotent. A replayed token, a double-tap, or a client who hits back
+    // and signs again must never produce a second signature record.
+    if (contract.signedAt) {
+      return { ok: true, signedAt: contract.signedAt.toMillis() };
+    }
+    if (!canTransition(contract.status, 'signed')) {
+      throw new HttpsError('failed-precondition', CONTRACT_DENIED);
+    }
+
+    // The IP comes from the request, never from the browser. Everything a
+    // client can set is evidence about them, not evidence they supply.
+    const raw = request.rawRequest || {};
+    const forwardedHeader = (raw.headers && raw.headers['x-forwarded-for']) || '';
+    const ip = String(forwardedHeader).split(',')[0].trim() || raw.ip || 'unknown';
+    const userAgent = String((raw.headers && raw.headers['user-agent']) || '').slice(0, 500);
+
+    // Signature and audit row commit together or not at all — the OPPOSITE
+    // of createContract's choice to swallow an audit failure. There, a
+    // missing audit row on creation is recoverable because the document's
+    // own timestamps survive; a retry only risks a duplicate draft. Here the
+    // idempotency check above makes a lost audit row unrecoverable: once
+    // signedAt is set, every future attempt sees it and returns early
+    // without ever writing the audit row again. A single batch removes the
+    // possibility of the two writes splitting.
+    const auditRef = ref.collection('audit').doc();
+    const batch = db.batch();
+    batch.update(ref, {
+      status: 'signed',
+      // The SERVER's clock, and ONLY EVER a serverTimestamp — never a JS
+      // Date or a number. This project has already been bitten once by
+      // trusting a client clock, in the spam check that would have binned
+      // real clients whose phone ran fast; the stakes here are a contested
+      // contract date. openContract's return path also does
+      // contract.signedAt.toMillis() with no guard that the field really is
+      // a Timestamp — this function is what creates the field, so that
+      // assumption must always hold.
+      signedAt: FieldValue.serverTimestamp(),
+      signature: {
+        typedName: typedName,
+        ip: ip,
+        userAgent: userAgent,
+        // Copied, not referenced, so the signature record stands alone even
+        // if every other field on the contract were altered later.
+        documentHash: contract.documentHash,
+        consentGiven: true,
+        consentTextVersion: 'esign-disclosure-v1'
+      }
+    });
+    batch.set(auditRef, {
+      event: 'signed',
+      at: FieldValue.serverTimestamp(),
+      typedName: typedName,
+      ip: ip,
+      documentHash: contract.documentHash
+    });
+    try {
+      await batch.commit();
+    } catch (err) {
+      console.warn('[signContract] could not record signature:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    const mail = signedCopyEmail({
+      clientName: contract.clientName,
+      contractUrl: SITE_ORIGIN + '/sign/?t=' + token,
+      signedAt: new Date()
+    });
+    const key = RESEND_API_KEY.value();
+    try {
+      await sendEmail({
+        apiKey: key,
+        to: contract.clientEmail,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html
+      });
+    } catch (err) {
+      // Logged, not thrown. The signature is already recorded and valid; a
+      // failed confirmation email must not make the client think their
+      // signing did not work. The opposite of sendContract's rollback — the
+      // difference is that here the important thing already succeeded.
+      console.warn('[signContract] confirmation email failed:', describeError(err));
+    }
+
+    console.log('[signContract] signed:', ref.id);
+    return { ok: true, signedAt: Date.now() };
   }
 );
 
