@@ -35,3 +35,63 @@ export function computeBalanceCents(totalCents, retainerCents) {
   if (!Number.isInteger(totalCents) || !Number.isInteger(retainerCents)) return 0;
   return totalCents - retainerCents;
 }
+
+export const MAX_NAME = 200;
+export const MAX_LOCATION = 300;
+export const MAX_LINE_LABEL = 120;
+export const MAX_LINE_ITEMS = 20;
+export const MAX_TOTAL_CENTS = 10000000; // $100,000 — far above her top package
+
+// A contract id arrives from a query string, becomes a Firestore path, and is
+// embedded in an email link. Its shape is not negotiable. Same reasoning, and
+// same regex, as isValidGalleryId.
+export function isValidContractId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9]{16,40}$/.test(id);
+}
+
+function trimmedString(v) {
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+export function validateContractInput(input) {
+  const errors = [];
+  const d = input && typeof input === 'object' ? input : {};
+
+  const name = trimmedString(d.clientName);
+  if (!name) errors.push('A client name is required.');
+  else if (name.length > MAX_NAME) errors.push('That client name is too long.');
+
+  // Deliberately loose. A strict RFC-5322 regex rejects real addresses, and
+  // the only check that actually matters is whether the emailed link arrives.
+  const email = trimmedString(d.clientEmail);
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    errors.push('That email address will not work.');
+  }
+
+  if (trimmedString(d.eventLocation).length > MAX_LOCATION) {
+    errors.push('That location is too long.');
+  }
+
+  const items = Array.isArray(d.lineItems) ? d.lineItems : null;
+  if (!items || items.length === 0) {
+    errors.push('A contract needs at least one line item.');
+  } else if (items.length > MAX_LINE_ITEMS) {
+    errors.push('That is too many line items.');
+  } else {
+    for (const item of items) {
+      const label = trimmedString(item ? item.label : null);
+      if (!label) { errors.push('Every line item needs a label.'); break; }
+      if (label.length > MAX_LINE_LABEL) { errors.push('A line item label is too long.'); break; }
+      if (!Number.isInteger(item.amountCents) || item.amountCents < 0) {
+        errors.push('Every line item needs a whole-cent amount of zero or more.');
+        break;
+      }
+    }
+  }
+
+  const total = sumLineItems(items);
+  if (total <= 0) errors.push('The total must be more than zero.');
+  if (total > MAX_TOTAL_CENTS) errors.push('That total looks wrong — is it in cents?');
+
+  return { ok: errors.length === 0, errors: errors };
+}
