@@ -135,27 +135,47 @@ service cloud.firestore {
     // entirely. So these constrain the DASHBOARD, and the dashboard alone.
     match /contracts/{contractId} {
 
-      // Everything that must be identical to what the client actually signed.
+      // Everything that must be identical to what the client actually signed —
+      // plus the three timestamps and the percentage that describe the sending
+      // itself. retainerPercent is here because retainerCents is: a contract
+      // whose stated percentage no longer matches the frozen amount is a
+      // document that contradicts itself. sentAt and firstOpenedAt are the
+      // evidence the chase ladder and the never-opened alarm reason from.
       function frozenFields() {
         return [
           'clientName', 'clientEmail', 'eventDate', 'eventLocation',
           'lineItems', 'totalCents', 'retainerCents', 'balanceCents',
+          'retainerPercent',
           'templateId', 'templateVersion',
-          'documentSnapshot', 'documentHash', 'tokenHash', 'signedAt',
+          'documentSnapshot', 'documentHash', 'tokenHash',
+          'sentAt', 'firstOpenedAt', 'signedAt',
           'signature'
         ];
       }
 
-      // Once signed, the frozen list is untouchable. Everything else — status,
-      // paidAt, openCount, the reminder counters — must STILL be writable, or
-      // the payment could never be recorded and every contract would strand at
-      // 'signed' while the money had already moved.
+      // Frozen from SENDING, not from signing. Keyed on signedAt, this froze one
+      // step too late: through the whole window between sending and signing —
+      // exactly while the client is sitting reading the agreement — an admin
+      // write could still rewrite documentSnapshot, documentHash, totalCents,
+      // retainerCents and tokenHash. signContract then copies the NEW
+      // documentHash into the signature, binding the signature to bytes the
+      // client never saw. sentAt is written in the SAME ref.update() as those
+      // frozen fields and deleted in the same rollback, so it is exactly as
+      // reliable a trigger as signedAt and covers strictly more.
+      //
+      // Everything NOT on the list above must still be writable, or the payment
+      // could never be recorded and every contract would strand at 'signed'
+      // while the money had already moved: status, paidAt, paymentIntent,
+      // paymentSessionId, isTestPayment, paymentAnomaly/paymentAnomalyAt,
+      // openCount, lastReminderAt, signReminderCount, payReminderCount,
+      // neverOpenedAlertAt, escalatedAt. Adding any of those to frozenFields()
+      // breaks the payment path.
       //
       // The affectedKeys() guard is load-bearing. Without it, an update that
       // merely CARRIES an unchanged frozen field is refused, which is the exact
       // bug this project already hit when seenAt was pinned to request.time.
       function frozenFieldsUnchanged() {
-        return !('signedAt' in resource.data)
+        return !('sentAt' in resource.data)
           || !request.resource.data.diff(resource.data).affectedKeys().hasAny(frozenFields());
       }
 
