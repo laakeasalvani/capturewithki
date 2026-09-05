@@ -31,7 +31,11 @@ import {
   MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition
 } from './lib/contracts.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
-import { readyToSignEmail, signedCopyEmail, formatCents } from './lib/contract-email.js';
+import {
+  readyToSignEmail, signedCopyEmail, formatCents,
+  signReminderEmail, payReminderEmail, neverOpenedAlertEmail, unpaidEscalationEmail
+} from './lib/contract-email.js';
+import { dueActions } from './lib/chase.js';
 import { fakePayAllowed, markContractPaid, getProvider } from './lib/payments.js';
 import { completeFakeSession, retrieveSession as retrieveFakeSession } from './lib/fake-payments.js';
 import { getStripe } from './lib/stripe.js';
@@ -1399,6 +1403,135 @@ export const escalateUnreadInquiries = onSchedule(
       } catch (err) {
         // One failure must not stop the rest.
         console.error('[alarm] could not raise for inquiry', inquiry.id, describeError(err));
+      }
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// The retainer chase — reminders, escalation, and reconciliation.
+//
+// Reconciliation runs FIRST, inside the same invocation, before dueActions
+// is ever called. A missed checkout.session.completed webhook (Stripe drops
+// them occasionally, and the fake payer has no webhook at all — completing a
+// fake session only ever updates fakeSessions, never the contract, unless
+// fakeCheckoutComplete itself ran) would otherwise leave a contract sitting
+// at status 'signed' with money already collected. If the chase logic below
+// ran against that stale status, it would email — or worse, alert Khiara
+// with "ACTION NEEDED" — over a bill the client already paid. That is the
+// single worst thing this function could do, so repair happens before
+// anything is read for chasing, and the in-memory contract is patched to
+// 'paid' immediately so `dueActions` (which never sees Firestore, only the
+// array handed to it) skips it in this same run too.
+// ---------------------------------------------------------------------------
+export const chaseContracts = onSchedule(
+  {
+    region: 'us-west1',
+    schedule: 'every 1 hours',
+    secrets: [RESEND_API_KEY]
+  },
+  async () => {
+    const now = Date.now();
+
+    let snap;
+    try {
+      // Only live states. 'paid', 'void', 'cancelled' and 'draft' are never
+      // chased, and fetching them would grow this query without bound as
+      // the years pass.
+      snap = await db.collection('contracts')
+        .where('status', 'in', ['sent', 'opened', 'signed'])
+        .get();
+    } catch (err) {
+      console.error('[chaseContracts] could not list contracts:', describeError(err));
+      return;
+    }
+
+    const contracts = snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+
+    // Reconciliation. Only 'signed' contracts with a checkout session on file
+    // are candidates, and only once the session has had a little time to
+    // resolve — checkContract's own webhook can legitimately still be in
+    // flight seconds after signing, and this must not race it.
+    for (const c of contracts) {
+      if (c.status !== 'signed' || !c.paymentSessionId) continue;
+      const signedAt = c.signedAt && typeof c.signedAt.toMillis === 'function'
+        ? c.signedAt.toMillis() : null;
+      if (signedAt === null || now - signedAt < 15 * 60000) continue;
+
+      try {
+        // Through the seam — never Stripe directly. The fake provider's
+        // retrieveSession reads the fakeSessions collection it already
+        // wrote at checkout, so this path is exercised for real today
+        // rather than first running the day real money is involved.
+        const session = await getProvider().retrieveSession(c.paymentSessionId);
+        if (session.payment_status === 'paid') {
+          console.warn('[chaseContracts] webhook was missed, repairing:', c.id);
+          await db.collection('contracts').doc(c.id).update({
+            status: 'paid',
+            paidAt: FieldValue.serverTimestamp(),
+            paymentIntent: session.payment_intent || null
+          });
+          await db.collection('contracts').doc(c.id).collection('audit').add({
+            event: 'paid-reconciled',
+            at: FieldValue.serverTimestamp(),
+            paymentIntent: session.payment_intent || null
+          });
+          // Patched in memory too, so dueActions below — which only ever
+          // sees this array, never Firestore again — skips it this run.
+          c.status = 'paid';
+        }
+      } catch (err) {
+        console.warn('[chaseContracts] could not reconcile', c.id, describeError(err));
+      }
+    }
+
+    const actions = dueActions(contracts, now);
+    console.log('[chaseContracts] scanned', contracts.length, 'due', actions.length);
+    if (!actions.length) return;
+
+    const key = RESEND_API_KEY.value();
+
+    for (const action of actions) {
+      const c = contracts.find((x) => x.id === action.contractId);
+      if (!c) continue;
+      const ref = db.collection('contracts').doc(c.id);
+
+      // Each action's send-and-record is its own try/catch. One bad address
+      // or one Resend hiccup must not stop every other contract's reminder
+      // from going out this hour.
+      try {
+        if (action.kind === 'sign-reminder') {
+          const m = signReminderEmail(c);
+          await sendEmail({ apiKey: key, to: c.clientEmail, subject: m.subject, text: m.text, html: m.html });
+          await ref.update({
+            signReminderCount: (c.signReminderCount || 0) + 1,
+            lastReminderAt: FieldValue.serverTimestamp()
+          });
+        } else if (action.kind === 'pay-reminder') {
+          const m = payReminderEmail(c);
+          await sendEmail({ apiKey: key, to: c.clientEmail, subject: m.subject, text: m.text, html: m.html });
+          await ref.update({
+            payReminderCount: (c.payReminderCount || 0) + 1,
+            lastReminderAt: FieldValue.serverTimestamp()
+          });
+        } else if (action.kind === 'never-opened-alert') {
+          const m = neverOpenedAlertEmail(c);
+          await sendEmail({ apiKey: key, to: OWNER_EMAIL, subject: m.subject, text: m.text, html: m.html });
+          await ref.update({ neverOpenedAlertAt: FieldValue.serverTimestamp() });
+        } else if (action.kind === 'unpaid-escalation') {
+          const m = unpaidEscalationEmail(c);
+          await sendEmail({ apiKey: key, to: OWNER_EMAIL, subject: m.subject, text: m.text, html: m.html });
+          await ref.update({ escalatedAt: FieldValue.serverTimestamp() });
+        } else {
+          continue;
+        }
+
+        await ref.collection('audit').add({
+          event: action.kind,
+          at: FieldValue.serverTimestamp()
+        });
+      } catch (err) {
+        console.warn('[chaseContracts] action failed', action.kind, c.id, describeError(err));
       }
     }
   }

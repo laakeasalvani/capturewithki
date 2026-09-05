@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { formatCents, readyToSignEmail, signedCopyEmail } from '../lib/contract-email.js';
+import {
+  formatCents, readyToSignEmail, signedCopyEmail,
+  signReminderEmail, payReminderEmail, neverOpenedAlertEmail, unpaidEscalationEmail
+} from '../lib/contract-email.js';
+
+// A stand-in for a Firestore Timestamp: chaseContracts hands these builders
+// raw contract documents straight off Firestore, where sentAt/signedAt are
+// Timestamp instances (a .toDate() method), never a plain Date or string.
+const fakeTimestamp = (date) => ({ toDate: () => date });
 
 test('cents render as dollars with a thousands separator', () => {
   assert.equal(formatCents(120000), '$1,200.00');
@@ -64,4 +72,125 @@ test('the signed-copy email links back to the permanent record', () => {
   });
   assert.ok(mail.text.includes('https://capturewithki.com/sign/?t=abc'));
   assert.ok(mail.html.includes('https://capturewithki.com/sign/?t=abc'));
+});
+
+// ---------------------------------------------------------------------------
+// The chase ladder (Task 6)
+// ---------------------------------------------------------------------------
+
+test('the sign reminder names the client, the date, and says the date is not held — with no fabricated sign link', () => {
+  const mail = signReminderEmail({ clientName: 'Jordan Rivera', eventDate: '2027-06-12' });
+  assert.ok(mail.subject.length > 0);
+  assert.ok(mail.text.includes('Jordan Rivera'));
+  assert.ok(mail.html.includes('Jordan Rivera'));
+  assert.ok(mail.text.includes('2027-06-12'));
+  assert.ok(mail.html.includes('2027-06-12'));
+  assert.ok(/not held/i.test(mail.text));
+  assert.ok(/not held/i.test(mail.html));
+  // No raw token exists to build a fresh sign link with — see the comment
+  // in contract-email.js. Nothing here should look like a fabricated one.
+  assert.equal(mail.text.includes('/sign/?t='), false);
+  assert.equal(mail.html.includes('/sign/?t='), false);
+});
+
+test('the pay reminder names the client, the retainer amount, the date, and says the date is not yet held', () => {
+  const mail = payReminderEmail({
+    clientName: 'Jordan Rivera', eventDate: '2027-06-12', retainerCents: 36000
+  });
+  assert.ok(mail.text.includes('Jordan Rivera'));
+  assert.ok(mail.html.includes('Jordan Rivera'));
+  assert.ok(mail.text.includes('$360.00'));
+  assert.ok(mail.html.includes('$360.00'));
+  assert.ok(mail.text.includes('2027-06-12'));
+  assert.ok(/not yet held/i.test(mail.text));
+  assert.ok(/not yet held/i.test(mail.html));
+});
+
+test('the never-opened alert names the client, gives contact details and when it was sent, and tells Khiara to consider texting', () => {
+  const sentAt = fakeTimestamp(new Date(Date.UTC(2026, 8, 1, 12, 0)));
+  const mail = neverOpenedAlertEmail({
+    clientName: 'Jordan Rivera',
+    clientEmail: 'jordan@example.com',
+    clientPhone: '808-555-0100',
+    sentAt: sentAt
+  });
+  assert.ok(mail.subject.includes('Jordan Rivera'));
+  assert.ok(mail.subject.toLowerCase().includes('has not opened'));
+  assert.ok(mail.text.includes('jordan@example.com'));
+  assert.ok(mail.html.includes('jordan@example.com'));
+  assert.ok(mail.text.includes('808-555-0100'));
+  assert.ok(mail.html.includes('808-555-0100'));
+  assert.ok(mail.text.includes('2026-09-01'));
+  assert.ok(mail.html.includes('2026-09-01'));
+  assert.ok(/spam/i.test(mail.text) && /text/i.test(mail.text));
+  assert.ok(/spam/i.test(mail.html) && /text/i.test(mail.html));
+  assert.ok(mail.text.includes('https://capturewithki.com/int/'));
+  assert.ok(mail.html.includes('https://capturewithki.com/int/'));
+});
+
+test('a missing phone renders plainly in the never-opened alert rather than blank', () => {
+  const mail = neverOpenedAlertEmail({
+    clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com',
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1, 12, 0)))
+  });
+  assert.ok(mail.text.includes('not given'));
+  assert.ok(mail.html.includes('not given'));
+});
+
+test('the unpaid escalation names the client, when they signed, the amount, the reminder count, and says the date is not held', () => {
+  const mail = unpaidEscalationEmail({
+    clientName: 'Jordan Rivera',
+    clientEmail: 'jordan@example.com',
+    clientPhone: '808-555-0100',
+    signedAt: fakeTimestamp(new Date(Date.UTC(2026, 7, 28, 9, 0))),
+    retainerCents: 36000,
+    payReminderCount: 3
+  });
+  assert.ok(mail.subject.startsWith('ACTION NEEDED'));
+  assert.ok(mail.subject.includes('Jordan Rivera'));
+  assert.ok(mail.text.includes('jordan@example.com'));
+  assert.ok(mail.html.includes('jordan@example.com'));
+  assert.ok(mail.text.includes('808-555-0100'));
+  assert.ok(mail.text.includes('2026-08-28'));
+  assert.ok(mail.html.includes('2026-08-28'));
+  assert.ok(mail.text.includes('$360.00'));
+  assert.ok(mail.html.includes('$360.00'));
+  assert.ok(mail.text.includes('3'));
+  assert.ok(mail.html.includes('3'));
+  assert.ok(/not held/i.test(mail.text));
+  assert.ok(/not held/i.test(mail.html));
+  assert.ok(mail.text.includes('https://capturewithki.com/int/'));
+  assert.ok(mail.html.includes('https://capturewithki.com/int/'));
+});
+
+test('a hostile client name cannot inject markup into the owner-facing alerts', () => {
+  const hostile = '<img src=x onerror=alert(1)>';
+  const alert1 = neverOpenedAlertEmail({
+    clientName: hostile, clientEmail: 'a@example.com',
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1)))
+  });
+  assert.equal(alert1.html.includes('<img src=x'), false);
+  assert.ok(alert1.html.includes('&lt;img'));
+
+  const alert2 = unpaidEscalationEmail({
+    clientName: hostile, clientEmail: 'a@example.com',
+    signedAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1))), retainerCents: 1000
+  });
+  assert.equal(alert2.html.includes('<img src=x'), false);
+  assert.ok(alert2.html.includes('&lt;img'));
+});
+
+test('a newline in the client name cannot forge either owner-alert subject', () => {
+  const hostile = 'Jordan\nBcc: someone@example.com';
+  const alert1 = neverOpenedAlertEmail({
+    clientName: hostile, clientEmail: 'a@example.com',
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1)))
+  });
+  assert.equal(alert1.subject.includes('\n'), false);
+
+  const alert2 = unpaidEscalationEmail({
+    clientName: hostile, clientEmail: 'a@example.com',
+    signedAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1))), retainerCents: 1000
+  });
+  assert.equal(alert2.subject.includes('\n'), false);
 });
