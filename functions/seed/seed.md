@@ -30,6 +30,20 @@ not exist until Task 9 is written, so the guard is being carried forward into
 that task instead). Until that guard exists, **do not point any sender at
 this template**, draft or otherwise.
 
+## CONFIRM WITH KHIARA BEFORE SEEDING — READ THIS FIRST
+
+Do not run the steps below until this is settled.
+
+The site's own comments (index.html line 110 and line 693) say pricing on
+this site is still placeholder text pending replacement "before launch."
+Before seeding ANY price as a real package, confirm it with Khiara — that
+includes "The Grand" ($1,200), the one package the task brief named as
+confirmed, since the same blanket comment technically covers it too. A wrong
+number here becomes a wrong number on a legal contract.
+
+The full list of prices awaiting her confirmation is at the end of this file,
+under "Why nothing else was seeded."
+
 ## Steps a human takes to load the template and packages
 
 1. Open the Firebase console for `capturewithki-69dd3` → Firestore Database.
@@ -103,14 +117,7 @@ directly under one clearly-named package, no guessing needed to match them
 up) — the open question is only whether the number itself is real or a
 placeholder Khiara hasn't replaced yet.
 
-## CONFIRM WITH KHIARA BEFORE SEEDING
-
-The site's own comments (index.html line 110 and line 693) say pricing on
-this site is still placeholder text pending replacement "before launch."
-Before seeding any of the following as real packages, confirm each price
-with Khiara — including double-checking "The Grand" above, since the same
-blanket comment technically covers it too, even though the task brief names
-it as confirmed.
+### The prices that still need confirming
 
 **Weddings** (index.html ~lines 862-888):
 - The Intimate — 4 hours, "Starting from $750" (`weddings.pkg1`)
