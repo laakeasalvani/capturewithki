@@ -8,12 +8,24 @@
 // handled — the same reasoning lib/stripe.js uses for building its client
 // lazily.
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { fakePayAllowed } from './payments.js';
 
 // Matches lib/stripe.js's createRetainerSession signature exactly. contract
 // and contractId decide the amount and the mapping back to a contract;
 // successUrl/cancelUrl are accepted for parity with the real provider but
 // unused — there is no external redirect to send them to.
 export async function createRetainerSession(contract, contractId, successUrl, cancelUrl) {
+  // Checked at session CREATION, not only at completion. Without this, a real
+  // client whose contract was signed while PAYMENT_PROVIDER was still 'fake'
+  // would be redirected to a page reading "TEST PAYMENT — NO MONEY MOVES".
+  // They could never complete it, but they should never SEE it either.
+  // Failing here instead means signContract's existing catch tells them their
+  // agreement is signed and a payment link will follow — which is true, calm,
+  // and leaves the contract in the chase ladder for Khiara.
+  if (!fakePayAllowed(contract)) {
+    throw new Error('fake provider: this contract is not allowlisted for test payments');
+  }
+
   const db = getFirestore();
   const ref = db.collection('fakeSessions').doc();
   // Recorded once, at creation, from the contract as it exists right now.

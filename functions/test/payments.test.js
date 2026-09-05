@@ -173,3 +173,15 @@ test('cancelled cannot be paid retroactively', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'not-payable-from-cancelled');
 });
+
+test('the fake provider refuses to create a session for a real client', async () => {
+  delete process.env.PAYMENT_PROVIDER;
+  const fake = getProvider();
+  await assert.rejects(
+    () => fake.createRetainerSession(
+      { clientEmail: 'bride@example.com', retainerCents: 36000 },
+      'abcdefghij0123456789', 'https://example.com/ok', 'https://example.com/back'
+    ),
+    /fake provider: this contract is not allowlisted/
+  );
+});
