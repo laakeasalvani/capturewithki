@@ -34,8 +34,11 @@ import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken 
 import { readyToSignEmail, signedCopyEmail, formatCents } from './lib/contract-email.js';
 import { fakePayAllowed, markContractPaid } from './lib/payments.js';
 import { completeFakeSession, retrieveSession as retrieveFakeSession } from './lib/fake-payments.js';
+import { getStripe } from './lib/stripe.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
+const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
 
 // Hard-coded, and never taken from request.data. The sign link emailed below
@@ -1057,6 +1060,148 @@ export const fakeCheckoutComplete = onCall(
 
     console.log('[fakeCheckoutComplete] test payment recorded:', contractId);
     return { ok: true };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// stripeWebhook — the only thing in this whole system permitted to mark a
+// contract paid.
+//
+// onRequest, not onCall: Stripe posts a raw signed body and knows nothing
+// about the callable protocol. Everything that decides whether an event
+// counts as a payment lives in markContractPaid (lib/payments.js) — the
+// idempotency check, the amount check, and the out-of-order guard. This
+// handler's only job is to verify the signature, pull the contract id out
+// of a verified event, and call that one shared function. fakeCheckoutComplete
+// above calls the very same function, so there is one implementation of
+// "is this really paid" and one set of tests for it.
+// ---------------------------------------------------------------------------
+export const stripeWebhook = onRequest(
+  { region: 'us-west1', secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
+  async (req, res) => {
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      res.status(400).send('missing signature');
+      return;
+    }
+
+    let event;
+    try {
+      // req.rawBody, NOT req.body. Firebase parses JSON before this handler
+      // runs, and re-serialising it produces different bytes — the signature
+      // then fails to verify for reasons that look like a Stripe bug.
+      event = getStripe().webhooks.constructEvent(
+        req.rawBody, signature, STRIPE_WEBHOOK_SECRET.value()
+      );
+    } catch (err) {
+      // Never log the body of a failed verification — an unverified payload
+      // is attacker-controlled. Log only that verification failed.
+      console.warn('[stripeWebhook] signature verification failed');
+      res.status(400).send('bad signature');
+      return;
+    }
+
+    if (event.type !== 'checkout.session.completed' && event.type !== 'charge.refunded') {
+      // 200, deliberately. Anything else makes Stripe retry an event we will
+      // never care about, forever.
+      res.status(200).send('ignored');
+      return;
+    }
+
+    const object = event.data.object;
+    const contractId = (object.metadata && object.metadata.contractId)
+      || object.client_reference_id
+      || '';
+    if (!isValidContractId(contractId)) {
+      console.warn('[stripeWebhook] event carried no usable contract id:', event.id);
+      res.status(200).send('no contract');
+      return;
+    }
+
+    const ref = db.collection('contracts').doc(contractId);
+
+    if (event.type === 'charge.refunded') {
+      // Audit-only. Refunding never changes status — that stays a manual,
+      // human decision, not something a webhook infers from a Stripe event.
+      let snap;
+      try {
+        snap = await ref.get();
+      } catch (err) {
+        // Transient — a Firestore hiccup, not a refusal. A real error status
+        // so Stripe retries; nothing has been decided yet either way.
+        console.error('[stripeWebhook] refund lookup failed:', contractId, describeError(err));
+        res.status(500).send('lookup failed');
+        return;
+      }
+      if (!snap.exists) {
+        console.warn('[stripeWebhook] refund for unknown contract:', contractId);
+        res.status(200).send('unknown contract');
+        return;
+      }
+      try {
+        await ref.collection('audit').add({
+          event: 'refunded',
+          at: FieldValue.serverTimestamp(),
+          stripeEventId: event.id,
+          amountCents: object.amount_refunded
+        });
+      } catch (err) {
+        console.error('[stripeWebhook] could not record refund audit row:', contractId, describeError(err));
+        res.status(500).send('audit write failed');
+        return;
+      }
+      console.log('[stripeWebhook] refund recorded:', contractId);
+      res.status(200).send('ok');
+      return;
+    }
+
+    // checkout.session.completed. amount_total is what the client actually
+    // paid, compared inside markContractPaid against the contract's own
+    // retainerCents — not trusted on its own.
+    const decision = await markContractPaid(db, contractId, {
+      amountCents: object.amount_total
+    });
+
+    if (!decision.ok) {
+      // 200, always. Retrying would never change the outcome: the contract
+      // is already paid, the amount is wrong, or it isn't payable yet and
+      // the reconciliation sweep will pick it up. An amount mismatch is
+      // logged loudly — it means something is badly wrong — everything
+      // else is a routine, expected refusal.
+      if (decision.reason === 'amount-mismatch') {
+        console.error('[stripeWebhook] amount mismatch, refusing to record payment:', contractId, event.id);
+      } else {
+        console.warn('[stripeWebhook] not recorded:', decision.reason, contractId);
+      }
+      res.status(200).send(decision.reason);
+      return;
+    }
+
+    try {
+      await decision.ref.update({
+        status: 'paid',
+        paymentIntent: object.payment_intent || null,
+        paidAt: FieldValue.serverTimestamp()
+      });
+      await decision.ref.collection('audit').add({
+        event: 'paid',
+        at: FieldValue.serverTimestamp(),
+        stripeEventId: event.id,
+        amountCents: object.amount_total
+      });
+    } catch (err) {
+      // The write itself failed after markContractPaid said this event is
+      // good — a transient Firestore error, not a refusal. Unlike the 200s
+      // above, this outcome CAN change on retry, and markContractPaid's own
+      // idempotency check makes a retry safe even if the first write partly
+      // landed. So: a real error status, on purpose, so Stripe retries.
+      console.error('[stripeWebhook] could not record payment:', contractId, describeError(err));
+      res.status(500).send('write failed');
+      return;
+    }
+
+    console.log('[stripeWebhook] paid:', contractId);
+    res.status(200).send('ok');
   }
 );
 
