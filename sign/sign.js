@@ -35,6 +35,15 @@ function tokenFromUrl() {
   return typeof raw === 'string' ? raw.trim() : '';
 }
 
+// A hint left by the redirect back from checkout, nothing more. Anyone can
+// close the checkout tab, block the redirect, or type this parameter onto
+// the URL themselves — it is never treated as proof of payment. Only
+// openContract's own read of the contract's status (set by the webhook, or
+// by the fake completion) may say the retainer is in.
+function paidHintFromUrl() {
+  return new URLSearchParams(location.search).get('paid') === '1';
+}
+
 function formatCents(cents) {
   if (!Number.isInteger(cents)) return null;
   const negative = cents < 0;
@@ -56,8 +65,31 @@ function formatSignedAt(ms) {
   }
 }
 
-function showConfirmed(signedAt) {
-  confirmTextEl.textContent = 'You signed this agreement on ' + formatSignedAt(signedAt) + '.';
+// status comes from openContract's read of the actual document — the only
+// place this page trusts as proof of payment. opts.paidHint is the redirect
+// parameter, a hint only; opts.checkoutFailed covers the case where signing
+// worked but no payment session could be created. Never conflate the hint
+// with the read: a contract can come back here with ?paid=1 long before, or
+// even without, the webhook ever landing.
+function signedMessage(status, signedAt, opts) {
+  const o = opts || {};
+  const signedLine = 'You signed this agreement on ' + formatSignedAt(signedAt) + '.';
+  if (o.checkoutFailed) {
+    return 'Your agreement is signed. We couldn’t open the payment page just now — ' +
+      'Khiara will email you a link to pay the retainer shortly.';
+  }
+  if (status === 'paid') {
+    return signedLine + ' Your retainer has been received — your date is held.';
+  }
+  if (o.paidHint) {
+    return signedLine + ' Thanks — we’re confirming your payment now. ' +
+      'This can take a minute; refresh this page to check.';
+  }
+  return signedLine;
+}
+
+function showConfirmed(status, signedAt, opts) {
+  confirmTextEl.textContent = signedMessage(status, signedAt, opts);
   show('confirm');
 }
 
@@ -87,8 +119,11 @@ if (!token) {
     // because of that — never point it at anything a client can write.
     bodyEl.innerHTML = data.documentSnapshot || '';
 
-    if (data.status === 'signed' || data.signedAt) {
-      showConfirmed(data.signedAt);
+    if (data.status === 'signed' || data.status === 'paid' || data.signedAt) {
+      // The real status, read from the document, decides the message —
+      // the ?paid=1 the client may have arrived with is only a hint that
+      // gets consulted when the document itself doesn't yet say 'paid'.
+      showConfirmed(data.status, data.signedAt, { paidHint: paidHintFromUrl() });
       return;
     }
 
@@ -133,7 +168,14 @@ form.addEventListener('submit', function (e) {
   signContract({ token: token, typedName: typedName, consent: true }).then(function (res) {
     const data = res.data || {};
     signErrorEl.textContent = '';
-    showConfirmed(data.signedAt);
+    if (data.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+    // The provider was unreachable (or, on a replay, no new session was
+    // made). Say something true rather than something reassuring: the
+    // agreement IS signed, and do not imply the date is held.
+    showConfirmed(null, data.signedAt, { checkoutFailed: true });
   }).catch(function () {
     signErrorEl.textContent = 'Something went wrong sending your signature. Please try again.';
     updateSignBtn();

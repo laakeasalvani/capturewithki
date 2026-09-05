@@ -32,7 +32,7 @@ import {
 } from './lib/contracts.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import { readyToSignEmail, signedCopyEmail, formatCents } from './lib/contract-email.js';
-import { fakePayAllowed, markContractPaid } from './lib/payments.js';
+import { fakePayAllowed, markContractPaid, getProvider } from './lib/payments.js';
 import { completeFakeSession, retrieveSession as retrieveFakeSession } from './lib/fake-payments.js';
 import { getStripe } from './lib/stripe.js';
 
@@ -856,9 +856,13 @@ export const signContract = onCall(
     }
 
     // Idempotent. A replayed token, a double-tap, or a client who hits back
-    // and signs again must never produce a second signature record.
+    // and signs again must never produce a second signature record. No new
+    // checkout session is created here either — the fake provider has no
+    // idempotency key, so calling it again on a replay would mint a second,
+    // orphaned session. checkoutUrl is null; a client who lands back on this
+    // path after already being redirected once has no need of a second one.
     if (contract.signedAt) {
-      return { ok: true, signedAt: contract.signedAt.toMillis() };
+      return { ok: true, signedAt: contract.signedAt.toMillis(), checkoutUrl: null };
     }
     if (!canTransition(contract.status, 'signed')) {
       throw new HttpsError('failed-precondition', CONTRACT_DENIED);
@@ -917,6 +921,32 @@ export const signContract = onCall(
       throw new HttpsError('internal', 'Something went wrong. Please try again.');
     }
 
+    // AFTER the signature is safely recorded, never before. If the payment
+    // provider is unreachable, the client has still signed and that fact
+    // must survive — a failure here costs a redirect, not an agreement.
+    const back = SITE_ORIGIN + '/sign/?t=' + token;
+    let checkoutUrl = null;
+    try {
+      // Dispatched through the seam, so this line is identical whether the
+      // fake payer or Stripe is configured. Switching between them is
+      // PAYMENT_PROVIDER and nothing else.
+      const session = await getProvider().createRetainerSession(
+        contract, ref.id, back + '&paid=1', back
+      );
+      checkoutUrl = session.url;
+      // Provider-agnostic name, deliberately: this document may end up paid
+      // by either provider, and a field named for one of them would be a lie
+      // about the other's rows — the same reason fakeCheckoutComplete and
+      // stripeWebhook both write to the shared `paymentIntent` field.
+      await ref.update({ paymentSessionId: session.id });
+    } catch (err) {
+      console.warn('[signContract] could not create checkout session:', describeError(err));
+      // Deliberately swallowed, not thrown. The signature above is already
+      // committed; the client sees a calm true message instead, and a signed-
+      // unpaid contract is exactly what the pay-reminder ladder and the
+      // dashboard exist to catch.
+    }
+
     const mail = signedCopyEmail({
       clientName: contract.clientName,
       contractUrl: SITE_ORIGIN + '/sign/?t=' + token,
@@ -940,7 +970,7 @@ export const signContract = onCall(
     }
 
     console.log('[signContract] signed:', ref.id);
-    return { ok: true, signedAt: Date.now() };
+    return { ok: true, signedAt: Date.now(), checkoutUrl: checkoutUrl };
   }
 );
 
