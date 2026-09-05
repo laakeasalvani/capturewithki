@@ -32,6 +32,8 @@ import {
 } from './lib/contracts.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import { readyToSignEmail, signedCopyEmail, formatCents } from './lib/contract-email.js';
+import { fakePayAllowed, markContractPaid } from './lib/payments.js';
+import { completeFakeSession, retrieveSession as retrieveFakeSession } from './lib/fake-payments.js';
 
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
@@ -936,6 +938,125 @@ export const signContract = onCall(
 
     console.log('[signContract] signed:', ref.id);
     return { ok: true, signedAt: Date.now() };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// The fake checkout completion.
+//
+// There is no staging Firebase project — capturewithki-69dd3 IS production —
+// so this endpoint lives next to the real payment path forever, not just
+// until Khiara has a Stripe account. The only thing standing between a real
+// client's contract and a button that "pays" for nothing is fakePayAllowed's
+// allowlist, checked below BEFORE anything is written. If that check is ever
+// weakened to a substring match or an environment flag, a real wedding could
+// be marked paid without a cent moving. Do not relax it.
+// ---------------------------------------------------------------------------
+export const fakeCheckoutComplete = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    const d = request.data || {};
+    const sessionId = typeof d.sessionId === 'string' ? d.sessionId.trim() : '';
+    if (!sessionId || sessionId.length > 200) {
+      throw new HttpsError('invalid-argument', 'That test payment link is not valid.');
+    }
+
+    let sessionSnap;
+    try {
+      sessionSnap = await db.collection('fakeSessions').doc(sessionId).get();
+    } catch (err) {
+      console.warn('[fakeCheckoutComplete] session lookup failed:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (!sessionSnap.exists) {
+      throw new HttpsError('not-found', 'That test payment link is not valid.');
+    }
+    const session = sessionSnap.data();
+    const contractId = session.contractId;
+    if (!isValidContractId(contractId)) {
+      throw new HttpsError('failed-precondition', 'That test payment link is not valid.');
+    }
+
+    let contractSnap;
+    try {
+      contractSnap = await db.collection('contracts').doc(contractId).get();
+    } catch (err) {
+      console.warn('[fakeCheckoutComplete] contract lookup failed:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (!contractSnap.exists) {
+      throw new HttpsError('not-found', 'That test payment link is not valid.');
+    }
+    const contract = contractSnap.data();
+
+    // THE GUARD. Exact, case- and whitespace-insensitive match against a
+    // hard-coded allowlist of two addresses — never a substring check, never
+    // an environment check. A real client's contract fails this even if
+    // PAYMENT_PROVIDER is left set to 'fake' in production.
+    if (!fakePayAllowed(contract)) {
+      console.warn('[fakeCheckoutComplete] refused, not allowlisted:', contractId);
+      throw new HttpsError('permission-denied', 'Test payment is not available for this contract.');
+    }
+
+    // Marks the session paid — the fake stand-in for a card being charged —
+    // then reads it back through the same shape the real webhook and Task
+    // 6's reconciliation will use, so that path runs today rather than
+    // first running the day real money is involved.
+    try {
+      await completeFakeSession(sessionId);
+    } catch (err) {
+      console.warn('[fakeCheckoutComplete] could not complete session:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    let result;
+    try {
+      result = await retrieveFakeSession(sessionId);
+    } catch (err) {
+      console.warn('[fakeCheckoutComplete] could not read session back:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (result.payment_status !== 'paid') {
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    // Compared against the amount recorded on the SESSION at creation, not
+    // the contract's current retainerCents — the same defence-in-depth
+    // markContractPaid applies to a real Stripe payment.
+    const decision = await markContractPaid(db, contractId, {
+      amountCents: session.amountCents,
+      paymentIntent: result.payment_intent
+    });
+
+    if (!decision.ok) {
+      console.warn('[fakeCheckoutComplete] not recorded:', decision.reason);
+      throw new HttpsError('failed-precondition', decision.reason);
+    }
+
+    try {
+      await decision.ref.update({
+        status: 'paid',
+        // Written on every fake payment without exception, so test data can
+        // be found and deleted later — this project already has one pile of
+        // undeleted test data from backend development; this must not
+        // become a second.
+        isTestPayment: true,
+        paymentIntent: result.payment_intent,
+        paidAt: FieldValue.serverTimestamp()
+      });
+      await decision.ref.collection('audit').add({
+        event: 'paid',
+        at: FieldValue.serverTimestamp(),
+        isTestPayment: true,
+        paymentIntent: result.payment_intent
+      });
+    } catch (err) {
+      console.warn('[fakeCheckoutComplete] could not record payment:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    console.log('[fakeCheckoutComplete] test payment recorded:', contractId);
+    return { ok: true };
   }
 );
 

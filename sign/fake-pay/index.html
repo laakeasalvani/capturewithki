@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TEST PAYMENT — no money moves</title>
+<!-- A test-only page. It must never be indexed or mistaken for a real part
+     of the site. -->
+<meta name="robots" content="noindex, nofollow">
+<style>
+  /* Deliberately ugly and unbranded: no site fonts, no site colors, no
+     wordmark. This page must be impossible to mistake for a real payment
+     page, so it borrows nothing from sign/sign.css. */
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000;
+  }
+  body {
+    padding: 24px;
+  }
+  .fp-box {
+    max-width: 480px;
+    margin: 0 auto;
+    border: 6px solid #cc0000;
+    padding: 24px;
+  }
+  .fp-banner {
+    color: #cc0000;
+    font-size: 28px;
+    font-weight: 900;
+    text-align: center;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+  }
+  .fp-sub {
+    color: #cc0000;
+    text-align: center;
+    font-weight: bold;
+    margin: 0 0 24px;
+  }
+  .fp-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dashed #999;
+    padding: 8px 0;
+    font-size: 14px;
+  }
+  .fp-row dt { font-weight: bold; }
+  .fp-row dd { margin: 0; }
+  dl.fp-facts { margin: 0 0 24px; }
+  #fpBtn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    font-size: 18px;
+    font-weight: bold;
+    background: #cc0000;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+  }
+  #fpBtn:disabled { opacity: 0.5; cursor: default; }
+  #fpMsg {
+    text-align: center;
+    margin-top: 16px;
+    font-weight: bold;
+  }
+  #fpMsg.fp-error { color: #cc0000; }
+  #fpMsg.fp-ok { color: #007700; }
+  .fp-noise {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="fp-box">
+  <p class="fp-banner">TEST PAYMENT<br>NO MONEY MOVES</p>
+  <p class="fp-sub">This page does not process any real payment.</p>
+
+  <dl class="fp-facts">
+    <div class="fp-row">
+      <dt>Contract ID</dt>
+      <dd id="fpContractId">&mdash;</dd>
+    </div>
+    <div class="fp-row">
+      <dt>Amount</dt>
+      <dd id="fpAmount">&mdash;</dd>
+    </div>
+  </dl>
+
+  <button id="fpBtn" type="button" disabled>Pretend to pay</button>
+  <p id="fpMsg" role="status" aria-live="polite"></p>
+
+  <p class="fp-noise">This is a developer testing tool. It only works for two
+    hard-coded addresses; no real client's contract can use it.</p>
+</div>
+
+<script type="module" src="fake-pay.js"></script>
+</body>
+</html>

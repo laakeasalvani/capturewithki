@@ -1,0 +1,67 @@
+// The fake payment provider. It does not simulate Stripe's API — it simulates
+// the ONE thing that matters about a checkout session: that it can be created,
+// and later read back to learn whether it was paid.
+//
+// getFirestore() is called lazily inside each function, never at module load.
+// index.js calls initializeApp() as part of its own top-level code, which
+// runs after this module's imports are resolved but before any request is
+// handled — the same reasoning lib/stripe.js uses for building its client
+// lazily.
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+// Matches lib/stripe.js's createRetainerSession signature exactly. contract
+// and contractId decide the amount and the mapping back to a contract;
+// successUrl/cancelUrl are accepted for parity with the real provider but
+// unused — there is no external redirect to send them to.
+export async function createRetainerSession(contract, contractId, successUrl, cancelUrl) {
+  const db = getFirestore();
+  const ref = db.collection('fakeSessions').doc();
+  // Recorded once, at creation, from the contract as it exists right now.
+  // fakeCheckoutComplete compares the eventual payment against THIS number,
+  // not against whatever the contract says later — the same reason a real
+  // charge is compared against the amount Stripe actually reports, not
+  // re-derived from a document that could have changed in between.
+  await ref.set({
+    contractId: contractId,
+    amountCents: contract.retainerCents,
+    status: 'unpaid',
+    paymentIntent: 'fake_pi_' + ref.id,
+    createdAt: FieldValue.serverTimestamp()
+  });
+  // contractId and amount ride along in the URL purely so the fake-pay page
+  // can show them before the button is pressed. Neither is a secret, and
+  // neither one grants anything — the sessionId is what fakeCheckoutComplete
+  // actually looks up, and fakePayAllowed re-checks the real contract on the
+  // server regardless of what this URL says.
+  return {
+    id: ref.id,
+    url: '/sign/fake-pay/?s=' + ref.id + '&c=' + encodeURIComponent(contractId) +
+      '&a=' + encodeURIComponent(String(contract.retainerCents))
+  };
+}
+
+// The one step a real gateway performs that this stand-in cannot: charging a
+// card. Clicking "Pretend to pay" on sign/fake-pay/ is what stands in for
+// that moment, via the fakeCheckoutComplete callable in index.js.
+export async function completeFakeSession(sessionId) {
+  const db = getFirestore();
+  await db.collection('fakeSessions').doc(sessionId).update({
+    status: 'paid',
+    paidAt: FieldValue.serverTimestamp()
+  });
+}
+
+// Matches lib/stripe.js's (future) retrieveSession shape exactly: same two
+// fields, same 'paid'|'unpaid' vocabulary. Reads the document createRetainerSession
+// wrote — this is the read-back the brief calls out as exercising Task 6's
+// reconciliation path today rather than the day real money is involved.
+export async function retrieveSession(sessionId) {
+  const db = getFirestore();
+  const snap = await db.collection('fakeSessions').doc(sessionId).get();
+  if (!snap.exists) return { payment_status: 'unpaid', payment_intent: null };
+  const data = snap.data();
+  return {
+    payment_status: data.status === 'paid' ? 'paid' : 'unpaid',
+    payment_intent: typeof data.paymentIntent === 'string' ? data.paymentIntent : null
+  };
+}
