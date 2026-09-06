@@ -40,6 +40,16 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 80px;max-width:1400px;mar
   font-family:inherit;font-size:15px;cursor:pointer;text-decoration:none;
 }
 .g-btn:disabled{opacity:.55;cursor:default;}
+
+/* Make the `hidden` attribute mean hidden, for everything on the page.
+   The browser's own rule for it is [hidden]{display:none}, which ANY author
+   rule setting display beats — so .g-btn's display:inline-flex quietly won and
+   a button told to hide stayed on screen. That is not theoretical: the couple
+   saw a stale "Get the rest ready" button sitting under a gallery that was
+   already finished. `.g-viewer[hidden]` below is the same bug, patched once
+   locally before anyone noticed the general case; it is left where it is
+   rather than churn a live page over a redundant line. */
+[hidden]{display:none !important;}
 .g-note{min-height:1.4em;margin:12px 0 0;font-size:13px;color:#a4342a;}
 
 .g-gallery-head{margin-bottom:clamp(18px,3vw,32px);}
