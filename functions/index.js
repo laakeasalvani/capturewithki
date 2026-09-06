@@ -8,6 +8,11 @@
 // unchanged, so a runtime-only change deploys as "Skipped (No changes
 // detected)" and silently does nothing. Verify with `firebase functions:list`
 // after any runtime change rather than trusting the deploy output.
+import { randomUUID } from 'node:crypto';
+// archiver 8 is ESM-native and dropped the old `archiver('zip', opts)`
+// factory for named classes. Verified against a real archive before use:
+// `new ZipArchive({ store: true })` writes entries as Stored at 0%.
+import { ZipArchive } from 'archiver';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
@@ -21,6 +26,8 @@ import { isBotSubmission, hashIp, checkRateLimit } from './lib/spam.js';
 import { ownerEmail, clientEmail, ownerEmailHtml, clientEmailHtml, sendEmail } from './lib/email.js';
 import { verifyPassword, galleryOpenable, isValidGalleryId, generatePassword, hashPassword } from './lib/gallery-auth.js';
 import { dueGalleries } from './lib/gallery-expiry.js';
+import { planZipParts, zipEntryName, zipFileName, sourceFingerprint,
+         isClaimStale, partDocId, zipStoragePath } from './lib/gallery-zip.js';
 import { dueEscalations, escalationEmail, BACKLOG_MS } from './lib/escalate.js';
 import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          keaOwnerEmailHtml, keaClientEmailHtml, sendKeaEmail,
@@ -476,6 +483,229 @@ export const regenerateGalleryPassword = onCall(
 );
 
 // ---------------------------------------------------------------------------
+// "Download all", as one file
+//
+// The couple used to get one save per photo, 700ms apart — 240 separate files
+// arriving one by one on a phone. This packs a gallery into zips instead.
+//
+// The zip is built HERE and written to Storage, rather than streamed straight
+// down to the phone, for one reason: a Storage download can be RESUMED. A
+// wedding gallery runs to ~2.5GB, the couple are on hotel wifi, and a stream
+// that dies at 90% has to start again from nothing. It is also built once and
+// then shared — the bride waits, her mum and her bridesmaids do not.
+//
+// Nothing is ever held whole in memory. Each photo is a read stream from
+// Storage, fed through the archiver and out to a write stream. Peak memory is
+// a few megabytes whatever the gallery weighs, which is exactly what the old
+// "do not zip on the phone" comment in galleries/gallery.js was protecting.
+// ---------------------------------------------------------------------------
+
+// Uploads in bounded chunks. Left unbounded, the Storage client keeps the
+// whole upload buffered so it can retry it, which would put the gallery back
+// in memory and undo the streaming above. 8MiB is a multiple of the 256KiB
+// the API requires.
+const ZIP_UPLOAD_CHUNK = 8 * 1024 * 1024;
+
+async function buildZipPart(galleryId, plan, allPhotos, fileName) {
+  const bucket = getStorage().bucket();
+  const path = zipStoragePath(galleryId, plan.index);
+
+  // A download token in the object's metadata, not a signed URL. A v4 signed
+  // URL needs `iam.serviceAccountTokenCreator` on the functions service
+  // account — a setup step that fails at RUN time, long after a deploy said
+  // it was fine. This form needs no IAM change, is unguessable, and Storage
+  // honours Range requests on it, which is the resume this design exists for.
+  const token = randomUUID();
+  const out = bucket.file(path);
+  const write = out.createWriteStream({
+    resumable: true,
+    chunkSize: ZIP_UPLOAD_CHUNK,
+    metadata: {
+      contentType: 'application/zip',
+      contentDisposition: 'attachment; filename="' + fileName.replace(/"/g, '') + '"',
+      metadata: { firebaseStorageDownloadTokens: token }
+    }
+  });
+
+  // No compression. JPEGs are already compressed, so deflate spends real CPU
+  // to save almost nothing — and storing them keeps the finished size
+  // predictable.
+  const archive = new ZipArchive({ store: true });
+
+  const finished = new Promise(function (resolve, reject) {
+    archive.on('error', reject);
+    write.on('error', reject);
+    write.on('finish', resolve);
+  });
+
+  archive.pipe(write);
+
+  // Numbering is by position in the WHOLE gallery, not within the part, so
+  // part 2 continues from where part 1 stopped instead of restarting at 001.
+  const positions = new Map();
+  allPhotos.forEach(function (p, i) { positions.set(p.id, i); });
+
+  let missing = 0;
+  for (const p of plan.photos) {
+    if (typeof p.fullPath !== 'string' || !p.fullPath) {
+      // A record with no file path cannot be fetched. Skipping it and saying
+      // so beats failing the whole gallery: the other 239 photos still arrive,
+      // and the page tells them to use the arrow on the ones that did not.
+      missing++;
+      console.warn('[zip] photo has no fullPath, skipped:', galleryId, p.id);
+      continue;
+    }
+    archive.append(bucket.file(p.fullPath).createReadStream(), {
+      name: zipEntryName(p, positions.get(p.id) || 0, allPhotos.length)
+    });
+  }
+
+  await archive.finalize();
+  await finished;
+
+  const [meta] = await out.getMetadata();
+  return {
+    bytes: Number(meta && meta.size) || 0,
+    missing: missing,
+    url: 'https://firebasestorage.googleapis.com/v0/b/' + bucket.name +
+         '/o/' + encodeURIComponent(path) + '?alt=media&token=' + token
+  };
+}
+
+export const prepareGalleryZip = onCall(
+  // 15 minutes and half a gigabyte. The work is almost entirely waiting on
+  // network inside Google's own data centre, so the memory is headroom rather
+  // than need. The timeout is deliberately shorter than the 20-minute window
+  // in isClaimStale(): the instance is always dead before its claim expires,
+  // so a claim can never be stolen from a build that is still running.
+  { region: 'us-west1', cors: true, memory: '512MiB', timeoutSeconds: 900 },
+  async (request) => {
+    const data = request.data || {};
+    const galleryId = typeof data.galleryId === 'string' ? data.galleryId.trim() : '';
+    const part = Number(data.part);
+
+    // The same claim the Firestore and Storage rules gate on. openGallery only
+    // mints it after checking the password, so holding it IS the permission.
+    const claim = request.auth && request.auth.token && request.auth.token.gal;
+    if (!isValidGalleryId(galleryId) || claim !== galleryId) {
+      throw new HttpsError('permission-denied', GALLERY_DENIED);
+    }
+    if (!Number.isInteger(part) || part < 1) {
+      throw new HttpsError('invalid-argument', 'Which part?');
+    }
+
+    // Re-read the gallery even though the caller holds a token: the Admin SDK
+    // bypasses rules, so the expiry check the rules would have made has to
+    // happen here instead. A token outlives the gallery it was minted for.
+    let snap;
+    try {
+      snap = await db.collection('galleries').doc(galleryId).get();
+    } catch (err) {
+      console.warn('[zip] could not read gallery:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    const gallery = snap.exists ? snap.data() : null;
+    if (!galleryOpenable(gallery, Date.now()).ok) {
+      throw new HttpsError('permission-denied', GALLERY_DENIED);
+    }
+
+    let photosSnap;
+    try {
+      photosSnap = await db.collection('galleries').doc(galleryId)
+        .collection('photos').orderBy('order').get();
+    } catch (err) {
+      console.warn('[zip] could not list photos:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    const photos = [];
+    photosSnap.forEach(function (d) { photos.push(Object.assign({ id: d.id }, d.data())); });
+    if (!photos.length) {
+      throw new HttpsError('failed-precondition', 'There are no photos in this gallery yet.');
+    }
+
+    const parts = planZipParts(photos);
+    if (part > parts.length) {
+      throw new HttpsError('invalid-argument', 'That part does not exist.');
+    }
+    const plan = parts[part - 1];
+    const fingerprint = sourceFingerprint(photos);
+    const fileName = zipFileName(gallery.title, part, parts.length);
+    const ref = db.collection('galleries').doc(galleryId).collection('zips').doc(partDocId(part));
+
+    // Claiming in a transaction is what stops two people tapping at once from
+    // both packing the same gigabyte.
+    const now = Date.now();
+    let outcome;
+    try {
+      outcome = await db.runTransaction(async function (tx) {
+        const cur = await tx.get(ref);
+        const d = cur.exists ? cur.data() : null;
+        // Already built FROM THESE PHOTOS. A zip whose fingerprint no longer
+        // matches is stale — she has added or removed something since — and
+        // gets rebuilt over the top.
+        if (d && d.status === 'ready' && d.fingerprint === fingerprint) return 'ready';
+        if (d && d.status === 'building' && !isClaimStale(d, now)) return 'building';
+        tx.set(ref, {
+          status: 'building',
+          index: part,
+          total: parts.length,
+          photoCount: plan.photos.length,
+          fingerprint: fingerprint,
+          name: fileName,
+          bytes: 0,
+          missing: 0,
+          url: null,
+          error: null,
+          startedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        return 'claimed';
+      });
+    } catch (err) {
+      console.warn('[zip] could not claim part:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    if (outcome !== 'claimed') {
+      console.log('[zip] part', part, 'of', galleryId, 'already', outcome);
+      return { status: outcome, total: parts.length };
+    }
+
+    console.log('[zip] building part', part, 'of', parts.length, 'for', galleryId,
+      '—', plan.photos.length, 'photos,', Math.round(plan.bytes / 1048576), 'MB');
+
+    try {
+      const built = await buildZipPart(galleryId, plan, photos, fileName);
+      await ref.update({
+        status: 'ready',
+        bytes: built.bytes,
+        missing: built.missing,
+        url: built.url,
+        error: null,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      console.log('[zip] part', part, 'of', galleryId, 'ready —', built.bytes, 'bytes');
+      return { status: 'ready', total: parts.length };
+    } catch (err) {
+      const reason = describeError(err);
+      console.error('[zip] part', part, 'of', galleryId, 'failed:', reason);
+      // Recorded rather than left as a dangling "building", so the page can
+      // offer Try again immediately instead of waiting out the claim window.
+      try {
+        await ref.update({
+          status: 'failed',
+          error: reason.slice(0, 300),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } catch (inner) {
+        console.error('[zip] could not record the failure:', describeError(inner));
+      }
+      throw new HttpsError('internal', 'Could not build that download. Please try again.');
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Expiry cleanup
 //
 // Runs daily. Finds galleries whose moment has passed, deletes their photo
@@ -529,6 +759,20 @@ export const cleanupExpiredGalleries = onSchedule(
         }
         if (n % 400 !== 0) await batch.commit();
 
+        // Then the zip records. The zip FILES are already gone — deleteFiles
+        // above sweeps the whole `galleries/{id}/` prefix and the zips live
+        // under it — but these records would survive it, each one pointing at
+        // a file that no longer exists.
+        const zips = await db.collection('galleries').doc(g.id).collection('zips').get();
+        let zipBatch = db.batch();
+        let z = 0;
+        for (const doc of zips.docs) {
+          zipBatch.delete(doc.ref);
+          z++;
+          if (z % 400 === 0) { await zipBatch.commit(); zipBatch = db.batch(); }
+        }
+        if (z % 400 !== 0) await zipBatch.commit();
+
         await db.collection('galleries').doc(g.id).update({
           status: 'expired',
           photoCount: 0,
@@ -536,7 +780,7 @@ export const cleanupExpiredGalleries = onSchedule(
           expiredAt: FieldValue.serverTimestamp()
         });
 
-        console.log('[cleanup] expired gallery', g.id, '—', n, 'photos removed');
+        console.log('[cleanup] expired gallery', g.id, '—', n, 'photos and', z, 'zips removed');
       } catch (err) {
         // One bad gallery must not stop the rest.
         console.error('[cleanup] failed for gallery', g.id, describeError(err));

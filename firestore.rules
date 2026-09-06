@@ -56,6 +56,20 @@ service cloud.firestore {
           (request.auth != null && request.auth.token.gal == galleryId);
         allow write: if isAdmin();
       }
+
+      // One record per zipped part: its size, its file name and its download
+      // link. Read by the same token that reads the photos — a part record is
+      // no more revealing than the photos it was made from.
+      //
+      // Writable by NOBODY, including her. prepareGalleryZip is the only thing
+      // that may write one, and it goes through the Admin SDK, which bypasses
+      // these rules. A browser that could write here could point the couple's
+      // "Save all" button at any URL it liked.
+      match /zips/{zipId} {
+        allow read: if isAdmin() ||
+          (request.auth != null && request.auth.token.gal == galleryId);
+        allow write: if false;
+      }
     }
 
     // Inquiries hold client contact details, so unlike the CMS collections
