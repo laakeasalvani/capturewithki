@@ -7,13 +7,23 @@
 // lives in functions/index.js, where node is fine.
 import { toMillis } from './gallery-expiry.js';
 
-// One gigabyte per part.
+// Three gigabytes per part, which for this photographer means ONE part.
 //
-// The photos are 4-5MB each and a wedding can run to 500 of them, so a whole
-// gallery reaches ~2.5GB. That is not one download on hotel wifi. A cap here
-// means a dropped connection costs at most one part, and each build stays well
-// inside the function's timeout.
-export const PART_CAP_BYTES = 1024 * 1024 * 1024;
+// Her worst realistic gallery is 500 photos at 5MB, about 2.44GB, so this cap
+// is set above it deliberately: the couple get one file and one tap, every
+// time. Splitting still exists below and is still correct, but it is a safety
+// valve for a gallery beyond anything she has ever sent, not a normal outcome.
+//
+// The number was 1GiB first, chosen to keep any single download small. That
+// was the wrong thing to optimise. A couple who has to understand "Part 2 of
+// 3" pays that cost on every gallery; the risk of a big download is paid
+// rarely and, because Storage downloads resume, is recoverable when it is.
+//
+// What it costs: a 2.4GB file needs 2.4GB free on the phone at once and can
+// take 10-40 minutes on bad wifi. Lower this constant if a client ever
+// struggles — everything else adapts on its own, including invalidating any
+// zip that was built under the old value.
+export const PART_CAP_BYTES = 3 * 1024 * 1024 * 1024;
 
 // What an unmeasured photo is assumed to weigh. Treating it as free would let
 // a part grow without bound, which is the one planning mistake that turns into
@@ -39,31 +49,50 @@ function byOrder(a, b) {
   return String(a.id || '') < String(b.id || '') ? -1 : 1;
 }
 
-// Pack the photos, in her order, into parts of at most `capBytes`.
+// Pack the photos, in her order, into parts no larger than `capBytes`.
 //
-// A photo larger than the cap on its own gets a part to itself rather than
-// being skipped: an oversized file is still the couple's photo, and a plan that
-// silently drops one is worse than a part that runs over.
+// Two passes, not one. The first works out how many parts are NEEDED; the
+// second spreads the photos evenly across exactly that many.
+//
+// Filling each part to the brim and letting the remainder fall into the next
+// one is simpler and produces lopsided splits: 400 photos at 4MB came out as
+// 1536MB + 64MB, so the couple downloaded an enormous file and then tapped
+// again for a scrap. Same number of parts, far worse to use. Evenly split,
+// that gallery is 800MB + 800MB.
+//
+// A photo larger than the cap on its own still gets a part to itself rather
+// than being skipped: an oversized file is still the couple's photo, and a plan
+// that silently drops one is worse than a part that runs over.
 export function planZipParts(photos, capBytes) {
   if (!Array.isArray(photos) || !photos.length) return [];
   const cap = typeof capBytes === 'number' && Number.isFinite(capBytes) && capBytes > 0
     ? capBytes
     : PART_CAP_BYTES;
 
-  const parts = [];
-  let current = null;
+  const ordered = photos.slice().sort(byOrder);
+  let total = 0;
+  for (const p of ordered) total += photoBytes(p);
 
-  for (const p of photos.slice().sort(byOrder)) {
+  const wanted = Math.max(1, Math.ceil(total / cap));
+  const target = total / wanted;
+
+  const parts = [];
+  let current = { index: 1, total: 0, photos: [], bytes: 0 };
+
+  for (const p of ordered) {
     const size = photoBytes(p);
-    // `current.photos.length` guards the oversized case: an empty part always
-    // accepts the next photo, however big it is.
-    if (!current || (current.bytes + size > cap && current.photos.length)) {
-      current = { index: parts.length + 1, total: 0, photos: [], bytes: 0 };
+    // Move on once this part has taken its share — but never open more parts
+    // than were planned, and never leave one empty. Those two guards are what
+    // keep an oversized photo, or a long tail of tiny ones, from turning the
+    // even split back into a ragged one.
+    if (current.photos.length && current.bytes + size > target && parts.length < wanted - 1) {
       parts.push(current);
+      current = { index: parts.length + 1, total: 0, photos: [], bytes: 0 };
     }
     current.photos.push(p);
     current.bytes += size;
   }
+  parts.push(current);
 
   // Stamped afterwards, because "of 3" is not known until the packing is done.
   for (const part of parts) part.total = parts.length;
@@ -113,11 +142,18 @@ export function zipFileName(title, index, total) {
 // of photos summing to the same bytes would collide; the cost of that is one
 // slightly out-of-date zip, with every photo still savable on its own, and
 // hashing every id instead would put real work in the browser to close it.
+//
+// The part count is in there for a sharper reason. Without it, changing
+// PART_CAP_BYTES leaves every existing zip looking valid while the plan around
+// it has changed shape: a gallery built as 3 parts, now planned as 1, would
+// hand the couple part 1 of the OLD plan and call the download complete —
+// silently short by two thirds of their wedding. Including it means any zip
+// built under a different cap is seen as stale and rebuilt.
 export function sourceFingerprint(photos) {
-  if (!Array.isArray(photos) || !photos.length) return '0:0';
+  if (!Array.isArray(photos) || !photos.length) return '0:0:0';
   let total = 0;
   for (const p of photos) total += photoBytes(p);
-  return photos.length + ':' + total;
+  return photos.length + ':' + total + ':' + planZipParts(photos).length;
 }
 
 export function isClaimStale(part, now) {

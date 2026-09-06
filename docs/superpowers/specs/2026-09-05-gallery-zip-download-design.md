@@ -87,7 +87,8 @@ Takes `{ galleryId, part }`. Steps:
    doc and confirm `status === 'live'` and not expired — the same check
    `firestore.rules` makes, done here because the Admin SDK bypasses rules.
 2. **Plan.** Read the photo docs (already carry `bytes`, `fullPath`, `order`)
-   and pack them in `order` into parts of at most **1 GiB**.
+   and pack them in `order` into parts of at most **3 GiB** — see "The cap"
+   below, which for this photographer means one part, always.
 3. **Claim.** In a Firestore transaction on `galleries/{id}/zips/part-{n}`,
    refuse if that part is already `building` with a fresh heartbeat, or already
    `ready` at the current fingerprint. Otherwise write `building`.
@@ -127,6 +128,40 @@ The client drives sequencing: ask for the first part that is not ready, and on
 seeing it go ready, ask for the next. Part 1 is savable while part 2 builds, and
 a page closed after part 2 leaves parts 1 and 2 done for the next person.
 
+### The cap
+
+Revised after the feature shipped, on the owner's instruction: *"I just want
+them to be able to download ALL into one file at one time."*
+
+It was 1 GiB, chosen to keep any single download small. That optimised the
+wrong thing. A couple who has to understand "Part 2 of 3" pays that cost on
+every gallery; the risk of a large download is paid rarely and, because a
+Storage download resumes, is recoverable when it is paid.
+
+3 GiB sits above her worst realistic gallery — 500 photos at 5MB, about
+2.44GB — so splitting never fires in practice. It remains implemented and
+tested as a safety valve, not as a normal outcome.
+
+What that accepts: a 2.4GB file needs 2.4GB free on the phone at once and can
+take 10-40 minutes on bad wifi. Lowering `PART_CAP_BYTES` is the whole change
+if a client ever struggles.
+
+### Splitting evenly
+
+When splitting does happen, the photos are spread evenly across exactly the
+number of parts needed, rather than filling each part to the brim and letting
+the remainder fall into the next one.
+
+Greedy packing produced lopsided splits: 400 photos at 4MB against a 1.5GiB cap
+came out as **1536MB + 64MB**, so the couple downloaded an enormous file and
+then tapped again for a scrap. The same gallery evenly split is **800MB +
+800MB** — same number of parts, far better to use.
+
+Two guards keep the even split from becoming ragged again: a part is never left
+empty, and the planner never opens more parts than it decided it needed. Those
+are what handle a photo bigger than the whole cap, and a long tail of small
+ones.
+
 ### Staleness
 
 If Khiara adds or removes photos, an existing zip is wrong. Each part records a
@@ -134,6 +169,13 @@ If Khiara adds or removes photos, an existing zip is wrong. Each part records a
 server-side from the photo docs the function itself read. The page computes the
 same value from the photos it loaded and ignores any part whose fingerprint
 differs, offering a rebuild instead. A rebuild overwrites in place.
+
+The fingerprint also carries the **part count**, which closes a trap that has
+teeth. Without it, changing `PART_CAP_BYTES` leaves every existing zip looking
+valid while the plan around it has changed shape: a gallery built as 3 parts and
+now planned as 1 would hand the couple part 1 of the OLD plan and call the
+download complete — silently short by two thirds of their wedding. With it, any
+zip built under a different cap is stale and gets rebuilt.
 
 This can theoretically collide — swap one photo for another of identical byte
 count and the fingerprint holds. The consequence is a slightly stale zip, not a

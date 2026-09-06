@@ -80,11 +80,50 @@ test('every photo lands in exactly one part', () => {
   assert.equal(new Set(packed).size, 500);
 });
 
-test('the cap defaults to 1 GiB', () => {
-  assert.equal(PART_CAP_BYTES, 1024 * 1024 * 1024);
+test('the cap is 3 GiB, so every gallery she actually sends is ONE file', () => {
+  assert.equal(PART_CAP_BYTES, 3 * 1024 * 1024 * 1024);
+  // Her worst realistic gallery: 500 photos at her largest file size, ~2.44GB.
+  const worst = [];
+  for (let i = 1; i <= 500; i++) worst.push(photo(i, 5 * MB));
+  assert.equal(planZipParts(worst).length, 1);
+});
+
+// --- splitting evenly, when it happens at all -----------------------------
+
+test('a split never leaves a runt file behind', () => {
+  // 400 photos at 4MB against a 1.5GiB cap. Filling each part to the brim gave
+  // 1536MB + 64MB: an enormous download, then a second tap for a scrap.
   const photos = [];
-  for (let i = 1; i <= 300; i++) photos.push(photo(i, 5 * MB)); // 1500MB
-  assert.equal(planZipParts(photos).length, 2);
+  for (let i = 1; i <= 400; i++) photos.push(photo(i, 4 * MB));
+  const parts = planZipParts(photos, 1536 * MB);
+  assert.equal(parts.length, 2);
+  const sizes = parts.map((p) => Math.round(p.bytes / MB));
+  assert.deepEqual(sizes, [800, 800]);
+});
+
+test('three parts come out even too', () => {
+  const photos = [];
+  for (let i = 1; i <= 600; i++) photos.push(photo(i, 5 * MB)); // 3000MB
+  const parts = planZipParts(photos, 1024 * MB);
+  assert.equal(parts.length, 3);
+  for (const part of parts) assert.equal(Math.round(part.bytes / MB), 1000);
+});
+
+test('no part is ever left empty', () => {
+  const photos = [];
+  for (let i = 1; i <= 7; i++) photos.push(photo(i, 300 * MB)); // 2100MB
+  const parts = planZipParts(photos, 1024 * MB);
+  for (const part of parts) assert.ok(part.photos.length > 0, 'empty part');
+});
+
+test('evening out never costs an extra part', () => {
+  for (const [count, mb, cap] of [[400, 4, 1536], [500, 4, 1536], [500, 5, 1024], [43, 7, 100]]) {
+    const photos = [];
+    for (let i = 1; i <= count; i++) photos.push(photo(i, mb * MB));
+    const parts = planZipParts(photos, cap * MB);
+    assert.equal(parts.length, Math.ceil((count * mb) / cap),
+      count + '@' + mb + 'MB cap ' + cap);
+  }
 });
 
 // --- names inside the zip -------------------------------------------------
@@ -169,6 +208,19 @@ test('removing a photo changes the fingerprint', () => {
 
 test('swapping a photo for one of a different size changes the fingerprint', () => {
   assert.notEqual(sourceFingerprint([photo(1, 3 * MB)]), sourceFingerprint([photo(9, 4 * MB)]));
+});
+
+test('changing the cap invalidates a zip built under the old one', () => {
+  // The trap this closes: a gallery built as 3 files, then re-planned as 1
+  // after the cap changed, would look valid and hand the couple part 1 alone —
+  // silently short two thirds of their wedding.
+  const photos = [];
+  for (let i = 1; i <= 500; i++) photos.push(photo(i, 5 * MB));
+  assert.equal(planZipParts(photos).length, 1);
+  assert.equal(planZipParts(photos, 1024 * MB).length, 3);
+  // Same photos, different plan shape, therefore a different fingerprint.
+  assert.notEqual(sourceFingerprint(photos), '500:2621440000:3');
+  assert.equal(sourceFingerprint(photos), '500:2621440000:1');
 });
 
 test('an empty gallery has a fingerprint rather than blowing up', () => {
