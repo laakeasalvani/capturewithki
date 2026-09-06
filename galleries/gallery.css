@@ -120,11 +120,9 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 80px;max-width:1400px;mar
 .g-dl .g-download-all{margin-top:0;}
 .g-dl-parts{list-style:none;margin:0;padding:0;}
 .g-dl-part{margin-top:10px;}
+.g-dl-part:has(.g-dl-pending){margin-top:6px;}
 .g-dl-save{margin-top:0;width:auto;}
-.g-dl-pending{
-  display:inline-flex;align-items:center;min-height:48px;
-  font-size:14px;color:#6b6b63;
-}
+.g-dl-pending{display:inline-block;font-size:14px;color:#6b6b63;}
 /* .g-note is the error red used by the password form. This one is a hint, not
    a problem, so it borrows the shape and not the colour. */
 .g-dl-hint{color:#6b6b63;margin-top:10px;}

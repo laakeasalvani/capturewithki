@@ -294,10 +294,14 @@ function renderDownloadAll() {
     dlParts.appendChild(li);
   });
 
-  dlButton.hidden = allReady;
-  dlButton.disabled = building && !failed;
+  // The button is for TAPPING, never for status. A disabled button reading
+  // "Getting your photos ready…" directly above a live Save button repeats the
+  // note word for word and gives the eye two pills where only one does
+  // anything. While a build is running the note says so on its own.
+  const someReady = states.some(function (s) { return s.state === 'ready'; });
+  dlButton.hidden = allReady || (building && !failed);
   dlButton.textContent = failed ? 'Try again'
-    : building ? 'Getting your photos ready…'
+    : someReady ? 'Get the rest ready'
       : 'Download all ' + photos.length + (photos.length === 1 ? ' photo' : ' photos');
 
   const skipped = states.reduce(function (n, s) {
@@ -316,7 +320,7 @@ function renderDownloadAll() {
         : '';
 
   // Only worth saying once there is a file to save.
-  dlHint.hidden = !states.some(function (s) { return s.state === 'ready'; });
+  dlHint.hidden = !someReady;
 }
 
 // Ask the server for the first part that is neither done nor already being
