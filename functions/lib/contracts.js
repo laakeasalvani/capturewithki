@@ -57,7 +57,11 @@ function trimmedString(v) {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-export function validateContractInput(input) {
+// Client-only checks, split out so createContract can run them even though it
+// no longer calls validateContractInput (that now runs against the PACKAGE via
+// validatePackage). Kept byte-for-byte identical to what validateContractInput
+// used to do inline — see the callers below for why each check exists.
+export function validateClientDetails(input) {
   const errors = [];
   const d = input && typeof input === 'object' ? input : {};
 
@@ -96,6 +100,14 @@ export function validateContractInput(input) {
   if (trimmedString(d.eventDate).length > MAX_EVENT_DATE) {
     errors.push('That event date is too long.');
   }
+
+  return { ok: errors.length === 0, errors: errors };
+}
+
+export function validateContractInput(input) {
+  const clientCheck = validateClientDetails(input);
+  const errors = clientCheck.errors.slice();
+  const d = input && typeof input === 'object' ? input : {};
 
   const items = Array.isArray(d.lineItems) ? d.lineItems : null;
   if (!items || items.length === 0) {

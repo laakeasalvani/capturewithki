@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import {
   DEFAULT_RETAINER_PERCENT, sumLineItems,
   computeRetainerCents, computeBalanceCents,
-  isValidContractId, validateContractInput, MAX_TOTAL_CENTS,
+  isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
   renderTemplate, STATUSES, canTransition
 } from '../lib/contracts.js';
 
@@ -136,6 +136,44 @@ test('line items must be present, sane, and finite in number', () => {
   const many = [];
   for (let i = 0; i < 50; i++) many.push({ label: 'Item', amountCents: 100 });
   assert.equal(validateContractInput(goodInput({ lineItems: many })).ok, false);
+});
+
+test('client details are validated on their own, not only as part of a full contract', () => {
+  const good = { clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com' };
+  assert.equal(validateClientDetails(good).ok, true);
+});
+
+// An empty name is the dangerous one: renderTemplate substitutes a present-but-empty
+// value as an empty string, NOT as an unfilled {{placeholder}}, so the send-time guard
+// never catches it and a blank name reaches a signed legal document.
+test('an empty client name is refused, because a blank one would render invisibly', () => {
+  assert.equal(validateClientDetails({ clientName: '', clientEmail: 'a@b.co' }).ok, false);
+  assert.equal(validateClientDetails({ clientName: '   ', clientEmail: 'a@b.co' }).ok, false);
+  assert.equal(validateClientDetails({ clientEmail: 'a@b.co' }).ok, false);
+});
+
+test('an unusable client email is refused, because a sent contract cannot be resent', () => {
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'nope' }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: '' }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b' }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b.co' }).ok, true);
+});
+
+test('over-long fields are refused, not silently truncated into the signed document', () => {
+  const base = { clientName: 'J', clientEmail: 'a@b.co' };
+  assert.equal(validateClientDetails({ ...base, clientName: 'x'.repeat(10000) }).ok, false);
+  assert.equal(validateClientDetails({ ...base, eventLocation: 'x'.repeat(10000) }).ok, false);
+});
+
+test('hostile and malformed input is survived, not crashed on', () => {
+  assert.equal(validateClientDetails(null).ok, false);
+  assert.equal(validateClientDetails(undefined).ok, false);
+  assert.equal(validateClientDetails('nope').ok, false);
+  assert.equal(validateClientDetails(42).ok, false);
+  assert.equal(validateClientDetails({ clientName: { a: 1 }, clientEmail: 'a@b.co' }).ok, false);
+  // Legitimate and must PASS — escaping is rendering's job, not validation's.
+  assert.equal(validateClientDetails({ clientName: "Siobhán O'Brien-Núñez", clientEmail: 'a@b.co' }).ok, true);
+  assert.equal(validateClientDetails({ clientName: '<script>alert(1)</script>', clientEmail: 'a@b.co' }).ok, true);
 });
 
 // A zero-total contract is almost certainly a mistake, and an implausible

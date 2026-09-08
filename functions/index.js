@@ -27,7 +27,7 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
-  computeFeeBlock
+  computeFeeBlock, validateClientDetails
 } from './lib/contracts.js';
 import { validatePackage } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
@@ -534,6 +534,16 @@ export const createContract = onCall(
     if (!check.ok) {
       throw new HttpsError('failed-precondition',
         'That package is not ready to send: ' + check.errors.join(' '));
+    }
+
+    // validatePackage checks the PACKAGE, not the client. Without this, an empty
+    // clientName renders as an empty STRING rather than an unfilled placeholder,
+    // so the send-time guard never fires and a blank name ships inside a signed
+    // legal document. A malformed clientEmail is worse: Resend accepts it, the
+    // contract is marked sent, and it silently never arrives.
+    const clientCheck = validateClientDetails(d);
+    if (!clientCheck.ok) {
+      throw new HttpsError('invalid-argument', clientCheck.errors.join(' '));
     }
 
     // Retainer is 30% of the PACKAGE PRICE only, never the total — travel is
