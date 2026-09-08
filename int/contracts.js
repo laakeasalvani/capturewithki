@@ -3,16 +3,14 @@ import {
   collection, query, orderBy, getDocs, limit
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js';
-import {
-  sumLineItems, computeRetainerCents, computeBalanceCents, DEFAULT_RETAINER_PERCENT,
-  renderTemplate, MAX_LINE_ITEMS
-} from '../functions/lib/contracts.js';
+import { computeFeeBlock, DEFAULT_RETAINER_PERCENT } from '../functions/lib/contracts.js';
 import { formatCents } from '../functions/lib/contract-email.js';
 import { toMillis } from '../functions/lib/gallery-expiry.js';
 
 const fns = getFunctions(app, 'us-west1');
 const createContractFn = httpsCallable(fns, 'createContract');
 const sendContractFn = httpsCallable(fns, 'sendContract');
+const markRetainerReceivedFn = httpsCallable(fns, 'markRetainerReceived');
 
 // A contract is never opened, signed, or paid the instant it's sent — the
 // window below is how long "sent, nothing back yet" is still normal. Past it,
@@ -20,6 +18,12 @@ const sendContractFn = httpsCallable(fns, 'sendContract');
 // email never arrived" — this is the number that decides which of those two
 // this dashboard tells her.
 const STALE_SENT_MS = 48 * 60 * 60 * 1000;
+
+const TEMPLATE_LABELS = { wedding: 'Wedding', elopement: 'Elopement', portrait: 'Portrait' };
+
+function templateLabel(key) {
+  return TEMPLATE_LABELS[key] || (key || 'contract');
+}
 
 function esc(v) {
   return String(v === undefined || v === null ? '' : v)
@@ -35,20 +39,19 @@ function fmtWhen(ts) {
   });
 }
 
-// She types dollars, everywhere this system stores cents. Commas and stray
-// whitespace are tolerated ("1,200" is a very normal thing to type); anything
-// that doesn't leave a clean non-negative number is refused rather than
-// guessed at, because a guess here becomes a wrong number on a legal
-// document. Never round through a float total — round once, at the cent.
-function dollarsToCents(raw) {
+// Travel fee is entered in WHOLE dollars only — no cents, no decimal point.
+// Blank means "no travel fee" (0 cents), which is a normal, valid answer, not
+// an error. Anything else that isn't a clean non-negative whole number is
+// refused (returns null) rather than guessed at, because a guess here becomes
+// a wrong number on a signed legal document. Never round through a float —
+// this never produces a fraction of a cent in the first place.
+function wholeDollarsToCents(raw) {
   const cleaned = String(raw === undefined || raw === null ? '' : raw).trim().replace(/,/g, '');
-  if (cleaned === '' || !/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
-  return Math.round(Number(cleaned) * 100);
-}
-
-function centsToDollarsStr(cents) {
-  if (!Number.isInteger(cents)) return '';
-  return (cents / 100).toFixed(2);
+  if (cleaned === '') return 0;
+  if (!/^\d+$/.test(cleaned)) return null;
+  const dollars = Number(cleaned);
+  if (!Number.isSafeInteger(dollars)) return null;
+  return dollars * 100;
 }
 
 // Client-callable errors carry the useful sentence in `message` (that's
@@ -84,7 +87,6 @@ export function initContracts(container) {
 
   let inquiries = [];
   let packages = [];
-  let templates = [];
   let contracts = [];
 
   // ---------------------------------------------------------------------
@@ -109,16 +111,6 @@ export function initContracts(container) {
     return out;
   }
 
-  async function loadTemplates() {
-    const snap = await getDocs(collection(db, 'contractTemplates'));
-    const out = [];
-    snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
-    // Real templates before the seeded placeholder, so the default selection
-    // in the composer is the one that can actually be sent, whenever one exists.
-    out.sort(function (a, b) { return (a.isDraft === true ? 1 : 0) - (b.isDraft === true ? 1 : 0); });
-    return out;
-  }
-
   async function loadContracts() {
     const snap = await getDocs(query(collection(db, 'contracts'), orderBy('createdAt', 'desc')));
     const out = [];
@@ -136,7 +128,6 @@ export function initContracts(container) {
       return;
     }
     inquiriesBox.innerHTML = inquiries.map(function (i) {
-      const who = i.partnerName ? esc(i.name) + ' &amp; ' + esc(i.partnerName) : esc(i.name);
       return '<div class="c-inquiry-row" data-id="' + esc(i.id) + '">' +
         '<div class="c-inquiry-who">' +
           '<strong class="c-inquiry-name"></strong>' +
@@ -167,29 +158,9 @@ export function initContracts(container) {
 
   function packageOptionsHtml() {
     if (!packages.length) return '<option value="">No packages set up yet</option>';
-    return '<option value="">Choose a package&#8230;</option>' + packages.map(function (p, idx) {
-      return '<option value="' + idx + '">' + esc(p.label) + ' — ' + esc(formatCents(p.amountCents)) + '</option>';
+    return '<option value="">Choose a package&#8230;</option>' + packages.map(function (p) {
+      return '<option value="' + esc(p.id) + '">' + esc(p.label) + ' — ' + esc(formatCents(p.priceCents)) + '</option>';
     }).join('');
-  }
-
-  function templateOptionsHtml() {
-    if (!templates.length) return '<option value="">No contract templates found</option>';
-    return templates.map(function (t) {
-      const label = (t.name || t.id) + (t.isDraft === true ? ' — DRAFT (cannot be sent)' : '');
-      return '<option value="' + esc(t.id) + '">' + esc(label) + '</option>';
-    }).join('');
-  }
-
-  function lineItemRowHtml(label, dollars) {
-    return '<div class="c-line-item-wrap">' +
-      '<div class="c-line-item">' +
-        '<input type="text" class="c-li-label" maxlength="120" placeholder="e.g. Travel" value="' + esc(label || '') + '">' +
-        '<span class="c-li-dollar">$</span>' +
-        '<input type="text" inputmode="decimal" class="c-li-amount" placeholder="0.00" value="' + esc(dollars || '') + '">' +
-        '<button type="button" class="c-li-remove" aria-label="Remove this line item">&#10005;</button>' +
-      '</div>' +
-      '<p class="c-li-error" hidden>Not a valid amount &#8212; this line is not counted in the total.</p>' +
-    '</div>';
   }
 
   function openComposer(inquiry) {
@@ -207,36 +178,27 @@ export function initContracts(container) {
       '<label class="s-label">Package' +
         '<select id="cPackage">' + packageOptionsHtml() + '</select>' +
       '</label>' +
-      '<div class="s-actions" style="margin:0 0 18px;"><button type="button" id="cAddPackage" class="s-secondary">Add package as line item</button></div>' +
+      '<p class="s-help" id="cWhichAgreement"></p>' +
 
-      '<div class="c-line-items" id="cLineItems"></div>' +
-      '<div class="s-actions" style="margin:0 0 18px;"><button type="button" id="cAddLine" class="s-secondary">Add line item</button></div>' +
+      '<label class="s-label">Travel fee, in whole dollars (optional)' +
+        '<input type="text" inputmode="numeric" id="cTravel" placeholder="0" maxlength="10">' +
+      '</label>' +
+      '<p class="c-li-error" id="cTravelError" hidden>Travel fee has to be a whole dollar amount (no cents) — leave it blank for $0.</p>' +
 
-      '<div class="c-totals">' +
-        '<div class="c-totals-row"><span>Total</span><strong id="cTotal">$0.00</strong></div>' +
-        '<div class="c-totals-row">' +
-          '<label class="c-retainer-label">Retainer %' +
-            '<input type="text" inputmode="decimal" id="cRetainerPct" value="' + DEFAULT_RETAINER_PERCENT + '">' +
-          '</label>' +
-          '<label class="c-retainer-label">Retainer $' +
-            '<input type="text" inputmode="decimal" id="cRetainerDollar">' +
-          '</label>' +
-        '</div>' +
-        '<div class="c-totals-row"><span>Balance due later</span><strong id="cBalance">$0.00</strong></div>' +
+      '<div class="c-totals" id="cFeeBlock">' +
+        '<div class="c-totals-row"><span>Package price</span><strong id="cFeePackage">$0.00</strong></div>' +
+        '<div class="c-totals-row"><span>Travel fees</span><strong id="cFeeTravel">$0.00</strong></div>' +
+        '<div class="c-totals-row"><span>Total</span><strong id="cFeeTotal">$0.00</strong></div>' +
+        '<div class="c-totals-row"><span>Retainer (' + DEFAULT_RETAINER_PERCENT + '%)</span><strong id="cFeeRetainer">$0.00</strong></div>' +
+        '<div class="c-totals-row"><span>Remaining balance</span><strong id="cFeeBalance">$0.00</strong></div>' +
       '</div>' +
 
-      '<label class="s-label">Send with template' +
-        '<select id="cTemplate">' + templateOptionsHtml() + '</select>' +
-      '</label>' +
-
       '<div class="s-actions">' +
-        '<button type="button" id="cPreview" class="s-secondary">Preview</button>' +
         '<button type="button" id="cSend">Create &amp; send contract</button>' +
         '<button type="button" id="cCancel" class="s-secondary">Cancel</button>' +
         '<span class="s-status" id="cStatus" aria-live="polite"></span>' +
       '</div>' +
 
-      '<div id="cPreviewBox" class="c-preview" hidden></div>' +
       '<div id="cResult" class="c-result" hidden></div>';
 
     composerBox.hidden = false;
@@ -248,20 +210,22 @@ export function initContracts(container) {
     const dateEl = composerBox.querySelector('#cDate');
     const locationEl = composerBox.querySelector('#cLocation');
     const packageEl = composerBox.querySelector('#cPackage');
-    const lineItemsEl = composerBox.querySelector('#cLineItems');
-    const totalEl = composerBox.querySelector('#cTotal');
-    const balanceEl = composerBox.querySelector('#cBalance');
-    const pctEl = composerBox.querySelector('#cRetainerPct');
-    const retainerDollarEl = composerBox.querySelector('#cRetainerDollar');
-    const templateEl = composerBox.querySelector('#cTemplate');
+    const whichAgreementEl = composerBox.querySelector('#cWhichAgreement');
+    const travelEl = composerBox.querySelector('#cTravel');
+    const travelErrorEl = composerBox.querySelector('#cTravelError');
+    const feePackageEl = composerBox.querySelector('#cFeePackage');
+    const feeTravelEl = composerBox.querySelector('#cFeeTravel');
+    const feeTotalEl = composerBox.querySelector('#cFeeTotal');
+    const feeRetainerEl = composerBox.querySelector('#cFeeRetainer');
+    const feeBalanceEl = composerBox.querySelector('#cFeeBalance');
     const statusEl = composerBox.querySelector('#cStatus');
-    const previewBox = composerBox.querySelector('#cPreviewBox');
     const resultBox = composerBox.querySelector('#cResult');
     const sendBtn = composerBox.querySelector('#cSend');
 
     // The client's own typed name is the one thing here that did NOT
-    // originate with her — it came off the public contact form. Set as text,
-    // never interpolated into the innerHTML strings above.
+    // originate with her — it came off the public contact form. Set as text
+    // (an input's .value, never interpolated into an innerHTML string), same
+    // rule as clientName everywhere else in this file.
     nameEl.value = prefillName;
     if (inquiry) {
       emailEl.value = inquiry.email || '';
@@ -271,114 +235,41 @@ export function initContracts(container) {
       // purpose — nothing to prefill it from yet.
     }
 
-    // Which of the two retainer inputs she edited last decides which one
-    // drives the other, so typing in either field does something sensible
-    // instead of one silently overwriting the other on every keystroke.
-    //
-    // Declared before anything below can call recompute() — recompute() reads
-    // this `let` binding, and reading a `let` before its own declaration line
-    // has run throws rather than reading `undefined`. addLineItem() below
-    // calls recompute() immediately, so this must come first or every event
-    // listener registered after that first call is never reached at all.
-    let retainerDriver = 'pct';
-
-    function addLineItem(label, dollars) {
-      if (lineItemsEl.children.length >= MAX_LINE_ITEMS) return;
-      lineItemsEl.insertAdjacentHTML('beforeend', lineItemRowHtml(label, dollars));
-      recompute();
+    function selectedPackage() {
+      return packages.filter(function (p) { return p.id === packageEl.value; })[0] || null;
     }
 
-    function currentLineItems() {
-      return Array.prototype.map.call(lineItemsEl.querySelectorAll('.c-line-item-wrap'), function (wrap) {
-        const label = wrap.querySelector('.c-li-label').value.trim();
-        const raw = wrap.querySelector('.c-li-amount').value.trim();
-        const cents = dollarsToCents(raw);
-        // Surfaced immediately, in place, rather than letting a mistyped
-        // amount just vanish from the total with nothing to explain why.
-        const errorEl = wrap.querySelector('.c-li-error');
-        if (errorEl) errorEl.hidden = !(raw !== '' && cents === null);
-        return { label: label, amountCents: cents };
-      });
-    }
-
+    // The one function that decides what she sees and what gets written must
+    // be the SAME function, imported, not reimplemented — otherwise a bug in
+    // a hand-rolled browser copy could show her one number while the server
+    // writes another into a signed document.
     function recompute() {
-      const validItems = currentLineItems().filter(function (i) {
-        return i.label && Number.isInteger(i.amountCents) && i.amountCents >= 0;
+      const pkg = selectedPackage();
+      const travelCents = wholeDollarsToCents(travelEl.value);
+      const travelInvalid = travelCents === null;
+      travelErrorEl.hidden = !travelInvalid;
+
+      const fees = computeFeeBlock({
+        packagePriceCents: pkg ? pkg.priceCents : 0,
+        travelFeesCents: travelInvalid ? 0 : travelCents
       });
-      const totalCents = sumLineItems(validItems);
-      totalEl.textContent = formatCents(totalCents);
 
-      let percent = parseFloat(pctEl.value);
-      if (!Number.isFinite(percent)) percent = DEFAULT_RETAINER_PERCENT;
+      feePackageEl.textContent = formatCents(fees.packagePriceCents);
+      feeTravelEl.textContent = formatCents(fees.travelFeesCents);
+      feeTotalEl.textContent = formatCents(fees.totalCents);
+      feeRetainerEl.textContent = formatCents(fees.retainerCents);
+      feeBalanceEl.textContent = formatCents(fees.balanceCents);
 
-      if (retainerDriver === 'dollar') {
-        const rc = dollarsToCents(retainerDollarEl.value);
-        percent = totalCents > 0 && Number.isInteger(rc) ? Math.round((rc / totalCents) * 10000) / 100 : 0;
-        percent = Math.max(0, Math.min(100, percent));
-        pctEl.value = String(percent);
-      }
-      const retainerCents = computeRetainerCents(totalCents, percent);
-      if (retainerDriver !== 'dollar' || !document.activeElement || document.activeElement !== retainerDollarEl) {
-        retainerDollarEl.value = centsToDollarsStr(retainerCents);
-      }
-      balanceEl.textContent = formatCents(computeBalanceCents(totalCents, retainerCents));
-      return { totalCents: totalCents, percent: percent, retainerCents: retainerCents, lineItems: validItems };
+      whichAgreementEl.textContent = pkg
+        ? 'This will send the ' + templateLabel(pkg.templateKey) + ' agreement.'
+        : 'Choose a package to see which agreement it will send.';
+
+      return { pkg: pkg, travelCents: travelCents, travelInvalid: travelInvalid, fees: fees };
     }
 
-    lineItemsEl.addEventListener('input', recompute);
-    lineItemsEl.addEventListener('click', function (e) {
-      const rm = e.target.closest('.c-li-remove');
-      if (!rm) return;
-      rm.closest('.c-line-item-wrap').remove();
-      recompute();
-    });
-    pctEl.addEventListener('input', function () { retainerDriver = 'pct'; recompute(); });
-    retainerDollarEl.addEventListener('input', function () { retainerDriver = 'dollar'; recompute(); });
-
-    composerBox.querySelector('#cAddLine').addEventListener('click', function () { addLineItem('', ''); });
-    composerBox.querySelector('#cAddPackage').addEventListener('click', function () {
-      const idx = packageEl.value;
-      if (idx === '') return;
-      const pkg = packages[Number(idx)];
-      if (!pkg) return;
-      addLineItem(pkg.label, centsToDollarsStr(pkg.amountCents));
-    });
-
-    addLineItem('', '');
-
-    function selectedTemplate() {
-      return templates.filter(function (t) { return t.id === templateEl.value; })[0] || null;
-    }
-
-    composerBox.querySelector('#cPreview').addEventListener('click', function () {
-      const tpl = selectedTemplate();
-      if (!tpl) {
-        previewBox.hidden = false;
-        previewBox.textContent = 'No contract template is available to preview against.';
-        return;
-      }
-      const t = recompute();
-      const fields = {
-        client_name: nameEl.value.trim(),
-        client_email: emailEl.value.trim(),
-        event_date: dateEl.value.trim(),
-        event_location: locationEl.value.trim(),
-        total: formatCents(t.totalCents),
-        retainer: formatCents(t.retainerCents),
-        balance: formatCents(computeBalanceCents(t.totalCents, t.retainerCents)),
-        line_items: t.lineItems.map(function (i) { return i.label + ' — ' + formatCents(i.amountCents); }).join('; ')
-      };
-      // renderTemplate escapes every one of these values itself (same function
-      // sendContract uses server-side) — the only unescaped HTML here is her
-      // own template markup, which she authored. That is what makes innerHTML
-      // safe on this one line; nothing client-supplied reaches it unescaped.
-      previewBox.innerHTML = renderTemplate(tpl.html, fields);
-      previewBox.hidden = false;
-      if (tpl.isDraft === true) {
-        previewBox.insertAdjacentHTML('afterbegin',
-          '<p class="c-alert-loud">This template is marked DRAFT. Sending will be refused until a real, non-draft template is chosen.</p>');
-      }
-    });
+    packageEl.addEventListener('change', recompute);
+    travelEl.addEventListener('input', recompute);
+    recompute();
 
     composerBox.querySelector('#cCancel').addEventListener('click', function () {
       composerBox.hidden = true;
@@ -386,17 +277,17 @@ export function initContracts(container) {
     });
 
     sendBtn.addEventListener('click', async function () {
-      const t = recompute();
+      const state = recompute();
       const clientName = nameEl.value.trim();
       const clientEmail = emailEl.value.trim();
       if (!clientName) { statusEl.textContent = 'Type the client’s name first.'; nameEl.focus(); return; }
       if (!clientEmail) { statusEl.textContent = 'Type the client’s email first.'; emailEl.focus(); return; }
-      if (!t.lineItems.length || t.totalCents <= 0) {
-        statusEl.textContent = 'Add at least one line item with an amount.';
+      if (!state.pkg) { statusEl.textContent = 'Choose a package first.'; return; }
+      if (state.travelInvalid) {
+        statusEl.textContent = 'Fix the travel fee first — it has to be a whole dollar amount.';
+        travelEl.focus();
         return;
       }
-      const tpl = selectedTemplate();
-      if (!tpl) { statusEl.textContent = 'Choose a contract template first.'; return; }
 
       sendBtn.disabled = true;
       statusEl.textContent = 'Creating contract…';
@@ -411,8 +302,8 @@ export function initContracts(container) {
           clientPhone: phoneEl.value.trim(),
           eventDate: dateEl.value.trim(),
           eventLocation: locationEl.value.trim(),
-          lineItems: t.lineItems,
-          retainerPercent: t.percent
+          packageId: state.pkg.id,
+          travelFeesCents: state.travelCents
         });
         contractId = res.data.contractId;
       } catch (err) {
@@ -423,7 +314,7 @@ export function initContracts(container) {
 
       statusEl.textContent = 'Sending…';
       try {
-        const res = await sendContractFn({ contractId: contractId, templateId: tpl.id });
+        const res = await sendContractFn({ contractId: contractId });
         statusEl.textContent = '';
         resultBox.hidden = false;
         resultBox.innerHTML =
@@ -463,7 +354,16 @@ export function initContracts(container) {
       return { cls: 'c-status-sent', label: 'Sent — not opened yet' };
     }
     if (status === 'opened') return { cls: 'c-status-opened', label: 'Read, not signed yet' };
-    if (status === 'signed') return { cls: 'c-status-signed', label: 'Signed — retainer NOT paid. The date is not held.' };
+    if (status === 'signed') {
+      // signedAt alone is never booked. Her own contracts say the date is
+      // reserved only once BOTH the signed agreement and the retainer have
+      // arrived — retainerReceivedAt (stamped by markRetainerReceived, a
+      // manual Venmo/cheque/cash record) is the only thing that can promote
+      // a SIGNED contract to booked without a Stripe payment landing.
+      return c.retainerReceivedAt
+        ? { cls: 'c-status-paid', label: 'Booked — date held' }
+        : { cls: 'c-status-signed', label: 'Signed — retainer not yet received. The date is not held.' };
+    }
     // A fake payment is not a booking. sign/fake-pay/ exists so Khiara can
     // walk the whole flow herself, and isTestPayment is written by all three
     // paid-writers (fakeCheckoutComplete, stripeWebhook, chaseContracts'
@@ -501,6 +401,7 @@ export function initContracts(container) {
         : '') +
       '<dl class="c-meta">' +
         '<div><dt>Event date</dt><dd>' + esc(c.eventDate || 'Not given') + '</dd></div>' +
+        '<div><dt>Package</dt><dd>' + esc(c.packageLabel || 'Not given') + '</dd></div>' +
         '<div><dt>Total</dt><dd>' + esc(formatCents(c.totalCents)) + '</dd></div>' +
         '<div><dt>Retainer</dt><dd>' + esc(formatCents(c.retainerCents)) + '</dd></div>' +
         '<div><dt>Balance due</dt><dd>' + esc(formatCents(c.balanceCents)) + '</dd></div>' +
@@ -509,14 +410,20 @@ export function initContracts(container) {
         '<div><dt>First opened</dt><dd>' + (c.firstOpenedAt ? esc(fmtWhen(c.firstOpenedAt)) + ' (' + (c.openCount || 1) + '&times;)' : 'Never') + '</dd></div>' +
         '<div><dt>Signed</dt><dd>' + esc(c.signedAt ? fmtWhen(c.signedAt) : 'Not signed') + '</dd></div>' +
         '<div><dt>Signed by</dt><dd class="c-signed-by"></dd></div>' +
+        '<div><dt>Retainer received</dt><dd>' + (c.retainerReceivedAt ? esc(fmtWhen(c.retainerReceivedAt)) : 'Not yet') + '</dd></div>' +
       '</dl>' +
       (c.status === 'draft'
         ? '<div class="s-actions">' +
-            '<label class="c-inline-label">Template' +
-              '<select class="c-resend-template">' + templateOptionsHtml() + '</select>' +
-            '</label>' +
             '<button type="button" class="c-resend">Send</button>' +
             '<span class="s-status c-card-status" aria-live="polite"></span>' +
+          '</div>'
+        : '') +
+      (c.status === 'signed'
+        ? '<div class="s-actions">' +
+            (c.retainerReceivedAt
+              ? '<button type="button" class="c-retainer-undo s-secondary">Undo — retainer not actually received</button>'
+              : '<button type="button" class="c-retainer-mark">Mark retainer received</button>') +
+            '<span class="s-status c-retainer-status" aria-live="polite"></span>' +
           '</div>'
         : '') +
     '</article>';
@@ -543,20 +450,52 @@ export function initContracts(container) {
 
       const resendBtn = card.querySelector('.c-resend');
       if (resendBtn) {
-        const templateSel = card.querySelector('.c-resend-template');
         const status = card.querySelector('.c-card-status');
         resendBtn.addEventListener('click', async function () {
-          const templateId = templateSel.value;
-          if (!templateId) { status.textContent = 'Choose a template first.'; return; }
           resendBtn.disabled = true;
           status.textContent = 'Sending…';
           try {
-            await sendContractFn({ contractId: c.id, templateId: templateId });
+            await sendContractFn({ contractId: c.id });
             status.textContent = '';
             await refreshContracts();
           } catch (err) {
             status.textContent = 'Could not send it: ' + describeErr(err);
             resendBtn.disabled = false;
+          }
+        });
+      }
+
+      // The retainer control: marking it is reversible on purpose. A mis-tap
+      // on a money record — the wrong card, a client who paid by Venmo but
+      // hasn't actually sent it yet — has to be undoable without a console.
+      const markBtn = card.querySelector('.c-retainer-mark');
+      const undoBtn = card.querySelector('.c-retainer-undo');
+      const retainerStatus = card.querySelector('.c-retainer-status');
+      if (markBtn) {
+        markBtn.addEventListener('click', async function () {
+          markBtn.disabled = true;
+          retainerStatus.textContent = 'Saving…';
+          try {
+            await markRetainerReceivedFn({ contractId: c.id, received: true });
+            retainerStatus.textContent = '';
+            await refreshContracts();
+          } catch (err) {
+            retainerStatus.textContent = 'Could not save: ' + describeErr(err);
+            markBtn.disabled = false;
+          }
+        });
+      }
+      if (undoBtn) {
+        undoBtn.addEventListener('click', async function () {
+          undoBtn.disabled = true;
+          retainerStatus.textContent = 'Saving…';
+          try {
+            await markRetainerReceivedFn({ contractId: c.id, received: false });
+            retainerStatus.textContent = '';
+            await refreshContracts();
+          } catch (err) {
+            retainerStatus.textContent = 'Could not undo: ' + describeErr(err);
+            undoBtn.disabled = false;
           }
         });
       }
@@ -587,11 +526,6 @@ export function initContracts(container) {
       packages = await loadPackages();
     } catch (err) {
       console.warn('[contracts] could not load packages:', describeErr(err));
-    }
-    try {
-      templates = await loadTemplates();
-    } catch (err) {
-      console.warn('[contracts] could not load templates:', describeErr(err));
     }
     await refreshContracts();
   })();
