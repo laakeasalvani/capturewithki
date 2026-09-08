@@ -1195,6 +1195,79 @@ export const startRetainerPayment = onCall(
   }
 );
 
+// markRetainerReceived is how a retainer paid outside this system — Venmo, a
+// cheque, cash — gets recorded. Nothing here can detect those; a person has
+// to say so. Her contracts say the date is not reserved until the signed
+// Agreement AND the required retainer have been received, so this is the
+// field that lets the dashboard tell the truth about whether a date is held.
+//
+// Deliberately provider-agnostic, same reasoning as paymentSessionId and
+// paymentIntent elsewhere in this file: when Stripe is switched on, the
+// webhook sets this SAME field, and the dashboard needs no change. Do not
+// name or shape this around manual entry.
+export const markRetainerReceived = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    await requireAdmin(request);
+    const d = request.data || {};
+    const contractId = typeof d.contractId === 'string' ? d.contractId.trim() : '';
+    if (!isValidContractId(contractId)) {
+      throw new HttpsError('invalid-argument', 'That contract id is not valid.');
+    }
+    // Defaults true; pass false to undo a mis-tap.
+    const received = d.received !== false;
+
+    const ref = db.collection('contracts').doc(contractId);
+    let snap;
+    try {
+      snap = await ref.get();
+    } catch (err) {
+      console.warn('[markRetainerReceived] could not read contract:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (!snap.exists) throw new HttpsError('not-found', 'No such contract.');
+    const contract = snap.data();
+
+    // You cannot receive a retainer for a contract nobody signed.
+    if (!contract.signedAt) {
+      throw new HttpsError('failed-precondition', 'That contract has not been signed yet.');
+    }
+
+    // Idempotent. If the flag is already set the way this call asks for,
+    // return success without rewriting it — re-stamping would move the date
+    // she actually recorded, and un-marking an already-unmarked contract has
+    // nothing left to undo.
+    const alreadyReceived = !!contract.retainerReceivedAt;
+    if (received === alreadyReceived) {
+      return { ok: true };
+    }
+
+    // Update and audit row commit together or not at all, same reasoning as
+    // signContract: once the check above passes, this is the only chance to
+    // write both, and a lost audit row here is unrecoverable.
+    const auditRef = ref.collection('audit').doc();
+    const batch = db.batch();
+    batch.update(ref, {
+      retainerReceivedAt: received ? FieldValue.serverTimestamp() : FieldValue.delete(),
+      retainerReceivedBy: received ? request.auth.uid : FieldValue.delete()
+    });
+    batch.set(auditRef, {
+      event: received ? 'retainer-received' : 'retainer-unmarked',
+      at: FieldValue.serverTimestamp(),
+      by: request.auth.uid
+    });
+    try {
+      await batch.commit();
+    } catch (err) {
+      console.warn('[markRetainerReceived] could not update:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    console.log('[markRetainerReceived]', received ? 'marked:' : 'unmarked:', contractId);
+    return { ok: true };
+  }
+);
+
 // ---------------------------------------------------------------------------
 // The fake checkout completion.
 //
