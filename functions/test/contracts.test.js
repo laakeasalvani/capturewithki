@@ -265,3 +265,44 @@ test('an unknown status transitions nowhere', () => {
   assert.equal(canTransition('draft', 'nonsense'), false);
   assert.equal(canTransition('constructor', 'sent'), false);
 });
+
+// Append to functions/test/contracts.test.js
+import { computeFeeBlock } from '../lib/contracts.js';
+
+test('the retainer is 30 percent of the package, and travel does not inflate it', () => {
+  const f = computeFeeBlock({ packagePriceCents: 120000, travelFeesCents: 5000 });
+  assert.equal(f.packagePriceCents, 120000);
+  assert.equal(f.travelFeesCents, 5000);
+  assert.equal(f.retainerCents, 36000);   // 30% of 120000, NOT of 125000
+  assert.equal(f.totalCents, 125000);
+  assert.equal(f.balanceCents, 89000);    // 125000 - 36000
+});
+
+// The property that matters, checked against an independent integer oracle so it
+// cannot agree with the implementation by construction.
+test('retainer plus balance always equals package plus travel', () => {
+  for (let pkg = 0; pkg <= 200000; pkg += 1301) {
+    for (const travel of [0, 1, 4999, 25000]) {
+      const f = computeFeeBlock({ packagePriceCents: pkg, travelFeesCents: travel });
+      const scaled = pkg * 30;
+      const expected = Math.floor(scaled / 100) + ((scaled % 100) >= 50 ? 1 : 0);
+      assert.equal(f.retainerCents, expected, 'wrong retainer at pkg=' + pkg);
+      assert.equal(f.retainerCents + f.balanceCents, pkg + travel,
+        'does not sum at pkg=' + pkg + ' travel=' + travel);
+    }
+  }
+});
+
+test('travel of zero behaves, and a missing travel fee counts as zero', () => {
+  assert.equal(computeFeeBlock({ packagePriceCents: 17500, travelFeesCents: 0 }).balanceCents, 12250);
+  assert.equal(computeFeeBlock({ packagePriceCents: 17500 }).totalCents, 17500);
+});
+
+test('nonsense input yields zeroes rather than a wrong number', () => {
+  const bad = computeFeeBlock({ packagePriceCents: -1, travelFeesCents: 0 });
+  assert.equal(bad.retainerCents, 0);
+  assert.equal(bad.totalCents, 0);
+  assert.equal(computeFeeBlock(null).totalCents, 0);
+  assert.equal(computeFeeBlock({ packagePriceCents: 12.5 }).totalCents, 0);
+  assert.equal(computeFeeBlock({ packagePriceCents: 10000, travelFeesCents: -5 }).totalCents, 0);
+});

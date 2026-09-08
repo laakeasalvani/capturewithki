@@ -158,3 +158,34 @@ export function canTransition(from, to) {
   if (!Object.prototype.hasOwnProperty.call(TRANSITIONS, from)) return false;
   return TRANSITIONS[from].indexOf(to) !== -1;
 }
+
+// The retainer is 30% of the PACKAGE PRICE, never of the total. Her contracts list
+// "Package Price" and "Travel Fees" as separate lines and label the retainer "(30%)",
+// and the owner's decision is that travel is billed but does not inflate the deposit.
+// Computing it from the total would print a number in a signed legal document that
+// does not match the label above it.
+export function computeFeeBlock(input) {
+  const d = input && typeof input === 'object' ? input : {};
+  const pkg = d.packagePriceCents;
+  const travel = d.travelFeesCents === undefined || d.travelFeesCents === null ? 0 : d.travelFeesCents;
+  const pct = Number.isFinite(d.retainerPercent) ? d.retainerPercent : DEFAULT_RETAINER_PERCENT;
+
+  const bad = !Number.isInteger(pkg) || pkg < 0
+    || !Number.isInteger(travel) || travel < 0
+    || pct < 0 || pct > 100;
+  if (bad) {
+    return { packagePriceCents: 0, travelFeesCents: 0, retainerCents: 0, totalCents: 0, balanceCents: 0 };
+  }
+
+  const retainerCents = Math.round(pkg * pct / 100);
+  const totalCents = pkg + travel;
+  return {
+    packagePriceCents: pkg,
+    travelFeesCents: travel,
+    retainerCents: retainerCents,
+    totalCents: totalCents,
+    // By subtraction, always. Computing this independently means the two halves
+    // fail to sum on any amount where the percentage lands on a half-cent.
+    balanceCents: computeBalanceCents(totalCents, retainerCents)
+  };
+}
