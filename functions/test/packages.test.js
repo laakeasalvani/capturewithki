@@ -48,9 +48,30 @@ test('a package missing any required spec is refused, and the error names it', (
   assert.ok(validatePackage(noOutfits).errors.join(' ').includes('outfitChanges'));
 });
 
-test('a portrait spec is not accepted on a wedding package and vice versa', () => {
-  const w = wedding({ specs: { packageName: 'X', sessionMinutes: 60, editedImages: '1' } });
-  assert.equal(validatePackage(w).ok, false);
+// The extra field is added to a spec set that is otherwise COMPLETE, so this can
+// only fail for the reason it claims. The previous version of this test replaced
+// the whole specs object and so also dropped the required `hours` — it passed
+// because of the missing field, and would have kept passing if the extra-spec
+// rule were deleted outright.
+test('a spec the chosen contract has no place for is refused', () => {
+  const w = wedding({ specs: {
+    packageName: 'The Grand 8-Hour Package', hours: 8, editedImages: '400+',
+    sessionMinutes: 60
+  } });
+  const r = validatePackage(w);
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.join(' ').includes('sessionMinutes'));
+});
+
+test('and the same the other way round', () => {
+  const p = portrait({ specs: {
+    packageName: 'Maternity Session', sessionMinutes: 60, editedImages: '30+',
+    locations: 1, outfitChanges: 2,
+    hours: 8
+  } });
+  const r = validatePackage(p);
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.join(' ').includes('hours'));
 });
 
 test('price and label are checked, and hostile input is survived not crashed on', () => {
