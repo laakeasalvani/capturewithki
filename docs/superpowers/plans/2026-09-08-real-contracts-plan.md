@@ -1045,7 +1045,7 @@ Warn before saving that this changes the contract future clients will sign.
 
 - [ ] **Step 4: Escaping**
 
-`client1Name`, `client2Name` and `signature.typedName` are typed by strangers into a public form. Every one of them reaches the DOM via `textContent`, never `innerHTML`. Grep `int/contracts.js` and `int/templates.js` for `innerHTML` and justify every hit in your report.
+`clientName`, `client2Name` and `signature.typedName` are typed by strangers into a public form. Every one of them reaches the DOM via `textContent`, never `innerHTML`. Grep `int/contracts.js` and `int/templates.js` for `innerHTML` and justify every hit in your report.
 
 - [ ] **Step 5: Verify**
 
