@@ -35,6 +35,15 @@ const payErrorEl = document.getElementById('sPayError');
 // owed, not just that something is.
 let retainerCents = null;
 
+// Whether the server has a payment provider configured at all — read from
+// openContract's response, because the page itself has no way to read
+// PAYMENT_PROVIDER (a server env var). While this is false, nothing on this
+// page may mention a payment page, a payment link, or imply a date is held:
+// there is no provider that could ever make either true. Kept module-level
+// so the post-sign handler below (which gets no fresh read of its own) can
+// still branch on it.
+let paymentsOn = false;
+
 // One calm sentence for every failure to open checkout, whether the provider
 // refused, the network died, or the function threw. The error code never
 // reaches the client.
@@ -92,6 +101,25 @@ function formatSignedAt(ms) {
 function signedMessage(status, signedAt, opts) {
   const o = opts || {};
   const signedLine = 'You signed this agreement on ' + formatSignedAt(signedAt) + '.';
+
+  // A contract already marked paid is true regardless of the CURRENT
+  // provider setting — this checks the document's own status, not
+  // paymentsOn, so a client whose retainer already came through does not
+  // get told the date "will be held" if Stripe is later switched off.
+  // Checked first, above the payments-off branch, for exactly that reason.
+  if (status === 'paid') {
+    return signedLine + ' Your retainer has been received — your date is held.';
+  }
+
+  // Payments are off: no sentence here may mention a payment page, a
+  // payment link, or a retry, because none of those exist to fail or
+  // succeed. This states only what the contract itself says — that the
+  // date is held once the retainer reaches Khiara some other way — and
+  // never that it is held now.
+  if (!o.paymentsOn) {
+    return signedLine + ' Your date will be held once your retainer reaches Khiara.';
+  }
+
   // Named in the message itself, not only on the button, so the amount owed
   // and the fact that the date is not held survive even if the pay block is
   // hidden. Every other surface in this system says this; this page is the
@@ -104,9 +132,6 @@ function signedMessage(status, signedAt, opts) {
     return 'Your agreement is signed.' + owed +
       ' We couldn’t open the payment page just now — you can try again below.';
   }
-  if (status === 'paid') {
-    return signedLine + ' Your retainer has been received — your date is held.';
-  }
   if (o.paidHint) {
     return signedLine + ' Thanks — we’re confirming your payment now. ' +
       'This can take a minute; refresh this page to check.';
@@ -118,20 +143,33 @@ function showConfirmed(status, signedAt, opts) {
   const o = opts || {};
   confirmTextEl.textContent = signedMessage(status, signedAt, o);
 
-  // "You're all set" is true of exactly one state: paid. Every other way this
-  // panel is reached is a signed contract with the retainer still owed, where
-  // the date is not held and saying otherwise is how a date gets given away.
-  confirmTitleEl.textContent = status === 'paid'
-    ? 'You’re all set'
-    : 'Signed — retainer still due';
+  // "You're all set" is true of exactly one state: paid, and that is true
+  // regardless of the current paymentsOn setting — checked first, same
+  // reasoning as signedMessage above. While payments are off and the
+  // contract is not paid, the title is simply "Signed": there is no payment
+  // state to describe, so nothing here may imply one ("retainer still due"
+  // names a payment path that does not exist right now).
+  if (status === 'paid') {
+    confirmTitleEl.textContent = 'You’re all set';
+  } else if (!o.paymentsOn) {
+    confirmTitleEl.textContent = 'Signed';
+  } else {
+    // Every other way this panel is reached is a signed contract with the
+    // retainer still owed, where the date is not held and saying otherwise
+    // is how a date gets given away.
+    confirmTitleEl.textContent = 'Signed — retainer still due';
+  }
 
   const amount = formatCents(retainerCents);
 
-  // The button is offered only when the document itself says signed-and-unpaid,
-  // and NOT when the client has just come back from a successful checkout with
-  // ?paid=1: the webhook can be seconds behind, and putting a pay button in
+  // The pay block is never shown while payments are off — gated first, and
+  // separately from needsPayment, so a stale or wrong needsPayment value can
+  // never surface it. Kept (not deleted) for when Stripe returns: the button
+  // is offered only when the document itself says signed-and-unpaid, and NOT
+  // when the client has just come back from a successful checkout with
+  // ?paid=1 — the webhook can be seconds behind, and putting a pay button in
   // front of someone who has already paid invites a second payment.
-  if (o.needsPayment && !o.paidHint) {
+  if (o.paymentsOn && o.needsPayment && !o.paidHint) {
     payNoteEl.textContent = amount
       ? 'Your retainer of ' + amount + ' has not been paid yet. Your date is not ' +
         'held until it is.'
@@ -163,6 +201,11 @@ if (!token) {
     // still owed on a signed-but-unpaid contract.
     retainerCents = data.retainerCents;
 
+    // Read once here and kept module-level: the post-sign handler below
+    // gets no fresh openContract read of its own; it has to know whether
+    // payments are on from this same value.
+    paymentsOn = data.paymentsEnabled === true;
+
     const metaParts = [];
     if (data.eventDate) metaParts.push('Event date: ' + data.eventDate);
     const total = formatCents(data.totalCents);
@@ -186,7 +229,8 @@ if (!token) {
       // checkout was abandoned had no route back to paying at all.
       showConfirmed(data.status, data.signedAt, {
         paidHint: paidHintFromUrl(),
-        needsPayment: data.needsPayment === true
+        needsPayment: data.needsPayment === true,
+        paymentsOn: paymentsOn
       });
       return;
     }
@@ -236,12 +280,20 @@ form.addEventListener('submit', function (e) {
       window.location.href = data.checkoutUrl;
       return;
     }
-    // The provider was unreachable (or, on a replay, no new session was
-    // made). Say something true rather than something reassuring: the
-    // agreement IS signed, and do not imply the date is held. needsPayment is
-    // true because we have just this second signed and nothing has been paid,
-    // so the pay button is offered as the retry.
-    showConfirmed(null, data.signedAt, { checkoutFailed: true, needsPayment: true });
+    if (!paymentsOn) {
+      // checkoutUrl is null because payments are off — the normal state
+      // today, not a failure. Nothing went wrong, so nothing here may
+      // apologise, offer a retry, or mention payment at all.
+      showConfirmed(null, data.signedAt, { needsPayment: false, paymentsOn: false });
+      return;
+    }
+    // Payments ARE on and the provider was still unreachable (or, on a
+    // replay, no new session was made). Say something true rather than
+    // something reassuring: the agreement IS signed, and do not imply the
+    // date is held. needsPayment is true because we have just this second
+    // signed and nothing has been paid, so the pay button is offered as
+    // the retry.
+    showConfirmed(null, data.signedAt, { checkoutFailed: true, needsPayment: true, paymentsOn: true });
   }).catch(function () {
     signErrorEl.textContent = 'Something went wrong sending your signature. Please try again.';
     updateSignBtn();

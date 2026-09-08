@@ -905,7 +905,15 @@ export const openContract = onCall(
       // Read from the document, never from the ?paid=1 hint on the URL. No
       // session is created here: openContract runs on every page load, and the
       // session is minted by startRetainerPayment on an actual click.
-      needsPayment: contract.status === 'signed' && !contract.paidAt
+      //
+      // Forced false while payments are off, on top of the status check:
+      // with no provider configured, no session can ever be minted for any
+      // contract, so this must never invite a client to click a pay button
+      // that leads nowhere.
+      needsPayment: paymentsEnabled() && contract.status === 'signed' && !contract.paidAt,
+      // The page cannot read PAYMENT_PROVIDER itself — that is a server env
+      // var — so this is how it learns whether to mention payment at all.
+      paymentsEnabled: paymentsEnabled()
     };
   }
 );
