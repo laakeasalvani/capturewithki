@@ -1223,7 +1223,9 @@ export const markRetainerReceived = onCall(
       throw new HttpsError('invalid-argument', 'That contract id is not valid.');
     }
     // Defaults true; pass false to undo a mis-tap.
-    const received = d.received !== false;
+    // Strict, because `d.received !== false` treated the STRING "false" as true —
+    // the precise thing a caller that serialises booleans would send.
+    const received = d.received !== false && d.received !== 'false';
 
     const ref = db.collection('contracts').doc(contractId);
     let snap;
@@ -1236,9 +1238,13 @@ export const markRetainerReceived = onCall(
     if (!snap.exists) throw new HttpsError('not-found', 'No such contract.');
     const contract = snap.data();
 
-    // You cannot receive a retainer for a contract nobody signed.
-    if (!contract.signedAt) {
-      throw new HttpsError('failed-precondition', 'That contract has not been signed yet.');
+    // signedAt alone is not enough. It is written once and never cleared, and
+    // canTransition permits signed -> cancelled and paid -> cancelled, so a
+    // called-off booking still carries it. Requiring a live status too means a
+    // cancelled contract cannot have a retainer recorded against it — which
+    // matters the moment a cancel control exists.
+    if (!contract.signedAt || (contract.status !== 'signed' && contract.status !== 'paid')) {
+      throw new HttpsError('failed-precondition', 'That contract is not a signed, active booking.');
     }
 
     // Idempotent. If the flag is already set the way this call asks for,
