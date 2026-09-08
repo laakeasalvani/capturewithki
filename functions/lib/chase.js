@@ -12,8 +12,11 @@ const DAY = 24 * HOUR;
 
 export const NEVER_OPENED_MS = 48 * HOUR;
 export const SIGN_REMINDERS_MS = [24 * HOUR, 72 * HOUR];
-export const PAY_REMINDERS_MS = [1 * HOUR, 24 * HOUR, 72 * HOUR];
-export const UNPAID_ESCALATION_MS = 7 * DAY;
+
+// Replaces the unpaid escalation. The failure this system can actually have is a
+// contract that goes out and is never signed — after the nudges are spent, she is
+// the only one who can do anything about it.
+export const UNSIGNED_ESCALATION_MS = 7 * DAY;
 
 // Nothing older than this is ever acted on. Without it, the first run after
 // deploy mails every client she has ever had. escalate.js needed the same
@@ -36,7 +39,7 @@ export function dueActions(contracts, now) {
 
   for (const c of contracts) {
     if (!c || typeof c !== 'object') continue;
-    if (['paid', 'void', 'cancelled', 'draft'].indexOf(c.status) !== -1) continue;
+    if (['paid', 'void', 'cancelled', 'draft', 'signed'].indexOf(c.status) !== -1) continue;
 
     const sentAt = toMillis(c.sentAt);
     if (sentAt === null) continue;
@@ -52,25 +55,18 @@ export function dueActions(contracts, now) {
     }
 
     if (c.status === 'opened') {
+      // Escalation first: once it is a week old she needs to know, whether or
+      // not another nudge is also due this hour.
+      if (now - sentAt >= UNSIGNED_ESCALATION_MS
+          && (c.signReminderCount || 0) >= SIGN_REMINDERS_MS.length
+          && !c.escalatedAt) {
+        out.push({ contractId: c.id, kind: 'unsigned-escalation', to: 'owner' });
+        continue;
+      }
       if (reminderDue(SIGN_REMINDERS_MS, c.signReminderCount || 0, now - sentAt)) {
         out.push({ contractId: c.id, kind: 'sign-reminder', to: 'client' });
       }
       continue;
-    }
-
-    if (c.status === 'signed') {
-      const signedAt = toMillis(c.signedAt);
-      if (signedAt === null) continue;
-
-      // Escalation first: once it is a week old she needs to know, whether or
-      // not another client nudge is also due this hour.
-      if (now - signedAt >= UNPAID_ESCALATION_MS && !c.escalatedAt) {
-        out.push({ contractId: c.id, kind: 'unpaid-escalation', to: 'owner' });
-        continue;
-      }
-      if (reminderDue(PAY_REMINDERS_MS, c.payReminderCount || 0, now - signedAt)) {
-        out.push({ contractId: c.id, kind: 'pay-reminder', to: 'client' });
-      }
     }
   }
 

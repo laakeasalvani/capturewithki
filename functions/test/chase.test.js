@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import {
-  NEVER_OPENED_MS, SIGN_REMINDERS_MS, PAY_REMINDERS_MS,
-  UNPAID_ESCALATION_MS, BACKLOG_MS, dueActions
+  NEVER_OPENED_MS, SIGN_REMINDERS_MS,
+  UNSIGNED_ESCALATION_MS, BACKLOG_MS, dueActions
 } from '../lib/chase.js';
 
 const HOUR = 3600000;
@@ -15,8 +15,7 @@ function contract(extra) {
     status: 'sent',
     sentAt: new Date(NOW - 1 * HOUR),
     openCount: 0,
-    signReminderCount: 0,
-    payReminderCount: 0
+    signReminderCount: 0
   }, extra || {});
 }
 
@@ -25,8 +24,7 @@ const kinds = (list) => list.map((a) => a.kind);
 test('the thresholds are what the spec says', () => {
   assert.equal(NEVER_OPENED_MS, 48 * HOUR);
   assert.deepEqual(SIGN_REMINDERS_MS, [24 * HOUR, 72 * HOUR]);
-  assert.deepEqual(PAY_REMINDERS_MS, [1 * HOUR, 24 * HOUR, 72 * HOUR]);
-  assert.equal(UNPAID_ESCALATION_MS, 7 * DAY);
+  assert.equal(UNSIGNED_ESCALATION_MS, 7 * DAY);
   assert.equal(BACKLOG_MS, 30 * DAY);
 });
 
@@ -68,53 +66,50 @@ test('an opened but unsigned contract nudges the client twice and then stops', (
   assert.deepEqual(dueActions([contract(done)], NOW), []);
 });
 
-test('a signed but unpaid contract is chased three times', () => {
-  const signed = (hoursAgo, count) => contract({
-    status: 'signed',
-    sentAt: new Date(NOW - (hoursAgo + 2) * HOUR),
-    signedAt: new Date(NOW - hoursAgo * HOUR),
-    payReminderCount: count
-  });
-  assert.deepEqual(kinds(dueActions([signed(2, 0)], NOW)), ['pay-reminder']);
-  assert.deepEqual(dueActions([signed(2, 1)], NOW), []);
-  assert.deepEqual(kinds(dueActions([signed(25, 1)], NOW)), ['pay-reminder']);
-  assert.deepEqual(kinds(dueActions([signed(73, 2)], NOW)), ['pay-reminder']);
-  assert.deepEqual(dueActions([signed(73, 3)], NOW), []);
+test('a signed contract is never chased — there is nothing left to ask for', () => {
+  const c = contract({ status: 'signed', sentAt: new Date(NOW - 5 * DAY), signedAt: new Date(NOW - 4 * DAY) });
+  assert.deepEqual(dueActions([c], NOW), []);
 });
 
-// The dangerous state: she has a signed agreement and no money, and the date
-// is not actually held.
-test('a week-old unpaid signature escalates to her', () => {
+test('an unsigned contract escalates to her once the nudges are spent', () => {
   const c = contract({
-    status: 'signed',
-    sentAt: new Date(NOW - 8 * DAY),
-    signedAt: new Date(NOW - 8 * DAY),
-    payReminderCount: 3
+    status: 'opened', sentAt: new Date(NOW - 8 * DAY), openCount: 1, signReminderCount: 2
   });
-  const actions = dueActions([c], NOW);
-  assert.deepEqual(kinds(actions), ['unpaid-escalation']);
-  assert.equal(actions[0].to, 'owner');
+  const a = dueActions([c], NOW);
+  assert.deepEqual(a.map(x => x.kind), ['unsigned-escalation']);
+  assert.equal(a[0].to, 'owner');
 });
 
-test('the escalation fires once, not every hour for the rest of time', () => {
+test('the unsigned escalation fires once, not every hour thereafter', () => {
   const c = contract({
-    status: 'signed',
-    sentAt: new Date(NOW - 8 * DAY),
-    signedAt: new Date(NOW - 8 * DAY),
-    payReminderCount: 3,
-    escalatedAt: new Date(NOW - 1 * HOUR)
+    status: 'opened', sentAt: new Date(NOW - 8 * DAY), openCount: 1,
+    signReminderCount: 2, escalatedAt: new Date(NOW - 1 * HOUR)
   });
   assert.deepEqual(dueActions([c], NOW), []);
 });
 
+test('the escalation waits for the nudges to be spent first', () => {
+  const c = contract({
+    status: 'opened', sentAt: new Date(NOW - 8 * DAY), openCount: 1, signReminderCount: 0
+  });
+  assert.deepEqual(dueActions([c], NOW).map(x => x.kind), ['sign-reminder']);
+});
+
+test('the removed payment rungs no longer exist', async () => {
+  const mod = await import('../lib/chase.js');
+  assert.equal(mod.PAY_REMINDERS_MS, undefined);
+  assert.equal(mod.UNPAID_ESCALATION_MS, undefined);
+  assert.equal(UNSIGNED_ESCALATION_MS, 7 * DAY);
+});
+
 // escalate.js needed exactly this guard, for exactly this reason.
 test('the back catalogue cannot flood the first run', () => {
-  const ancient = contract({ status: 'signed', sentAt: new Date(NOW - 200 * DAY), signedAt: new Date(NOW - 200 * DAY) });
+  const ancient = contract({ status: 'opened', sentAt: new Date(NOW - 200 * DAY) });
   assert.deepEqual(dueActions([ancient], NOW), []);
 });
 
 test('finished and abandoned contracts are never chased', () => {
-  for (const status of ['paid', 'void', 'cancelled', 'draft']) {
+  for (const status of ['paid', 'void', 'cancelled', 'draft', 'signed']) {
     const c = contract({ status: status, sentAt: new Date(NOW - 10 * DAY), signedAt: new Date(NOW - 10 * DAY) });
     assert.deepEqual(dueActions([c], NOW), [], 'chased a ' + status + ' contract');
   }

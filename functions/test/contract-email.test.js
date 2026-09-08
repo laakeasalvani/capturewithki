@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import {
   formatCents, readyToSignEmail, signedCopyEmail,
-  signReminderEmail, payReminderEmail, neverOpenedAlertEmail, unpaidEscalationEmail
+  signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail
 } from '../lib/contract-email.js';
 
 // A stand-in for a Firestore Timestamp: chaseContracts hands these builders
@@ -75,7 +75,7 @@ test('the signed-copy email links back to the permanent record', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The chase ladder (Task 6)
+// The chase ladder (Task 6, narrowed by Task 4 to the signature alone)
 // ---------------------------------------------------------------------------
 
 test('the sign reminder names the client, the date, and says the date is not held — with no fabricated sign link', () => {
@@ -91,40 +91,6 @@ test('the sign reminder names the client, the date, and says the date is not hel
   // in contract-email.js. Nothing here should look like a fabricated one.
   assert.equal(mail.text.includes('/sign/?t='), false);
   assert.equal(mail.html.includes('/sign/?t='), false);
-});
-
-test('the pay reminder names the client, the retainer amount, the date, and says the date is not yet held', () => {
-  const mail = payReminderEmail({
-    clientName: 'Jordan Rivera', eventDate: '2027-06-12', retainerCents: 36000
-  });
-  assert.ok(mail.text.includes('Jordan Rivera'));
-  assert.ok(mail.html.includes('Jordan Rivera'));
-  assert.ok(mail.text.includes('$360.00'));
-  assert.ok(mail.html.includes('$360.00'));
-  assert.ok(mail.text.includes('2027-06-12'));
-  assert.ok(/not yet held/i.test(mail.text));
-  assert.ok(/not yet held/i.test(mail.html));
-});
-
-// The reminder cannot carry a link of its own (no raw token is stored), so it
-// sends the client to an email that has one. It must name the RIGHT email: the
-// signed-copy email has no payment link in it at all, and telling a client to
-// look there for one sends them hunting for something that does not exist —
-// three times, at +1h, +24h and +72h.
-test('the pay reminder points at the ready-to-sign email, which is the one that reaches a page with a pay button', () => {
-  const mail = payReminderEmail({
-    clientName: 'Jordan Rivera', eventDate: '2027-06-12', retainerCents: 36000
-  });
-  assert.ok(mail.text.includes('Your CaptureWithKi agreement is ready to sign'));
-  assert.ok(mail.html.includes('Your CaptureWithKi agreement is ready to sign'));
-  assert.equal(/signed CaptureWithKi agreement/i.test(mail.text), false);
-  assert.equal(/signed CaptureWithKi agreement/i.test(mail.html), false);
-  // Still no fabricated link, for the same reason as the sign reminder.
-  assert.equal(mail.text.includes('/sign/?t='), false);
-  assert.equal(mail.html.includes('/sign/?t='), false);
-  // And it still offers the human fallback.
-  assert.ok(/reply to this one/i.test(mail.text));
-  assert.ok(/reply to this one/i.test(mail.html));
 });
 
 test('the never-opened alert names the client, gives contact details and when it was sent, and tells Khiara to consider texting', () => {
@@ -158,30 +124,37 @@ test('a missing phone renders plainly in the never-opened alert rather than blan
   assert.ok(mail.html.includes('not given'));
 });
 
-test('the unpaid escalation names the client, when they signed, the amount, the reminder count, and says the date is not held', () => {
-  const mail = unpaidEscalationEmail({
+test('the unsigned escalation names the client, when it was sent, contact details, the reminder count, and says the date is not held', () => {
+  const mail = unsignedEscalationEmail({
     clientName: 'Jordan Rivera',
     clientEmail: 'jordan@example.com',
     clientPhone: '808-555-0100',
-    signedAt: fakeTimestamp(new Date(Date.UTC(2026, 7, 28, 9, 0))),
-    retainerCents: 36000,
-    payReminderCount: 3
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 7, 28, 9, 0))),
+    signReminderCount: 2
   });
   assert.ok(mail.subject.startsWith('ACTION NEEDED'));
   assert.ok(mail.subject.includes('Jordan Rivera'));
+  assert.ok(/has not signed/i.test(mail.subject));
   assert.ok(mail.text.includes('jordan@example.com'));
   assert.ok(mail.html.includes('jordan@example.com'));
   assert.ok(mail.text.includes('808-555-0100'));
   assert.ok(mail.text.includes('2026-08-28'));
   assert.ok(mail.html.includes('2026-08-28'));
-  assert.ok(mail.text.includes('$360.00'));
-  assert.ok(mail.html.includes('$360.00'));
-  assert.ok(mail.text.includes('3'));
-  assert.ok(mail.html.includes('3'));
+  assert.ok(mail.text.includes('2'));
+  assert.ok(mail.html.includes('2'));
   assert.ok(/not held/i.test(mail.text));
   assert.ok(/not held/i.test(mail.html));
   assert.ok(mail.text.includes('https://capturewithki.com/int/'));
   assert.ok(mail.html.includes('https://capturewithki.com/int/'));
+});
+
+test('a missing phone renders plainly in the unsigned escalation rather than blank', () => {
+  const mail = unsignedEscalationEmail({
+    clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com',
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 7, 28, 9, 0)))
+  });
+  assert.ok(mail.text.includes('not given'));
+  assert.ok(mail.html.includes('not given'));
 });
 
 test('a hostile client name cannot inject markup into the owner-facing alerts', () => {
@@ -193,9 +166,9 @@ test('a hostile client name cannot inject markup into the owner-facing alerts', 
   assert.equal(alert1.html.includes('<img src=x'), false);
   assert.ok(alert1.html.includes('&lt;img'));
 
-  const alert2 = unpaidEscalationEmail({
+  const alert2 = unsignedEscalationEmail({
     clientName: hostile, clientEmail: 'a@example.com',
-    signedAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1))), retainerCents: 1000
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1)))
   });
   assert.equal(alert2.html.includes('<img src=x'), false);
   assert.ok(alert2.html.includes('&lt;img'));
@@ -209,9 +182,9 @@ test('a newline in the client name cannot forge either owner-alert subject', () 
   });
   assert.equal(alert1.subject.includes('\n'), false);
 
-  const alert2 = unpaidEscalationEmail({
+  const alert2 = unsignedEscalationEmail({
     clientName: hostile, clientEmail: 'a@example.com',
-    signedAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1))), retainerCents: 1000
+    sentAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1)))
   });
   assert.equal(alert2.subject.includes('\n'), false);
 });

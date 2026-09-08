@@ -172,31 +172,23 @@ export function signedCopyEmail(o) {
 }
 
 // ---------------------------------------------------------------------------
-// The chase ladder (Task 6). All four below are built by chaseContracts in
-// index.js from a raw contract document — a plain object with an `id` and
+// The chase ladder (Task 6, narrowed by Task 4 to the signature alone — there
+// is no payment left to chase). All three below are built by chaseContracts
+// in index.js from a raw contract document — a plain object with an `id` and
 // whatever Firestore has on it, never something these functions fetch or
 // shape themselves.
 //
-// A NOTE ON LINKS THE CLIENT-FACING TWO DO NOT HAVE: signReminderEmail and
-// payReminderEmail cannot carry a fresh "click here to sign" / "click here to
-// pay" link. That link is `SITE_ORIGIN + '/sign/?t=' + token`, and the raw
-// token is never persisted anywhere — only tokenHash (contract-crypto.js's
-// hashToken, one-way sha256) is stored, by design, so that a Firestore read
-// can never hand out a working credential. There is no honest way to
-// reconstruct it here, and minting a fresh token silently on a reminder would
-// invalidate the link already sitting in the client's inbox from
-// readyToSignEmail/signedCopyEmail without warning them. So both reminders
-// instead point the client back to that original email and offer a human
-// fallback (reply, or call) if they cannot find it — true today, and never
-// wrong in a way that costs Khiara a client who says "I never got a link."
-//
-// BOTH now name the SAME email: "Your CaptureWithKi agreement is ready to
-// sign." payReminderEmail used to name the signed-copy email as the one
-// holding the payment link, which was simply false — that email has no
-// payment link in it. The sign page reached from the ready-to-sign link is
-// the one surface that carries a working pay button (openContract returns
-// needsPayment; sign.js calls startRetainerPayment), so it is the only
-// honest thing to point an unpaid client at.
+// A NOTE ON THE LINK signReminderEmail DOES NOT HAVE: it cannot carry a
+// fresh "click here to sign" link. That link is
+// `SITE_ORIGIN + '/sign/?t=' + token`, and the raw token is never persisted
+// anywhere — only tokenHash (contract-crypto.js's hashToken, one-way sha256)
+// is stored, by design, so that a Firestore read can never hand out a
+// working credential. There is no honest way to reconstruct it here, and
+// minting a fresh token silently on a reminder would invalidate the link
+// already sitting in the client's inbox from readyToSignEmail without
+// warning them. So the reminder instead points the client back to that
+// original email — "Your CaptureWithKi agreement is ready to sign" — and
+// offers a human fallback (reply, or call) if they cannot find it.
 // ---------------------------------------------------------------------------
 
 export function signReminderEmail(c) {
@@ -242,60 +234,6 @@ export function signReminderEmail(c) {
           '</td></tr>' +
           '<tr><td style="font-family:' + SANS + ';font-size:14px;color:' + C.muted + ';padding-top:16px;">' +
             'Your date is not held until the agreement is signed and the retainer is paid.' +
-          '</td></tr>' +
-        '</table>' +
-      '</td></tr>' +
-    '</table>';
-
-  return { subject: subject, text: text, html: html };
-}
-
-export function payReminderEmail(c) {
-  const d = c || {};
-  const name = oneLine(d.clientName);
-  const date = oneLine(d.eventDate);
-  const retainer = formatCents(d.retainerCents);
-
-  const subject = 'Your CaptureWithKi retainer is still outstanding';
-
-  const text = [
-    'Hi ' + name + ',',
-    '',
-    'Your agreement for ' + date + ' is signed, but the retainer of ' + retainer +
-      ' has not come through yet.',
-    '',
-    'You can pay it on the same page you signed from. That link is in the email ' +
-      'titled "Your CaptureWithKi agreement is ready to sign" — open it again and ' +
-      'the page will have a button to pay the retainer. If you can\'t find that ' +
-      'email, just reply to this one and we will send it right over.',
-    '',
-    'Your date is not yet held.',
-    '',
-    'Khiara',
-    'CaptureWithKi'
-  ].join('\n');
-
-  const html =
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ' +
-      'style="background:' + C.bg + ';padding:24px 0;">' +
-      '<tr><td align="center">' +
-        '<table role="presentation" width="560" cellpadding="0" cellspacing="0" ' +
-          'style="background:' + C.paper + ';border:1px solid ' + C.line + ';padding:32px;">' +
-          '<tr><td style="font-family:' + SERIF + ';font-size:22px;color:' + C.ink + ';">' +
-            'Your retainer is still outstanding' +
-          '</td></tr>' +
-          '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
-            'Hi ' + escapeHtml(name) + ', your agreement for ' + escapeHtml(date) +
-            ' is signed, but the retainer of ' + escapeHtml(retainer) + ' has not come through yet.' +
-          '</td></tr>' +
-          '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
-            'You can pay it on the same page you signed from. That link is in the email titled ' +
-            '&ldquo;Your CaptureWithKi agreement is ready to sign&rdquo; &mdash; open it again and the ' +
-            'page will have a button to pay the retainer. If you can&rsquo;t find that email, ' +
-            'just reply to this one and we will send it right over.' +
-          '</td></tr>' +
-          '<tr><td style="font-family:' + SANS + ';font-size:14px;font-weight:bold;color:' + C.ink + ';padding-top:16px;">' +
-            'Your date is not yet held.' +
           '</td></tr>' +
         '</table>' +
       '</td></tr>' +
@@ -350,20 +288,22 @@ export function neverOpenedAlertEmail(c) {
   return { subject: subject, text: text, html: html };
 }
 
-export function unpaidEscalationEmail(c) {
+// Replaces unpaidEscalationEmail. The failure this system can actually have
+// is a contract that goes out and is never signed — after both sign
+// reminders are spent, Khiara is the only one who can do anything about it
+// (call, text, or otherwise reach the client directly).
+export function unsignedEscalationEmail(c) {
   const d = c || {};
   const name = oneLine(d.clientName);
   const email = oneLine(d.clientEmail);
   const phone = oneLine(d.clientPhone) || 'not given';
-  const signedAt = formatTimestamp(d.signedAt);
-  const amount = formatCents(d.retainerCents);
-  const reminders = String(d.payReminderCount || 0);
-  const subject = 'ACTION NEEDED: ' + oneLine(name) + ' signed but has not paid';
+  const sentAt = formatTimestamp(d.sentAt);
+  const reminders = String(d.signReminderCount || 0);
+  const subject = 'ACTION NEEDED: ' + oneLine(name) + ' has not signed';
 
   const text = [
-    name + ' signed their agreement on ' + signedAt + ' and the retainer is still unpaid.',
+    name + '\'s agreement was sent on ' + sentAt + ' and still has not been signed.',
     '',
-    'Retainer: ' + amount,
     'Email: ' + email,
     'Phone: ' + phone,
     'Reminders sent: ' + reminders,
@@ -379,11 +319,11 @@ export function unpaidEscalationEmail(c) {
       '<table role="presentation" width="560" cellpadding="0" cellspacing="0" ' +
         'style="background:' + C.paper + ';border:1px solid ' + C.line + ';padding:32px;">' +
         '<tr><td style="font-family:' + SERIF + ';font-size:20px;color:' + C.ink + ';">' +
-          escapeHtml(name) + ' signed but has not paid' +
+          escapeHtml(name) + ' has not signed' +
         '</td></tr>' +
         '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
-          'Signed ' + escapeHtml(signedAt) + '. Retainer of ' + escapeHtml(amount) +
-          ' is still outstanding after ' + escapeHtml(reminders) + ' reminder(s).' +
+          'Sent ' + escapeHtml(sentAt) + '. Still unsigned after ' + escapeHtml(reminders) +
+          ' reminder(s).' +
         '</td></tr>' +
         '<tr><td style="font-family:' + SANS + ';font-size:15px;font-weight:bold;color:' + C.ink + ';padding-top:16px;">' +
           'The date is not held.' +

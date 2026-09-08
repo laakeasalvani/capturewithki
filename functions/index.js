@@ -33,7 +33,7 @@ import {
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import {
   readyToSignEmail, signedCopyEmail, formatCents,
-  signReminderEmail, payReminderEmail, neverOpenedAlertEmail, unpaidEscalationEmail
+  signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail
 } from './lib/contract-email.js';
 import { dueActions } from './lib/chase.js';
 import { fakePayAllowed, markContractPaid, getProvider, providerName, paymentsEnabled } from './lib/payments.js';
@@ -983,8 +983,10 @@ export const signContract = onCall(
         console.warn('[signContract] could not create checkout session:', describeError(err));
         // Deliberately swallowed, not thrown. The signature above is already
         // committed; the client sees a calm true message instead, and a signed-
-        // unpaid contract is exactly what the pay-reminder ladder and the
-        // dashboard exist to catch.
+        // unpaid contract is exactly what needsPayment on the dashboard/sign
+        // page exists to catch — there is no reminder ladder for it anymore,
+        // since a contract this far along has nothing left to be chased for
+        // signing.
       }
     }
 
@@ -1600,20 +1602,21 @@ export const escalateUnreadInquiries = onSchedule(
 );
 
 // ---------------------------------------------------------------------------
-// The retainer chase — reminders, escalation, and reconciliation.
+// The signature chase — reminders and escalation — plus reconciliation.
 //
-// Reconciliation runs FIRST, inside the same invocation, before dueActions
-// is ever called. A missed checkout.session.completed webhook (Stripe drops
-// them occasionally, and the fake payer has no webhook at all — completing a
-// fake session only ever updates fakeSessions, never the contract, unless
-// fakeCheckoutComplete itself ran) would otherwise leave a contract sitting
-// at status 'signed' with money already collected. If the chase logic below
-// ran against that stale status, it would email — or worse, alert Khiara
-// with "ACTION NEEDED" — over a bill the client already paid. That is the
-// single worst thing this function could do, so repair happens before
-// anything is read for chasing, and the in-memory contract is patched to
-// 'paid' immediately so `dueActions` (which never sees Firestore, only the
-// array handed to it) skips it in this same run too.
+// dueActions never chases a 'signed' contract for anything (Task 4: there is
+// no payment left to ask for, so a signature is the end of the ladder), so
+// reconciliation below is no longer about protecting the chase from a stale
+// status. It still matters for the dashboard and the sign page: openContract
+// reports needsPayment from `status === 'signed' && !paidAt`, and a missed
+// checkout.session.completed webhook (Stripe drops them occasionally, and
+// the fake payer has no webhook at all — completing a fake session only ever
+// updates fakeSessions, never the contract, unless fakeCheckoutComplete
+// itself ran) would otherwise leave that flag wrongly true even though the
+// client already paid. Reconciliation runs FIRST, inside the same
+// invocation, and patches the in-memory contract to 'paid' immediately, so a
+// contract this run just repaired is never even considered stale by
+// anything reading `contracts` afterward.
 // ---------------------------------------------------------------------------
 export const chaseContracts = onSchedule(
   {
@@ -1745,19 +1748,12 @@ export const chaseContracts = onSchedule(
             signReminderCount: (c.signReminderCount || 0) + 1,
             lastReminderAt: FieldValue.serverTimestamp()
           });
-        } else if (action.kind === 'pay-reminder') {
-          const m = payReminderEmail(c);
-          await sendEmail({ apiKey: key, to: c.clientEmail, subject: m.subject, text: m.text, html: m.html });
-          await ref.update({
-            payReminderCount: (c.payReminderCount || 0) + 1,
-            lastReminderAt: FieldValue.serverTimestamp()
-          });
         } else if (action.kind === 'never-opened-alert') {
           const m = neverOpenedAlertEmail(c);
           await sendEmail({ apiKey: key, to: OWNER_EMAIL, subject: m.subject, text: m.text, html: m.html });
           await ref.update({ neverOpenedAlertAt: FieldValue.serverTimestamp() });
-        } else if (action.kind === 'unpaid-escalation') {
-          const m = unpaidEscalationEmail(c);
+        } else if (action.kind === 'unsigned-escalation') {
+          const m = unsignedEscalationEmail(c);
           await sendEmail({ apiKey: key, to: OWNER_EMAIL, subject: m.subject, text: m.text, html: m.html });
           await ref.update({ escalatedAt: FieldValue.serverTimestamp() });
         } else {
