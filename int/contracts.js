@@ -54,6 +54,24 @@ function wholeDollarsToCents(raw) {
   return dollars * 100;
 }
 
+// Her public site promises the balance is due up to two weeks before the
+// event, so that is the default offered here. Only offered when eventDate
+// parses as an actual date — a free-text answer like "sometime in June"
+// must not turn into a guessed, wrong date on a signed legal document, so
+// this returns '' rather than guessing, and the field is left for her to
+// type into herself.
+function defaultBalanceDueDate(eventDateStr) {
+  const raw = String(eventDateStr === undefined || eventDateStr === null ? '' : eventDateStr).trim();
+  if (!raw) return '';
+  const parsed = new Date(raw);
+  if (isNaN(parsed.getTime())) return '';
+  const due = new Date(parsed.getTime());
+  due.setDate(due.getDate() - 14);
+  // Same options as formatLongDate in functions/index.js, so the default
+  // reads exactly like every other date already in the document.
+  return due.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 // Client-callable errors carry the useful sentence in `message` (that's
 // exactly what HttpsError puts there, and several of these messages — the
 // isDraft-template refusal chief among them — are written to be read by her,
@@ -175,6 +193,9 @@ export function initContracts(container) {
       '<label class="s-label">Event date<input type="text" id="cDate" maxlength="40" placeholder="e.g. June 14, 2027"></label>' +
       '<label class="s-label">Event location<input type="text" id="cLocation" maxlength="300" placeholder="Venue or city — this is not on the inquiry form yet"></label>' +
 
+      '<label class="s-label">Balance due date<input type="text" id="cBalanceDue" maxlength="40" placeholder="e.g. May 29, 2027"></label>' +
+      '<p class="c-li-error" id="cBalanceDueError" hidden>Set a balance due date before sending — it prints as a blank line in the contract otherwise.</p>' +
+
       '<label class="s-label">Package' +
         '<select id="cPackage">' + packageOptionsHtml() + '</select>' +
       '</label>' +
@@ -191,6 +212,7 @@ export function initContracts(container) {
         '<div class="c-totals-row"><span>Total</span><strong id="cFeeTotal">$0.00</strong></div>' +
         '<div class="c-totals-row"><span>Retainer (' + DEFAULT_RETAINER_PERCENT + '%)</span><strong id="cFeeRetainer">$0.00</strong></div>' +
         '<div class="c-totals-row"><span>Remaining balance</span><strong id="cFeeBalance">$0.00</strong></div>' +
+        '<div class="c-totals-row"><span>Balance due date</span><strong id="cFeeBalanceDueDate">&mdash;</strong></div>' +
       '</div>' +
 
       '<div class="s-actions">' +
@@ -209,6 +231,8 @@ export function initContracts(container) {
     const phoneEl = composerBox.querySelector('#cPhone');
     const dateEl = composerBox.querySelector('#cDate');
     const locationEl = composerBox.querySelector('#cLocation');
+    const balanceDueEl = composerBox.querySelector('#cBalanceDue');
+    const balanceDueErrorEl = composerBox.querySelector('#cBalanceDueError');
     const packageEl = composerBox.querySelector('#cPackage');
     const whichAgreementEl = composerBox.querySelector('#cWhichAgreement');
     const travelEl = composerBox.querySelector('#cTravel');
@@ -218,6 +242,7 @@ export function initContracts(container) {
     const feeTotalEl = composerBox.querySelector('#cFeeTotal');
     const feeRetainerEl = composerBox.querySelector('#cFeeRetainer');
     const feeBalanceEl = composerBox.querySelector('#cFeeBalance');
+    const feeBalanceDueDateEl = composerBox.querySelector('#cFeeBalanceDueDate');
     const statusEl = composerBox.querySelector('#cStatus');
     const resultBox = composerBox.querySelector('#cResult');
     const sendBtn = composerBox.querySelector('#cSend');
@@ -234,6 +259,12 @@ export function initContracts(container) {
       // Inquiries don't collect a venue today, so this starts blank on
       // purpose — nothing to prefill it from yet.
     }
+
+    // True once she has typed into the balance-due field herself. Before
+    // that, changing the event date is allowed to keep updating the default;
+    // after that, her own answer is never overwritten out from under her.
+    let balanceDueTouched = false;
+    balanceDueEl.value = defaultBalanceDueDate(dateEl.value);
 
     function selectedPackage() {
       return packages.filter(function (p) { return p.id === packageEl.value; })[0] || null;
@@ -260,15 +291,36 @@ export function initContracts(container) {
       feeRetainerEl.textContent = formatCents(fees.retainerCents);
       feeBalanceEl.textContent = formatCents(fees.balanceCents);
 
+      const balanceDueDate = balanceDueEl.value.trim();
+      const balanceDueEmpty = !balanceDueDate;
+      balanceDueErrorEl.hidden = !balanceDueEmpty;
+      feeBalanceDueDateEl.textContent = balanceDueDate || '—';
+
       whichAgreementEl.textContent = pkg
         ? 'This will send the ' + templateLabel(pkg.templateKey) + ' agreement.'
         : 'Choose a package to see which agreement it will send.';
 
-      return { pkg: pkg, travelCents: travelCents, travelInvalid: travelInvalid, fees: fees };
+      return {
+        pkg: pkg, travelCents: travelCents, travelInvalid: travelInvalid, fees: fees,
+        balanceDueDate: balanceDueDate, balanceDueEmpty: balanceDueEmpty
+      };
     }
 
     packageEl.addEventListener('change', recompute);
     travelEl.addEventListener('input', recompute);
+    // Only auto-fills while she hasn't touched the field herself — see
+    // balanceDueTouched above. An unparseable event date clears the default
+    // rather than leaving a stale guess sitting there.
+    dateEl.addEventListener('input', function () {
+      if (!balanceDueTouched) {
+        balanceDueEl.value = defaultBalanceDueDate(dateEl.value);
+      }
+      recompute();
+    });
+    balanceDueEl.addEventListener('input', function () {
+      balanceDueTouched = true;
+      recompute();
+    });
     recompute();
 
     composerBox.querySelector('#cCancel').addEventListener('click', function () {
@@ -288,6 +340,11 @@ export function initContracts(container) {
         travelEl.focus();
         return;
       }
+      if (state.balanceDueEmpty) {
+        statusEl.textContent = 'Set a balance due date first.';
+        balanceDueEl.focus();
+        return;
+      }
 
       sendBtn.disabled = true;
       statusEl.textContent = 'Creating contract…';
@@ -302,6 +359,7 @@ export function initContracts(container) {
           clientPhone: phoneEl.value.trim(),
           eventDate: dateEl.value.trim(),
           eventLocation: locationEl.value.trim(),
+          balanceDueDate: state.balanceDueDate,
           packageId: state.pkg.id,
           travelFeesCents: state.travelCents
         });

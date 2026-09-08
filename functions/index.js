@@ -27,7 +27,7 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
-  computeFeeBlock, validateClientDetails
+  computeFeeBlock, validateClientDetails, missingRequiredFields
 } from './lib/contracts.js';
 import { validatePackage } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
@@ -678,7 +678,7 @@ export const sendContract = onCall(
       client_email: contract.clientEmail,
       client_phone: contract.clientPhone || 'Not given',
       event_date: contract.eventDate,
-      event_location: contract.eventLocation,
+      event_location: contract.eventLocation || 'Not given',
       start_time: contract.startTime || 'To be confirmed',
       end_time: contract.endTime || 'To be confirmed',
       package_name: contract.specs.packageName,
@@ -702,6 +702,14 @@ export const sendContract = onCall(
     } else {
       fields.hours = String(contract.specs.hours);
       fields.edited_images = String(contract.specs.editedImages);
+    }
+
+    // Checked before rendering, because after rendering an empty value is
+    // indistinguishable from text that was meant to be short.
+    const blank = missingRequiredFields(fields);
+    if (blank.length) {
+      throw new HttpsError('failed-precondition',
+        'This contract is missing: ' + blank.join(', ') + '. Fill those in before sending.');
     }
 
     // Rendered ONCE, here, and stored. From this moment the live template is

@@ -150,6 +150,23 @@ export function renderTemplate(templateHtml, fields) {
   });
 }
 
+// The unfilled-placeholder guard only catches a literal {{token}} left in the
+// output. It cannot catch a field that WAS substituted — with nothing. An empty
+// value leaves a blank line in a signed legal document and looks like a design
+// choice rather than a fault. These fields must never be blank.
+export const REQUIRED_FIELDS = [
+  'client_1_name', 'event_date', 'balance_due_date',
+  'package_name', 'package_price', 'retainer', 'remaining_balance'
+];
+
+export function missingRequiredFields(fields) {
+  const f = fields && typeof fields === 'object' ? fields : {};
+  return REQUIRED_FIELDS.filter(function (k) {
+    const v = f[k];
+    return v === undefined || v === null || String(v).trim() === '';
+  });
+}
+
 export const STATUSES = ['draft', 'sent', 'opened', 'signed', 'paid', 'void', 'cancelled'];
 
 // `void` means never signed and killed off. `cancelled` means signed and then

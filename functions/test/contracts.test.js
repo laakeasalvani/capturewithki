@@ -4,7 +4,7 @@ import {
   DEFAULT_RETAINER_PERCENT, sumLineItems,
   computeRetainerCents, computeBalanceCents,
   isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
-  renderTemplate, STATUSES, canTransition
+  renderTemplate, STATUSES, canTransition, missingRequiredFields
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -343,4 +343,39 @@ test('nonsense input yields zeroes rather than a wrong number', () => {
   assert.equal(computeFeeBlock(null).totalCents, 0);
   assert.equal(computeFeeBlock({ packagePriceCents: 12.5 }).totalCents, 0);
   assert.equal(computeFeeBlock({ packagePriceCents: 10000, travelFeesCents: -5 }).totalCents, 0);
+});
+
+test('a required merge field that is present but EMPTY is caught', () => {
+  const full = {
+    client_1_name: 'Jordan Rivera', event_date: 'June 12, 2027',
+    balance_due_date: 'May 29, 2027', package_name: 'The Grand 8-Hour Package',
+    package_price: '$1,200.00', retainer: '$360.00', remaining_balance: '$840.00'
+  };
+  assert.deepEqual(missingRequiredFields(full), []);
+  assert.deepEqual(missingRequiredFields({ ...full, balance_due_date: '' }), ['balance_due_date']);
+  assert.deepEqual(missingRequiredFields({ ...full, balance_due_date: '   ' }), ['balance_due_date']);
+  assert.deepEqual(missingRequiredFields({ ...full, client_1_name: null }), ['client_1_name']);
+});
+
+test('several blanks are all reported, so she fixes them in one pass', () => {
+  const r = missingRequiredFields({ client_1_name: 'J' });
+  assert.ok(r.length >= 5);
+  assert.ok(r.includes('balance_due_date'));
+  assert.equal(r.includes('client_1_name'), false);
+});
+
+test('missingRequiredFields survives nonsense', () => {
+  assert.deepEqual(missingRequiredFields(null).length > 0, true);
+  assert.deepEqual(missingRequiredFields(undefined).length > 0, true);
+  assert.deepEqual(missingRequiredFields('nope').length > 0, true);
+});
+
+// Optional fields are deliberately NOT on the list — a blank phone or venue is
+// normal, and those fall back to readable text rather than rendering empty.
+test('optional fields are not required', () => {
+  const full = {
+    client_1_name: 'J', event_date: 'D', balance_due_date: 'B',
+    package_name: 'P', package_price: '$1', retainer: '$1', remaining_balance: '$1'
+  };
+  assert.deepEqual(missingRequiredFields({ ...full, client_phone: '', client_2_name: '' }), []);
 });
