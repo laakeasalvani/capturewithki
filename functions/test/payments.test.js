@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { fakePayAllowed, FAKE_ALLOWLIST, providerName, getProvider, markContractPaid } from '../lib/payments.js';
+import { fakePayAllowed, FAKE_ALLOWLIST, providerName, paymentsEnabled, getProvider, markContractPaid } from '../lib/payments.js';
 
 test('the allowlist is small and explicit', () => {
   assert.ok(Array.isArray(FAKE_ALLOWLIST));
@@ -47,14 +47,14 @@ test('an allowlisted address embedded in a longer local part or domain is refuse
   assert.equal(fakePayAllowed({ clientEmail: FAKE_ALLOWLIST[1].replace('@', '@evil.') }), false);
 });
 
-test('the provider defaults to fake and is switched by env alone', () => {
-  delete process.env.PAYMENT_PROVIDER;
+test('the provider is switched by env alone, among the recognised values', () => {
+  process.env.PAYMENT_PROVIDER = 'fake';
   assert.equal(providerName(), 'fake');
   process.env.PAYMENT_PROVIDER = 'stripe';
   assert.equal(providerName(), 'stripe');
   process.env.PAYMENT_PROVIDER = 'nonsense';
-  // An unrecognised value must NOT silently fall through to fake, or a typo
-  // in configuration becomes a payment system that takes no money.
+  // An unrecognised value must NOT silently fall through to off or fake, or
+  // a typo in configuration becomes a payment system that takes no money.
   assert.throws(() => providerName());
   delete process.env.PAYMENT_PROVIDER;
 });
@@ -70,7 +70,7 @@ test('the throw names the unrecognised value', () => {
 });
 
 test('getProvider returns exactly two methods, matching the env selection', () => {
-  delete process.env.PAYMENT_PROVIDER;
+  process.env.PAYMENT_PROVIDER = 'fake';
   const fake = getProvider();
   assert.deepEqual(Object.keys(fake).sort(), ['createRetainerSession', 'retrieveSession']);
   assert.equal(typeof fake.createRetainerSession, 'function');
@@ -175,7 +175,7 @@ test('cancelled cannot be paid retroactively', async () => {
 });
 
 test('the fake provider refuses to create a session for a real client', async () => {
-  delete process.env.PAYMENT_PROVIDER;
+  process.env.PAYMENT_PROVIDER = 'fake';
   const fake = getProvider();
   await assert.rejects(
     () => fake.createRetainerSession(
@@ -184,4 +184,33 @@ test('the fake provider refuses to create a session for a real client', async ()
     ),
     /fake provider: this contract is not allowlisted/
   );
+  delete process.env.PAYMENT_PROVIDER;
+});
+
+test('payments are OFF by default, not fake', () => {
+  delete process.env.PAYMENT_PROVIDER;
+  assert.equal(providerName(), 'off');
+  assert.equal(paymentsEnabled(), false);
+});
+
+test('the other two providers still resolve and count as enabled', () => {
+  process.env.PAYMENT_PROVIDER = 'fake';
+  assert.equal(providerName(), 'fake');
+  assert.equal(paymentsEnabled(), true);
+  process.env.PAYMENT_PROVIDER = 'stripe';
+  assert.equal(providerName(), 'stripe');
+  assert.equal(paymentsEnabled(), true);
+  delete process.env.PAYMENT_PROVIDER;
+});
+
+test('an unrecognised value still throws rather than silently falling back', () => {
+  process.env.PAYMENT_PROVIDER = 'nonsense';
+  assert.throws(() => providerName());
+  assert.throws(() => paymentsEnabled());
+  delete process.env.PAYMENT_PROVIDER;
+});
+
+test('asking for a provider while payments are off is refused loudly', () => {
+  delete process.env.PAYMENT_PROVIDER;
+  assert.throws(() => getProvider(), /off/i);
 });

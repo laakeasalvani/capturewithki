@@ -19,13 +19,20 @@ import {
 export { FAKE_ALLOWLIST, fakePayAllowed } from './fake-payments.js';
 
 export function providerName() {
-  const name = process.env.PAYMENT_PROVIDER || 'fake';
-  if (name !== 'fake' && name !== 'stripe') {
+  // OFF is the default. She has no payment processor, and the previous default of
+  // 'fake' meant a real client's signature ended with "Khiara will email you a
+  // payment link" — a sentence that is not true of this system.
+  const name = process.env.PAYMENT_PROVIDER || 'off';
+  if (name !== 'off' && name !== 'fake' && name !== 'stripe') {
     // Loud, not silent. A typo that quietly selected the fake provider would
     // be a live payment system that never takes any money.
     throw new Error('Unknown PAYMENT_PROVIDER: ' + name);
   }
   return name;
+}
+
+export function paymentsEnabled() {
+  return providerName() !== 'off';
 }
 
 // Wraps checkout.sessions.retrieve() into the same minimal shape the fake
@@ -55,7 +62,14 @@ async function stripeRetrieveSession(sessionId) {
 // these two methods — that is what makes the swap a swap rather than two
 // unrelated code paths that happen to share a name.
 export function getProvider() {
-  if (providerName() === 'stripe') {
+  const name = providerName();
+  if (name === 'off') {
+    // Callers must check paymentsEnabled() first. Throwing here rather than
+    // returning a no-op provider means a caller that forgot cannot silently
+    // half-work.
+    throw new Error('getProvider: payments are off');
+  }
+  if (name === 'stripe') {
     return {
       createRetainerSession: stripeCreateRetainerSession,
       retrieveSession: stripeRetrieveSession

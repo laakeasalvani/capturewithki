@@ -36,7 +36,7 @@ import {
   signReminderEmail, payReminderEmail, neverOpenedAlertEmail, unpaidEscalationEmail
 } from './lib/contract-email.js';
 import { dueActions } from './lib/chase.js';
-import { fakePayAllowed, markContractPaid, getProvider, providerName } from './lib/payments.js';
+import { fakePayAllowed, markContractPaid, getProvider, providerName, paymentsEnabled } from './lib/payments.js';
 import { completeFakeSession, retrieveSession as retrieveFakeSession } from './lib/fake-payments.js';
 import { getStripe } from './lib/stripe.js';
 
@@ -961,25 +961,31 @@ export const signContract = onCall(
     // must survive — a failure here costs a redirect, not an agreement.
     const back = SITE_ORIGIN + '/sign/?t=' + token;
     let checkoutUrl = null;
-    try {
-      // Dispatched through the seam, so this line is identical whether the
-      // fake payer or Stripe is configured. Switching between them is
-      // PAYMENT_PROVIDER and nothing else.
-      const session = await getProvider().createRetainerSession(
-        contract, ref.id, back + '&paid=1', back
-      );
-      checkoutUrl = session.url;
-      // Provider-agnostic name, deliberately: this document may end up paid
-      // by either provider, and a field named for one of them would be a lie
-      // about the other's rows — the same reason fakeCheckoutComplete and
-      // stripeWebhook both write to the shared `paymentIntent` field.
-      await ref.update({ paymentSessionId: session.id });
-    } catch (err) {
-      console.warn('[signContract] could not create checkout session:', describeError(err));
-      // Deliberately swallowed, not thrown. The signature above is already
-      // committed; the client sees a calm true message instead, and a signed-
-      // unpaid contract is exactly what the pay-reminder ladder and the
-      // dashboard exist to catch.
+    // Payments off is the normal state today — Khiara has no processor
+    // configured — not a failure that happens to look like one. No session
+    // is created and checkoutUrl stays null; nothing here is logged as a
+    // warning, because nothing has gone wrong.
+    if (paymentsEnabled()) {
+      try {
+        // Dispatched through the seam, so this line is identical whether the
+        // fake payer or Stripe is configured. Switching between them is
+        // PAYMENT_PROVIDER and nothing else.
+        const session = await getProvider().createRetainerSession(
+          contract, ref.id, back + '&paid=1', back
+        );
+        checkoutUrl = session.url;
+        // Provider-agnostic name, deliberately: this document may end up paid
+        // by either provider, and a field named for one of them would be a lie
+        // about the other's rows — the same reason fakeCheckoutComplete and
+        // stripeWebhook both write to the shared `paymentIntent` field.
+        await ref.update({ paymentSessionId: session.id });
+      } catch (err) {
+        console.warn('[signContract] could not create checkout session:', describeError(err));
+        // Deliberately swallowed, not thrown. The signature above is already
+        // committed; the client sees a calm true message instead, and a signed-
+        // unpaid contract is exactly what the pay-reminder ladder and the
+        // dashboard exist to catch.
+      }
     }
 
     const mail = signedCopyEmail({
@@ -1036,6 +1042,15 @@ export const startRetainerPayment = onCall(
 
     // Checked before touching Firestore, same as openContract.
     if (!isValidTokenShape(token)) throw new HttpsError('permission-denied', CONTRACT_DENIED);
+
+    // Payments are off today — Khiara has no processor configured. There is
+    // no session this function could ever mint, for any contract, so this is
+    // checked before Firestore is touched at all, and refused plainly rather
+    // than treated as the token-based CONTRACT_DENIED (a real, held client
+    // reaching this path has done nothing wrong).
+    if (!paymentsEnabled()) {
+      throw new HttpsError('failed-precondition', 'Online payment is not set up yet.');
+    }
 
     const hash = hashToken(token);
     let found = null;
@@ -1637,7 +1652,14 @@ export const chaseContracts = onSchedule(
     // are candidates, and only once the session has had a little time to
     // resolve — checkContract's own webhook can legitimately still be in
     // flight seconds after signing, and this must not race it.
-    for (const c of contracts) {
+    //
+    // Skipped entirely while payments are off: there is no provider to ask
+    // and no checkout session was ever minted (signContract and
+    // startRetainerPayment both skip that step too), so every contract's
+    // paymentSessionId is already absent and this loop would be a no-op
+    // anyway. Checking paymentsEnabled() up front avoids calling
+    // getProvider() at all, which would otherwise throw once per contract.
+    for (const c of (paymentsEnabled() ? contracts : [])) {
       if (c.status !== 'signed' || !c.paymentSessionId) continue;
       const signedAt = c.signedAt && typeof c.signedAt.toMillis === 'function'
         ? c.signedAt.toMillis() : null;
