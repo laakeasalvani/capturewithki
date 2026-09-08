@@ -26,10 +26,10 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          keaOwnerEmailHtml, keaClientEmailHtml, sendKeaEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
 import {
-  validateContractInput, sumLineItems, computeRetainerCents,
-  computeBalanceCents, DEFAULT_RETAINER_PERCENT, isValidContractId,
-  MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition
+  isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
+  computeFeeBlock
 } from './lib/contracts.js';
+import { validatePackage } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import {
   readyToSignEmail, signedCopyEmail, formatCents,
@@ -50,6 +50,17 @@ const OWNER_EMAIL = 'capturewithki@gmail.com';
 // caller supplies can reach it, which is what makes it safe to drop into an
 // href after nothing more than escaping.
 const SITE_ORIGIN = 'https://capturewithki.com';
+
+// She is the party offering the contract's terms, and her countersignature is
+// stamped into every sent contract by sendContract below — see the comment
+// there for why that happens BEFORE hashDocument runs.
+const PHOTOGRAPHER_NAME = 'Khiara Salvani';
+
+// e.g. "September 8, 2026" — used only for her countersignature date, which
+// is a merge field in the document text, not a stored Firestore Timestamp.
+function formatLongDate(d) {
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
 
 initializeApp();
 const db = getFirestore();
@@ -510,34 +521,55 @@ export const createContract = onCall(
     await requireAdmin(request);
 
     const d = request.data || {};
-    const check = validateContractInput(d);
+
+    // The package decides which of the three contracts this client signs and
+    // what its blanks say. Loaded and validated BEFORE anything else: a
+    // package missing a spec would otherwise produce a contract with a
+    // visible blank in it, and refusing here lets her fix the package
+    // instead of discovering the hole at send time.
+    const pkgSnap = await db.collection('packages').doc(String(d.packageId || '')).get();
+    if (!pkgSnap.exists) throw new HttpsError('not-found', 'No such package.');
+    const pkg = pkgSnap.data();
+    const check = validatePackage(pkg);
     if (!check.ok) {
-      // She is the only caller, so unlike the client-facing paths this one
-      // says exactly what is wrong. There is no id to probe for here.
-      throw new HttpsError('invalid-argument', check.errors.join(' '));
+      throw new HttpsError('failed-precondition',
+        'That package is not ready to send: ' + check.errors.join(' '));
     }
 
-    const lineItems = d.lineItems.map(function (item) {
-      return { label: String(item.label).trim().slice(0, 120), amountCents: item.amountCents };
+    // Retainer is 30% of the PACKAGE PRICE only, never the total — travel is
+    // billed but does not inflate the deposit. See computeFeeBlock's own
+    // comment in lib/contracts.js.
+    const fees = computeFeeBlock({
+      packagePriceCents: pkg.priceCents,
+      travelFeesCents: Number.isInteger(d.travelFeesCents) ? d.travelFeesCents : 0
     });
-    const totalCents = sumLineItems(lineItems);
-    const percent = Number.isFinite(d.retainerPercent) ? d.retainerPercent : DEFAULT_RETAINER_PERCENT;
-    const retainerCents = computeRetainerCents(totalCents, percent);
+    if (fees.totalCents <= 0) throw new HttpsError('invalid-argument', 'That total is not valid.');
 
     const doc = {
       status: 'draft',
       inquiryId: typeof d.inquiryId === 'string' && d.inquiryId ? d.inquiryId : null,
-      clientName: String(d.clientName).trim().slice(0, 200),
-      clientEmail: String(d.clientEmail).trim().slice(0, 254),
+      packageId: String(d.packageId),
+      templateKey: pkg.templateKey,
+      packageLabel: pkg.label,
+      specs: pkg.specs,
+      packagePriceCents: fees.packagePriceCents,
+      travelFeesCents: fees.travelFeesCents,
+      retainerCents: fees.retainerCents,
+      totalCents: fees.totalCents,
+      balanceCents: fees.balanceCents,
+      // clientName already means Client 1 and is read in 21 places across
+      // openContract, sign.js, the email builders and the dashboard — kept
+      // exactly as it is rather than renamed. client2Name is new and optional;
+      // sendContract renders it as "Not applicable" when empty.
+      clientName: typeof d.clientName === 'string' ? d.clientName.trim().slice(0, 200) : '',
+      client2Name: typeof d.client2Name === 'string' ? d.client2Name.trim().slice(0, 200) : '',
+      clientEmail: typeof d.clientEmail === 'string' ? d.clientEmail.trim().slice(0, 254) : '',
       clientPhone: typeof d.clientPhone === 'string' ? d.clientPhone.trim().slice(0, MAX_PHONE) : '',
       eventDate: typeof d.eventDate === 'string' ? d.eventDate.trim().slice(0, MAX_EVENT_DATE) : '',
       eventLocation: typeof d.eventLocation === 'string' ? d.eventLocation.trim().slice(0, 300) : '',
-      lineItems: lineItems,
-      totalCents: totalCents,
-      retainerCents: retainerCents,
-      // By subtraction. Never recomputed as a second percentage.
-      balanceCents: computeBalanceCents(totalCents, retainerCents),
-      retainerPercent: percent,
+      startTime: typeof d.startTime === 'string' ? d.startTime.trim().slice(0, MAX_EVENT_DATE) : '',
+      endTime: typeof d.endTime === 'string' ? d.endTime.trim().slice(0, MAX_EVENT_DATE) : '',
+      balanceDueDate: typeof d.balanceDueDate === 'string' ? d.balanceDueDate.trim().slice(0, MAX_EVENT_DATE) : '',
       openCount: 0,
       signReminderCount: 0,
       payReminderCount: 0,
@@ -603,10 +635,14 @@ export const sendContract = onCall(
       throw new HttpsError('failed-precondition', 'That contract cannot be sent from its current state.');
     }
 
-    const templateId = typeof d.templateId === 'string' ? d.templateId.trim() : '';
+    // The PACKAGE decides which contract this client signs, not a
+    // caller-supplied id — templateKey was fixed by createContract and
+    // validated then against pkg.specs, so there is nothing left for a
+    // caller to choose here.
+    const templateKey = typeof contract.templateKey === 'string' ? contract.templateKey : '';
     let tplSnap;
     try {
-      tplSnap = await db.collection('contractTemplates').doc(templateId).get();
+      tplSnap = await db.collection('contractTemplates').doc(templateKey).get();
     } catch (err) {
       console.warn('[sendContract] could not read template:', describeError(err));
       throw new HttpsError('internal', 'Something went wrong. Please try again.');
@@ -622,24 +658,51 @@ export const sendContract = onCall(
         'That contract template is still marked a draft. Replace it with the real agreement first.');
     }
 
+    // Stamped in BEFORE the snapshot is hashed, so her countersignature is covered
+    // by the same tamper-evidence as the client's. She is the party offering these
+    // terms; the client accepts them, so the document goes out already countersigned.
+    const sentDate = new Date();
+    const fields = {
+      client_1_name: contract.clientName,
+      client_2_name: contract.client2Name || 'Not applicable',
+      client_email: contract.clientEmail,
+      client_phone: contract.clientPhone || 'Not given',
+      event_date: contract.eventDate,
+      event_location: contract.eventLocation,
+      start_time: contract.startTime || 'To be confirmed',
+      end_time: contract.endTime || 'To be confirmed',
+      package_name: contract.specs.packageName,
+      package_price: formatCents(contract.packagePriceCents),
+      retainer: formatCents(contract.retainerCents),
+      travel_fees: formatCents(contract.travelFeesCents),
+      remaining_balance: formatCents(contract.balanceCents),
+      balance_due_date: contract.balanceDueDate,
+      photographer_name: PHOTOGRAPHER_NAME,
+      photographer_signed_date: formatLongDate(sentDate)
+    };
+    // Template-specific specs. Portrait has no hours; wedding and elopement
+    // have no portrait specs — passing an unused field is harmless
+    // (renderTemplate only substitutes what the template asks for), but a
+    // MISSING one would leave that template's own placeholder unfilled.
+    if (contract.templateKey === 'portrait') {
+      fields.session_minutes = String(contract.specs.sessionMinutes);
+      fields.locations = String(contract.specs.locations);
+      fields.outfit_changes = String(contract.specs.outfitChanges);
+      fields.edited_images = String(contract.specs.editedImages);
+    } else {
+      fields.hours = String(contract.specs.hours);
+      fields.edited_images = String(contract.specs.editedImages);
+    }
+
     // Rendered ONCE, here, and stored. From this moment the live template is
     // irrelevant to this contract: editing a clause later cannot change what
     // this client agreed to, and the hash is what proves it.
-    const documentSnapshot = renderTemplate(tpl.html, {
-      client_name: contract.clientName,
-      client_email: contract.clientEmail,
-      event_date: contract.eventDate,
-      event_location: contract.eventLocation,
-      total: formatCents(contract.totalCents),
-      retainer: formatCents(contract.retainerCents),
-      balance: formatCents(contract.balanceCents),
-      line_items: contract.lineItems
-        .map(function (i) { return i.label + ' — ' + formatCents(i.amountCents); })
-        .join('; ')
-    });
+    const documentSnapshot = renderTemplate(tpl.html, fields);
 
     // A placeholder the template asked for and the data could not fill would
-    // ship a contract with a visible hole in it. Refuse instead.
+    // ship a contract with a visible hole in it. Refuse instead. This also
+    // catches a template/spec mismatch — e.g. a portrait package pointed at
+    // the wedding template would leave {{hours}} unfilled.
     const unfilled = documentSnapshot.match(/\{\{\s*[a-z_][a-z0-9_]*\s*\}\}/gi);
     if (unfilled) {
       throw new HttpsError('failed-precondition',
@@ -654,7 +717,6 @@ export const sendContract = onCall(
     try {
       await ref.update({
         status: 'sent',
-        templateId: templateId,
         templateVersion: tpl.version || 1,
         documentSnapshot: documentSnapshot,
         documentHash: hashDocument(documentSnapshot),
@@ -708,7 +770,6 @@ export const sendContract = onCall(
           sentAt: FieldValue.delete(),
           documentSnapshot: FieldValue.delete(),
           documentHash: FieldValue.delete(),
-          templateId: FieldValue.delete(),
           templateVersion: FieldValue.delete()
         });
       } catch (rollbackErr) {
