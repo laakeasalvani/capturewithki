@@ -2005,7 +2005,10 @@ export const prepareGalleryZip = onCall(
 // at, and one gallery going wrong must not stop the others.
 // ---------------------------------------------------------------------------
 export const cleanupExpiredGalleries = onSchedule(
-  { region: 'us-west1', schedule: 'every day 03:00', timeZone: 'Pacific/Honolulu' },
+  // 03:00 where SHE is. Left on Pacific/Honolulu this fired at 05:00 or 06:00
+  // Oregon time depending on daylight saving — no longer the quiet hour it was
+  // chosen to be, for a job that deletes a client's photos.
+  { region: 'us-west1', schedule: 'every day 03:00', timeZone: BUSINESS_TZ },
   async () => {
     const now = Date.now();
 
@@ -2103,7 +2106,10 @@ export const escalateUnreadInquiries = onSchedule(
   {
     region: 'us-west1',
     schedule: 'every 60 minutes',
-    timeZone: 'Pacific/Honolulu',
+    // An interval schedule does not actually depend on the zone, but leaving a
+    // Hawaii one here invites a wrong assumption the day somebody changes this
+    // to a wall-clock time.
+    timeZone: BUSINESS_TZ,
     secrets: [RESEND_API_KEY]
   },
   async () => {
