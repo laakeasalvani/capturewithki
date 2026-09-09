@@ -199,6 +199,25 @@ export function canTransition(from, to) {
   return TRANSITIONS[from].indexOf(to) !== -1;
 }
 
+// Closing a contract out of her way means two different things, and the
+// difference is not cosmetic.
+//
+// An offer that was never agreed to is VOID — withdrawn, as though it had not
+// been made. An agreement a client actually signed is CANCELLED — it existed,
+// it was executed, and it was called off. Recording a signed wedding as "void"
+// would misdescribe a legal document in her own permanent record.
+//
+// Returns null for anything already closed, or any status this does not
+// recognise, so the caller refuses rather than inventing a transition. Lives
+// here rather than in the callable because it decides how an executed
+// agreement is described forever, and index.js is not unit-tested by this
+// project's convention.
+export function closingStatusFor(from) {
+  if (from === 'signed' || from === 'paid') return 'cancelled';
+  if (from === 'draft' || from === 'sent' || from === 'opened') return 'void';
+  return null;
+}
+
 // The package price is a DEFAULT, not a fixed price.
 //
 // Her weddings are advertised "starting from $750 / $1,000 / $1,200", and a

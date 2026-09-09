@@ -5,7 +5,7 @@ import {
   computeRetainerCents, computeBalanceCents,
   isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
   renderTemplate, STATUSES, canTransition, missingRequiredFields, resolvePackagePrice,
-  isValidEventDateISO, formatEventDate, isEventPast
+  isValidEventDateISO, formatEventDate, isEventPast, closingStatusFor
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -147,9 +147,10 @@ test('client details are validated on their own, not only as part of a full cont
 });
 
 // A contract created without an event date is not merely incomplete, it is a
-// permanent dead draft: sendContract refuses it forever (event_date is in
-// REQUIRED_FIELDS), there is no edit control, no void, and firestore.rules
-// forbids delete. So it is refused here, before createContract writes anything.
+// dead draft: sendContract refuses it forever (event_date is in REQUIRED_FIELDS)
+// and there is no edit control. voidContract can now at least file one away, and
+// firestore.rules still forbids delete, so it is refused here — before
+// createContract writes anything — rather than left for her to tidy up after.
 test('a blank event date is refused, because the draft it would create can never be sent or deleted', () => {
   const base = { clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com' };
   assert.equal(validateClientDetails({ ...base, eventDate: '' }).ok, false);
@@ -512,5 +513,49 @@ test('an unusable date is never treated as past', () => {
   // get filed away into a section that is hidden by default.
   for (const bad of ['Summer 2027', '', null, 'TBD']) {
     assert.equal(isEventPast(bad, '2026-09-09'), false, 'hid ' + JSON.stringify(bad));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Closing a contract out of her way.
+// ---------------------------------------------------------------------------
+
+test('an offer nobody agreed to is voided, not cancelled', () => {
+  assert.equal(closingStatusFor('draft'), 'void');
+  assert.equal(closingStatusFor('sent'), 'void');
+  assert.equal(closingStatusFor('opened'), 'void');
+});
+
+test('an agreement a client actually signed is cancelled, not voided', () => {
+  // Describing a signed wedding as "void" would misdescribe an executed legal
+  // document in her permanent record.
+  assert.equal(closingStatusFor('signed'), 'cancelled');
+  assert.equal(closingStatusFor('paid'), 'cancelled');
+});
+
+test('an already-closed contract yields no further transition', () => {
+  assert.equal(closingStatusFor('void'), null);
+  assert.equal(closingStatusFor('cancelled'), null);
+});
+
+test('an unrecognised status is refused rather than guessed at', () => {
+  assert.equal(closingStatusFor('nonsense'), null);
+  assert.equal(closingStatusFor(''), null);
+  assert.equal(closingStatusFor(undefined), null);
+  // Prototype keys must not be mistaken for statuses.
+  assert.equal(closingStatusFor('constructor'), null);
+  assert.equal(closingStatusFor('toString'), null);
+});
+
+test('every status closingStatusFor offers is one canTransition actually permits', () => {
+  // These two must never drift apart: closingStatusFor decides the target and
+  // canTransition is the gate, so a status allowed by one and refused by the
+  // other would make the button dead for that contract.
+  for (const from of STATUSES) {
+    const to = closingStatusFor(from);
+    if (to !== null) {
+      assert.equal(canTransition(from, to), true,
+        from + ' -> ' + to + ' is offered but not permitted');
+    }
   }
 });

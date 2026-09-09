@@ -12,6 +12,7 @@ const fns = getFunctions(app, 'us-west1');
 const createContractFn = httpsCallable(fns, 'createContract');
 const sendContractFn = httpsCallable(fns, 'sendContract');
 const markRetainerReceivedFn = httpsCallable(fns, 'markRetainerReceived');
+const voidContractFn = httpsCallable(fns, 'voidContract');
 
 // A contract is never opened, signed, or paid the instant it's sent — the
 // window below is how long "sent, nothing back yet" is still normal. Past it,
@@ -24,6 +25,19 @@ const TEMPLATE_LABELS = { wedding: 'Wedding', elopement: 'Elopement', portrait: 
 
 function templateLabel(key) {
   return TEMPLATE_LABELS[key] || (key || 'contract');
+}
+
+// Already finished with, one way or the other. These two are the only statuses
+// nothing further can happen from, which is why they are also the two that file
+// a contract into Past.
+function isClosed(status) {
+  return status === 'void' || status === 'cancelled';
+}
+
+// A real agreement exists. Closing one of these is a CANCELLATION, and the
+// record has to survive it — the client signed something.
+function isAgreed(status) {
+  return status === 'signed' || status === 'paid';
 }
 
 function esc(v) {
@@ -619,6 +633,20 @@ export function initContracts(container) {
             '<span class="s-status c-retainer-status" aria-live="polite"></span>' +
           '</div>'
         : '') +
+
+      // Clearing it out of her way. Nothing is deleted — this moves the
+      // contract into Past and, if a client was holding a signing link, kills
+      // that link. The two words are not interchangeable: an offer that was
+      // never agreed to is VOID, a booking that existed and was called off is
+      // CANCELLED, and she should see the one that matches what happened.
+      (isClosed(c.status)
+        ? ''
+        : '<div class="s-actions c-close-row">' +
+            '<button type="button" class="c-close s-secondary">' +
+              (isAgreed(c.status) ? 'Cancel this booking' : 'Void &mdash; withdraw this contract') +
+            '</button>' +
+            '<span class="s-status c-close-status" aria-live="polite"></span>' +
+          '</div>') +
       '</div>' +
     '</article>';
   }
@@ -721,7 +749,7 @@ export function initContracts(container) {
   // stays in "Needs you" rather than disappearing into a hidden past section.
   // ---------------------------------------------------------------------
   function contractGroup(c, todayISO) {
-    if (c.status === 'void' || c.status === 'cancelled') return 'past';
+    if (isClosed(c.status)) return 'past';
     if (c.status === 'draft') return 'needs';
     if (c.status === 'sent' || c.status === 'opened') return 'needs';
     if (!c.retainerReceivedAt && c.status !== 'paid') return 'needs';
@@ -964,6 +992,43 @@ export function initContracts(container) {
           } catch (err) {
             retainerStatus.textContent = 'Could not undo: ' + describeErr(err);
             undoBtn.disabled = false;
+          }
+        });
+      }
+
+      // Void / cancel. Unlike the retainer control this is NOT reversible —
+      // canTransition has nothing leading out of void or cancelled — so it asks
+      // first, and the question names the client and says what will actually
+      // happen, because "Are you sure?" on the wrong card is how the wrong
+      // wedding gets called off.
+      const closeBtn = card.querySelector('.c-close');
+      const closeStatus = card.querySelector('.c-close-status');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', async function () {
+          const agreed = isAgreed(c.status);
+          const who = c.clientName || 'this client';
+          const consequences = [];
+          if (c.sentAt && !isAgreed(c.status)) {
+            consequences.push('Their signing link will stop working immediately.');
+          }
+          consequences.push('It moves to Past. Nothing is deleted — the contract and its record are kept.');
+          consequences.push('This cannot be undone.');
+
+          const ok = window.confirm(
+            (agreed ? 'Cancel the booking for ' : 'Withdraw the contract for ') + who + '?\n\n' +
+            consequences.join('\n')
+          );
+          if (!ok) return;
+
+          closeBtn.disabled = true;
+          closeStatus.textContent = 'Saving…';
+          try {
+            await voidContractFn({ contractId: c.id });
+            closeStatus.textContent = '';
+            await refreshContracts();
+          } catch (err) {
+            closeStatus.textContent = 'Could not do that: ' + describeErr(err);
+            closeBtn.disabled = false;
           }
         });
       }

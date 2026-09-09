@@ -35,7 +35,7 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
   computeFeeBlock, validateClientDetails, missingRequiredFields, resolvePackagePrice,
-  isValidEventDateISO, formatEventDate
+  isValidEventDateISO, formatEventDate, closingStatusFor
 } from './lib/contracts.js';
 import { validatePackage, requiredSpecsFor } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
@@ -1435,6 +1435,103 @@ export const markRetainerReceived = onCall(
 
     console.log('[markRetainerReceived]', received ? 'marked:' : 'unmarked:', contractId);
     return { ok: true };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Clearing a contract out of her way.
+//
+// NOTHING IS DELETED. A contract she is finished with changes status and drops
+// into the Past section; the record, its document snapshot and its audit trail
+// all survive. That is deliberate and it is the owner's decision: a signed
+// agreement is an executed legal document, and the moment a client disputes
+// what they agreed to, the copy she deleted is the one she needed.
+//
+// Which status depends on where it had got to, because the two words mean
+// genuinely different things:
+//   draft / sent / opened  -> 'void'      — the offer is withdrawn, never agreed
+//   signed / paid          -> 'cancelled' — a real agreement, called off
+//
+// The important side effect is that a sent contract's tokenHash is destroyed,
+// which kills the client's signing link immediately. Without that, "I cancelled
+// it" would leave a live URL a client could still sign hours later.
+// ---------------------------------------------------------------------------
+const MAX_VOID_REASON = 500;
+
+export const voidContract = onCall(
+  { region: 'us-west1', cors: true },
+  async (request) => {
+    await requireAdmin(request);
+    const d = request.data || {};
+    const contractId = typeof d.contractId === 'string' ? d.contractId.trim() : '';
+    if (!isValidContractId(contractId)) {
+      throw new HttpsError('invalid-argument', 'That contract id is not valid.');
+    }
+
+    const reason = typeof d.reason === 'string' ? d.reason.trim().slice(0, MAX_VOID_REASON) : '';
+
+    const ref = db.collection('contracts').doc(contractId);
+    let snap;
+    try {
+      snap = await ref.get();
+    } catch (err) {
+      console.warn('[voidContract] could not read contract:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+    if (!snap.exists) throw new HttpsError('not-found', 'No such contract.');
+    const contract = snap.data();
+    const from = contract.status;
+
+    // Idempotent. Two taps, or two tabs, must not produce two audit rows or
+    // move the date she actually did this on.
+    if (from === 'void' || from === 'cancelled') {
+      return { ok: true, status: from, alreadyClosed: true };
+    }
+
+    const to = closingStatusFor(from);
+
+    // canTransition is the single source of truth for what may follow what. If
+    // it refuses, say so plainly rather than writing a status the rest of the
+    // system does not expect to see.
+    if (!to || !canTransition(from, to)) {
+      throw new HttpsError('failed-precondition',
+        'A contract that is "' + from + '" cannot be closed from here.');
+    }
+
+    const update = {
+      status: to,
+      closedAt: FieldValue.serverTimestamp(),
+      closedBy: request.auth.uid,
+      closedFrom: from,
+      // Kills the client's signing link. A draft never had one; delete() on a
+      // missing field is a no-op, so this is safe for every source status.
+      tokenHash: FieldValue.delete()
+    };
+    if (reason) update.closedReason = reason;
+
+    // Same all-or-nothing reasoning as markRetainerReceived: once the checks
+    // above pass, this is the only chance to write both, and an audit row lost
+    // here cannot be reconstructed.
+    const auditRef = ref.collection('audit').doc();
+    const batch = db.batch();
+    batch.update(ref, update);
+    batch.set(auditRef, {
+      event: to === 'cancelled' ? 'cancelled' : 'voided',
+      at: FieldValue.serverTimestamp(),
+      by: request.auth.uid,
+      from,
+      reason: reason || null
+    });
+
+    try {
+      await batch.commit();
+    } catch (err) {
+      console.warn('[voidContract] could not update:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    console.log('[voidContract]', from, '->', to, contractId);
+    return { ok: true, status: to };
   }
 );
 
