@@ -34,7 +34,8 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
-  computeFeeBlock, validateClientDetails, missingRequiredFields, resolvePackagePrice
+  computeFeeBlock, validateClientDetails, missingRequiredFields, resolvePackagePrice,
+  isValidEventDateISO, formatEventDate
 } from './lib/contracts.js';
 import { validatePackage, requiredSpecsFor } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
@@ -561,6 +562,20 @@ export const createContract = onCall(
     // so the send-time guard never fires and a blank name ships inside a signed
     // legal document. A malformed clientEmail is worse: Resend accepts it, the
     // contract is marked sent, and it silently never arrives.
+    // The event date arrives as a plain ISO day and the text printed on the
+    // contract is DERIVED from it, so the date the system sorts on and the date
+    // the client reads can never disagree. The free text this replaces parsed
+    // "Summer 2027" as 1 January, which would have filed an upcoming wedding
+    // under past events and hidden it from her.
+    //
+    // Derived before validation so validateClientDetails' existing
+    // "an event date is required" check still does its job unchanged.
+    const eventDateISO = typeof d.eventDateISO === 'string' ? d.eventDateISO.trim() : '';
+    if (eventDateISO && !isValidEventDateISO(eventDateISO)) {
+      throw new HttpsError('invalid-argument', 'That event date is not a real date.');
+    }
+    if (eventDateISO) d.eventDate = formatEventDate(eventDateISO);
+
     const clientCheck = validateClientDetails(d);
     if (!clientCheck.ok) {
       throw new HttpsError('invalid-argument', clientCheck.errors.join(' '));
@@ -603,6 +618,10 @@ export const createContract = onCall(
       clientEmail: typeof d.clientEmail === 'string' ? d.clientEmail.trim().slice(0, 254) : '',
       clientPhone: typeof d.clientPhone === 'string' ? d.clientPhone.trim().slice(0, MAX_PHONE) : '',
       eventDate: typeof d.eventDate === 'string' ? d.eventDate.trim().slice(0, MAX_EVENT_DATE) : '',
+      // The sortable half. Kept beside the display text rather than replacing
+      // it: the contract prints prose, the dashboard sorts on a calendar day,
+      // and both come from this one value.
+      eventDateISO: eventDateISO,
       eventLocation: typeof d.eventLocation === 'string' ? d.eventLocation.trim().slice(0, 300) : '',
       startTime: typeof d.startTime === 'string' ? d.startTime.trim().slice(0, MAX_EVENT_DATE) : '',
       endTime: typeof d.endTime === 'string' ? d.endTime.trim().slice(0, MAX_EVENT_DATE) : '',

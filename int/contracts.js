@@ -3,7 +3,8 @@ import {
   collection, query, orderBy, getDocs, limit
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js';
-import { computeFeeBlock, DEFAULT_RETAINER_PERCENT } from '../functions/lib/contracts.js';
+import { computeFeeBlock, DEFAULT_RETAINER_PERCENT, isValidEventDateISO,
+         formatEventDate, isEventPast } from '../functions/lib/contracts.js';
 import { formatCents } from '../functions/lib/contract-email.js';
 import { toMillis } from '../functions/lib/gallery-expiry.js';
 
@@ -60,16 +61,20 @@ function wholeDollarsToCents(raw) {
 // must not turn into a guessed, wrong date on a signed legal document, so
 // this returns '' rather than guessing, and the field is left for her to
 // type into herself.
-function defaultBalanceDueDate(eventDateStr) {
-  const raw = String(eventDateStr === undefined || eventDateStr === null ? '' : eventDateStr).trim();
-  if (!raw) return '';
-  const parsed = new Date(raw);
-  if (isNaN(parsed.getTime())) return '';
-  const due = new Date(parsed.getTime());
-  due.setDate(due.getDate() - 14);
-  // Same options as formatLongDate in functions/index.js, so the default
-  // reads exactly like every other date already in the document.
-  return due.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+function defaultBalanceDueDate(eventDateISO) {
+  if (!isValidEventDateISO(eventDateISO)) return '';
+  // Arithmetic entirely in UTC and formatting straight off the resulting ISO
+  // day. new Date('2027-06-12') is midnight UTC, so doing this with local
+  // methods lands on the 11th in Oregon — and a date that is one day out on a
+  // signed legal document is exactly the kind of error nobody spots until it
+  // matters. formatEventDate splits the string rather than parsing it, so no
+  // timezone is involved at any point.
+  const y = Number(eventDateISO.slice(0, 4));
+  const m = Number(eventDateISO.slice(5, 7));
+  const d = Number(eventDateISO.slice(8, 10));
+  const due = new Date(Date.UTC(y, m - 1, d));
+  due.setUTCDate(due.getUTCDate() - 14);
+  return formatEventDate(due.toISOString().slice(0, 10));
 }
 
 // Client-callable errors carry the useful sentence in `message` (that's
@@ -97,11 +102,20 @@ export function initContracts(container) {
     '<section id="cComposer" class="c-block c-composer" hidden></section>' +
 
     '<h3 class="c-block-title">Contracts</h3>' +
+    '<div class="c-search"><label class="s-label" for="cSearch">Find a contract</label>' +
+      '<input type="search" id="cSearch" placeholder="Client name" autocomplete="off"></div>' +
     '<div id="cList" class="c-list"><p class="s-help">Loading&#8230;</p></div>';
 
   const inquiriesBox = container.querySelector('#cInquiries');
   const composerBox = container.querySelector('#cComposer');
   const listBox = container.querySelector('#cList');
+  const searchEl = container.querySelector('#cSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', function () {
+      searchText = searchEl.value;
+      renderContracts();
+    });
+  }
 
   let inquiries = [];
   let packages = [];
@@ -212,7 +226,10 @@ export function initContracts(container) {
       '</label>' +
       '<label class="s-label">Client email<input type="email" id="cEmail" maxlength="254"></label>' +
       '<label class="s-label">Client phone (optional)<input type="text" id="cPhone" maxlength="40"></label>' +
-      '<label class="s-label">Event date<input type="text" id="cDate" maxlength="40" placeholder="e.g. June 14, 2027"></label>' +
+      // A real date, not free text. The contract still reads "June 14, 2027" —
+      // that wording is generated from this — so what she picks and what the
+      // client reads can never drift apart, and the dashboard can sort on it.
+      '<label class="s-label">Event date<input type="date" id="cDate"></label>' +
       '<p class="c-li-error" id="cDateError" hidden>Set an event date before sending — a contract created without one can never be sent and cannot be deleted.</p>' +
       // Optional, and genuinely so: a time may not be settled when the
       // contract goes out. Left empty they render "To be confirmed". But the
@@ -443,7 +460,8 @@ export function initContracts(container) {
           client2Name: client2El.value.trim(),
           clientEmail: clientEmail,
           clientPhone: phoneEl.value.trim(),
-          eventDate: state.eventDate,
+          // ISO day. The server derives the printed wording from it.
+          eventDateISO: state.eventDate,
           startTime: startTimeEl.value.trim(),
           endTime: endTimeEl.value.trim(),
           eventLocation: locationEl.value.trim(),
@@ -532,11 +550,17 @@ export function initContracts(container) {
 
   function cardHtml(c) {
     const info = statusInfo(c, Date.now());
+    // The row is a button: name, when, and whether anything is wrong. That is
+    // what she scans for. Everything else — money, times, signatures, the
+    // document itself — is one tap away rather than filling the screen.
     return '<article class="c-card" data-id="' + esc(c.id) + '">' +
-      '<header class="c-card-head">' +
+      '<button type="button" class="c-card-head" aria-expanded="false">' +
         '<h3 class="c-card-name"></h3>' +
+        '<span class="c-card-when">' + esc(c.eventDate || 'No date') + '</span>' +
         '<span class="c-status-badge ' + info.cls + '">' + esc(info.label) + '</span>' +
-      '</header>' +
+        '<span class="c-chevron" aria-hidden="true">\u203a</span>' +
+      '</button>' +
+      '<div class="c-card-detail" hidden>' +
       (info.cls === 'c-status-loud' ? '<p class="c-alert-loud">' + esc(info.label) + '</p>' : '') +
       // An amount mismatch is the one refusal where money has already moved
       // and the system declined to record it — and the chase ladder will keep
@@ -595,6 +619,7 @@ export function initContracts(container) {
             '<span class="s-status c-retainer-status" aria-live="polite"></span>' +
           '</div>'
         : '') +
+      '</div>' +
     '</article>';
   }
 
@@ -682,15 +707,137 @@ export function initContracts(container) {
       .sort(function (a, b) { return (toMillis(a.at) || 0) - (toMillis(b.at) || 0); });
   }
 
+
+  // ---------------------------------------------------------------------
+  // Which pile a contract belongs in.
+  //
+  // Derived, never filed by hand. An inquiry goes stale and somebody has to
+  // decide that; a contract has an event date, so the system already knows
+  // when it is done. Anything she has to remember to tidy is something that
+  // eventually stops being tidied.
+  //
+  // Order matters: a problem outranks a date. A wedding that has been and gone
+  // with no retainer recorded is still something she needs to deal with, so it
+  // stays in "Needs you" rather than disappearing into a hidden past section.
+  // ---------------------------------------------------------------------
+  function contractGroup(c, todayISO) {
+    if (c.status === 'void' || c.status === 'cancelled') return 'past';
+    if (c.status === 'draft') return 'needs';
+    if (c.status === 'sent' || c.status === 'opened') return 'needs';
+    if (!c.retainerReceivedAt && c.status !== 'paid') return 'needs';
+    // Only a settled contract can be filed away. isEventPast returns false for
+    // anything it cannot read, so a contract with no usable date — every one
+    // created before the date picker existed — stays VISIBLE rather than being
+    // hidden on a guess.
+    if (isEventPast(c.eventDateISO, todayISO)) return 'past';
+    return 'upcoming';
+  }
+
+  // Today where SHE is. The browser could be anywhere and UTC is already
+  // tomorrow for most of her evening — neither should decide whether
+  // Saturday's wedding is over.
+  function todayInBusinessTZ() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+    return parts;   // en-CA gives YYYY-MM-DD
+  }
+
+  function byEventDate(dir) {
+    return function (a, b) {
+      const x = a.eventDateISO || '';
+      const y = b.eventDateISO || '';
+      // No date sinks to the bottom either way, rather than sorting as if it
+      // were the year 0 and jumping to the top of her list.
+      if (!x && !y) return 0;
+      if (!x) return 1;
+      if (!y) return -1;
+      return dir === 'desc' ? (y < x ? -1 : y > x ? 1 : 0) : (x < y ? -1 : x > y ? 1 : 0);
+    };
+  }
+
+  function matchesSearch(c, needle) {
+    if (!needle) return true;
+    const hay = ((c.clientName || '') + ' ' + (c.client2Name || '')).toLowerCase();
+    return hay.indexOf(needle) !== -1;
+  }
+
+  // Search text, kept outside renderContracts so a redraw after marking a
+  // retainer does not silently discard what she had typed.
+  let searchText = '';
+  let showPast = false;
+
+  function sectionHtml(title, note, list, id) {
+    if (!list.length) return '';
+    return '<section class="c-group" data-group="' + id + '">' +
+      '<h3 class="c-group-head">' + esc(title) +
+        '<span class="c-group-count">' + list.length + '</span></h3>' +
+      (note ? '<p class="s-help">' + esc(note) + '</p>' : '') +
+      list.map(cardHtml).join('') +
+    '</section>';
+  }
+
   function renderContracts() {
     if (!contracts.length) {
       listBox.innerHTML = '<p class="s-help">No contracts yet.</p>';
       return;
     }
-    listBox.innerHTML = contracts.map(cardHtml).join('');
-    contracts.forEach(function (c) {
+
+    const today = todayInBusinessTZ();
+    const needle = searchText.trim().toLowerCase();
+    const shown = contracts.filter(function (c) { return matchesSearch(c, needle); });
+
+    if (!shown.length) {
+      listBox.innerHTML = '<p class="s-help">Nothing matches &ldquo;' + esc(searchText) + '&rdquo;.</p>';
+      return;
+    }
+
+    const needs = shown.filter(function (c) { return contractGroup(c, today) === 'needs'; }).sort(byEventDate('asc'));
+    const upcoming = shown.filter(function (c) { return contractGroup(c, today) === 'upcoming'; }).sort(byEventDate('asc'));
+    const past = shown.filter(function (c) { return contractGroup(c, today) === 'past'; }).sort(byEventDate('desc'));
+
+    // Searching reaches everywhere, including the past. Hiding a contract she
+    // has explicitly gone looking for by name would be the one moment this
+    // organisation actively got in her way.
+    const pastOpen = showPast || !!needle;
+
+    listBox.innerHTML =
+      sectionHtml('Needs you', 'Not sent, not signed, or the retainer has not come in.', needs, 'needs') +
+      sectionHtml('Upcoming', 'Signed and paid, soonest first.', upcoming, 'upcoming') +
+      (past.length
+        ? '<section class="c-group c-group-past">' +
+            '<button type="button" class="c-past-toggle s-secondary" aria-expanded="' + pastOpen + '">' +
+              (pastOpen ? 'Hide past contracts' : 'Show past contracts') +
+              ' <span class="c-group-count">' + past.length + '</span>' +
+            '</button>' +
+            '<div class="c-past-list"' + (pastOpen ? '' : ' hidden') + '>' +
+              past.map(cardHtml).join('') +
+            '</div>' +
+          '</section>'
+        : '');
+
+    const pastToggle = listBox.querySelector('.c-past-toggle');
+    if (pastToggle) {
+      pastToggle.addEventListener('click', function () {
+        showPast = !pastOpen;
+        renderContracts();
+      });
+    }
+
+    shown.forEach(function (c) {
       const card = listBox.querySelector('.c-card[data-id="' + c.id + '"]');
       if (!card) return;
+
+      const head = card.querySelector('.c-card-head');
+      const detail = card.querySelector('.c-card-detail');
+      if (head && detail) {
+        head.addEventListener('click', function () {
+          const opening = detail.hidden;
+          detail.hidden = !opening;
+          head.setAttribute('aria-expanded', String(opening));
+          card.classList.toggle('c-open', opening);
+        });
+      }
       // clientName and signature.typedName are text a CLIENT typed (clientName
       // arrives off the public contact form via the inquiry; typedName is
       // literally what they typed to sign). Neither has been escaped by

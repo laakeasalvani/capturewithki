@@ -260,3 +260,45 @@ export function computeFeeBlock(input) {
     balanceCents: computeBalanceCents(totalCents, retainerCents)
   };
 }
+
+// ---------------------------------------------------------------------------
+// Event dates.
+//
+// Stored as a plain ISO day, 'YYYY-MM-DD', and NEVER parsed with `new Date()`.
+// `new Date('2027-06-12')` is midnight UTC, which is the 11th in Oregon — so
+// a naive parse shifts every event date back a day for her. And the free text
+// this replaces was worse still: "Summer 2027" parsed as 1 January, which
+// would have filed an upcoming wedding under past events and hidden it.
+//
+// Splitting the string is timezone-proof because no timezone is involved: an
+// ISO day is a calendar date, not an instant. Comparison is lexical for the
+// same reason — 'YYYY-MM-DD' sorts correctly as text.
+// ---------------------------------------------------------------------------
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+
+export function isValidEventDateISO(iso) {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)), d = Number(iso.slice(8, 10));
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  // Rejects 31 February and friends: rebuild the date in UTC and check the
+  // parts survived. UTC is safe here because both sides are UTC.
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d;
+}
+
+// The text that goes ON the contract. Derived from the ISO day so the printed
+// date and the sorted date can never disagree.
+export function formatEventDate(iso) {
+  if (!isValidEventDateISO(iso)) return '';
+  return MONTHS[Number(iso.slice(5, 7)) - 1] + ' ' + Number(iso.slice(8, 10)) + ', ' + iso.slice(0, 4);
+}
+
+// todayISO is the current day in HER timezone, supplied by the caller — the
+// server runs in UTC and the browser in whatever zone the reader is in, and
+// neither should decide whether her Saturday wedding is over.
+export function isEventPast(iso, todayISO) {
+  if (!isValidEventDateISO(iso) || !isValidEventDateISO(todayISO)) return false;
+  return iso < todayISO;
+}

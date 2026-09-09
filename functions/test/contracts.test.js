@@ -4,7 +4,8 @@ import {
   DEFAULT_RETAINER_PERCENT, sumLineItems,
   computeRetainerCents, computeBalanceCents,
   isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
-  renderTemplate, STATUSES, canTransition, missingRequiredFields, resolvePackagePrice
+  renderTemplate, STATUSES, canTransition, missingRequiredFields, resolvePackagePrice,
+  isValidEventDateISO, formatEventDate, isEventPast
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -474,4 +475,42 @@ test('the retainer follows the overridden price, not the catalogue one', () => {
   const fees = computeFeeBlock({ packagePriceCents: price.cents, travelFeesCents: 0 });
   assert.equal(fees.retainerCents, 48000);
   assert.equal(fees.retainerCents + fees.balanceCents, fees.totalCents);
+});
+
+// ---------------------------------------------------------------------------
+// Event dates. The free text these replace parsed "Summer 2027" as 1 January,
+// which would have filed an upcoming wedding under past events and hidden it.
+// ---------------------------------------------------------------------------
+
+test('an ISO day formats without shifting a day', () => {
+  // new Date('2027-06-12') is midnight UTC — the 11th in Oregon. The whole
+  // point of splitting the string is that this cannot happen.
+  assert.equal(formatEventDate('2027-06-12'), 'June 12, 2027');
+  assert.equal(formatEventDate('2027-01-01'), 'January 1, 2027');
+  assert.equal(formatEventDate('2027-12-31'), 'December 31, 2027');
+});
+
+test('a nonsense date is refused, never guessed at', () => {
+  for (const bad of ['Summer 2027', 'next summer', 'TBD', '6/12/27', '2027-13-01',
+                     '2027-02-31', '2027-6-1', '', null, undefined, 42, {}]) {
+    assert.equal(isValidEventDateISO(bad), false, 'accepted ' + JSON.stringify(bad));
+    assert.equal(formatEventDate(bad), '', 'formatted ' + JSON.stringify(bad));
+  }
+  assert.equal(isValidEventDateISO('2028-02-29'), true);   // 2028 is a leap year
+  assert.equal(isValidEventDateISO('2027-02-29'), false);  // 2027 is not
+});
+
+test('past is decided by comparing calendar days, not instants', () => {
+  assert.equal(isEventPast('2026-09-08', '2026-09-09'), true);
+  assert.equal(isEventPast('2026-09-09', '2026-09-09'), false);   // today is not past
+  assert.equal(isEventPast('2026-09-10', '2026-09-09'), false);
+  assert.equal(isEventPast('2027-06-12', '2026-09-09'), false);
+});
+
+test('an unusable date is never treated as past', () => {
+  // The dangerous direction: anything we cannot read must stay VISIBLE, never
+  // get filed away into a section that is hidden by default.
+  for (const bad of ['Summer 2027', '', null, 'TBD']) {
+    assert.equal(isEventPast(bad, '2026-09-09'), false, 'hid ' + JSON.stringify(bad));
+  }
 });

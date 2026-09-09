@@ -232,9 +232,10 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 }
 
 .c-list{display:flex;flex-direction:column;gap:16px;}
-.c-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;}
-.c-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-.c-card-name{font-family:var(--display);font-weight:400;font-size:19px;margin:0;}
+/* Padding moved onto .c-card-head / .c-card-detail below: the head is now a
+   full-width button, and padding on the shell would leave a dead strip beside
+   it that looks clickable and is not. */
+.c-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px;}
 
 /* No white-space:nowrap. These labels are sentences, not words — the
    signed-but-unpaid one is "Signed — retainer NOT paid. The date is not
@@ -354,4 +355,57 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
   }
   body.c-printing .c-print-me .c-doc-panel{border:none;padding:0;background:#fff;}
   body.c-printing .c-cert-block{break-inside:avoid;}
+}
+
+/* ---------------------------------------------------------------------------
+   Contracts: search, groups, and compact rows.
+
+   Contracts differ from inquiries in one way that decides all of this — a
+   contract has an event date, so the system already knows when it is done.
+   Nothing here has to be filed by hand, because anything she has to remember
+   to tidy eventually stops being tidied.
+   --------------------------------------------------------------------------- */
+.c-search{margin:0 0 18px;max-width:340px;}
+.c-search input{
+  width:100%;padding:9px 12px;font-family:inherit;font-size:14px;
+  border:1px solid var(--line);border-radius:8px;background:var(--paper);
+}
+.c-group{margin:0 0 26px;}
+.c-group-head{
+  display:flex;align-items:center;gap:10px;
+  margin:0 0 4px;font-family:var(--display);font-weight:400;font-size:18px;
+}
+.c-group-count{
+  font-family:var(--sans);font-size:12px;color:var(--muted);
+  background:var(--cream);border-radius:10px;padding:1px 9px;
+}
+.c-group .s-help{margin:0 0 12px;}
+.c-group-past{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);}
+.c-past-toggle{
+  background:none;border:1px solid var(--line);color:var(--muted);
+  border-radius:18px;padding:8px 18px;font-family:inherit;font-size:14px;cursor:pointer;
+}
+.c-past-list{margin-top:16px;}
+
+/* The row. Name, when, and whether anything is wrong — that is what she scans
+   for; everything else is one tap away. A button, not a div, so it is
+   keyboard-reachable and announces its expanded state. */
+.c-card-head{
+  display:flex;align-items:center;gap:14px;width:100%;
+  padding:14px 16px;background:none;border:none;
+  font-family:inherit;text-align:left;cursor:pointer;
+}
+.c-card-head:hover{background:rgba(0,0,0,.02);}
+.c-card-name{margin:0;font-family:var(--display);font-weight:400;font-size:17px;flex:1 1 auto;}
+.c-card-when{font-size:13px;color:var(--muted);white-space:nowrap;}
+.c-chevron{color:var(--muted);transition:transform .15s;flex:0 0 auto;}
+.c-open .c-chevron{transform:rotate(90deg);}
+.c-card-detail{padding:0 16px 16px;}
+
+@media (max-width:640px){
+  /* Two lines rather than a squeezed row: the badge sentence is long, and a
+     44px target matters more than fitting everything across. */
+  .c-card-head{flex-wrap:wrap;gap:6px 10px;min-height:44px;}
+  .c-card-name{flex:1 1 100%;}
+  .c-chevron{margin-left:auto;}
 }
