@@ -26,11 +26,22 @@ fi
 perl -0pi -e "s/var BUILD = '[^']*';/var BUILD = '$STAMP';/" index.html
 printf '{ "v": "%s" }\n' "$STAMP" > version.json
 
+# The signing page carries no self-reload check — it is a short-lived page a
+# client opens once from a link. Versioned asset URLs do the same job there:
+# a new stamp is a URL the cache has never seen.
+sed -i '' "s|sign\.js?v=[0-9A-Za-z]*|sign.js?v=$STAMP|; s|sign\.css?v=[0-9A-Za-z]*|sign.css?v=$STAMP|" sign/index.html
+
 INDEX_BUILD=$(grep -o "var BUILD = '[^']*'" index.html | sed "s/var BUILD = '//; s/'//")
 JSON_BUILD=$(sed -n 's/.*"v": *"\([^"]*\)".*/\1/p' version.json)
 
 if [ "$INDEX_BUILD" != "$JSON_BUILD" ]; then
   echo "error: stamps disagree — index.html=$INDEX_BUILD version.json=$JSON_BUILD" >&2
+  exit 1
+fi
+
+SIGN_BUILD=$(grep -o "sign\.js?v=[0-9A-Za-z]*" sign/index.html | sed 's/.*?v=//')
+if [ "$SIGN_BUILD" != "$STAMP" ]; then
+  echo "error: sign/index.html was not stamped — got '$SIGN_BUILD'" >&2
   exit 1
 fi
 

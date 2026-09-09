@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sign.css">
+<link rel="stylesheet" href="sign.css?v=20260909060502">
 </head>
 <body>
 
@@ -115,6 +115,12 @@
 
 </main>
 
-<script type="module" src="sign.js"></script>
+<!-- Versioned deliberately. GitHub Pages serves these with
+     max-age=600 and we cannot set headers, so without a changing
+     URL a client can open this page running up to ten minutes of
+     stale code. On the marketing site that is a cosmetic risk; on
+     the page where somebody signs a contract it is not.
+     bin/stamp-version.sh rewrites these. -->
+<script type="module" src="sign.js?v=20260909060502"></script>
 </body>
 </html>
