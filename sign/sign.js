@@ -372,6 +372,17 @@ form.addEventListener('submit', function (e) {
   signContract({ token: token, typedName: typedName, consent: true }).then(function (res) {
     const data = res.data || {};
     signErrorEl.textContent = '';
+
+    // The panel is drawn from openContract's read, which happened before this
+    // signature existed — so without this it went on saying "Not yet signed"
+    // on a contract the client had just signed, immediately below the words
+    // confirming they had. There is no fresh read on this path, so update it
+    // from what we know: the name they typed and the timestamp the server
+    // returned.
+    if (sigRecord && !sigRecord.hidden) {
+      sigClientName.textContent = typedName;
+      sigClientDate.textContent = formatSignedAt(data.signedAt);
+    }
     if (data.checkoutUrl) {
       window.location.href = data.checkoutUrl;
       return;
