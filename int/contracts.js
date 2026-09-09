@@ -475,10 +475,17 @@ export function initContracts(container) {
       const clientEmail = emailEl.value.trim();
       if (!clientName) { statusEl.textContent = 'Type the client’s name first.'; nameEl.focus(); return; }
       if (!clientEmail) { statusEl.textContent = 'Type the client’s email first.'; emailEl.focus(); return; }
-      // Two signature lines with nobody named on the second one would print
-      // "Client 2:" followed by nothing into a document that is then frozen and
-      // hashed. Caught here rather than server-side so she can still fix it.
-      const client2Name = client2El.value.trim();
+      // The number SHE picked decides this, not what happens to be sitting in a
+      // text box. Read from the radio and forced empty for one signature, so
+      // the box's contents cannot matter at all.
+      //
+      // This is deliberately belt-and-braces. syncSigners already empties the
+      // field, and the field is meant to be hidden — but it was NOT hidden
+      // (.s-label's display:block beat the hidden attribute), so a name typed
+      // into a box that should not have been on screen went out as a second
+      // signature line on a contract she had asked to have one. The CSS is
+      // fixed too; this makes the data right even when the interface is not.
+      const client2Name = signerCount() === 2 ? client2El.value.trim() : '';
       if (signerCount() === 2 && !client2Name) {
         client2ErrorEl.textContent = 'The agreement prints this name, so it cannot be blank.';
         statusEl.textContent = 'Name the second signer, or switch back to one signature.';

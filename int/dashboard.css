@@ -51,6 +51,16 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 .s-title{font-family:var(--display);font-weight:400;font-size:23px;margin:0 0 6px;}
 .s-help{color:var(--muted);font-size:13px;margin:0 0 18px;}
 .s-help code{background:var(--cream);padding:1px 5px;border-radius:4px;}
+/* This line is why the hidden attribute works at all in here.
+   .s-label sets display:block, and an author display rule beats the user
+   agent's display:none for [hidden] — so `el.hidden = true` on a .s-label
+   changed nothing. That is exactly how a contract went out for two signatures
+   when one was asked for: the "Second signer's name" box stayed on screen with
+   "One signature" selected, got filled in, and client2Name is what the whole
+   system reads to decide how many signatures a contract needs.
+   Global, because every other explicit display in this file has the same hole. */
+[hidden]{display:none !important;}
+
 .s-label{display:block;font-size:12px;color:var(--muted);margin-bottom:14px;}
 .s-label input,.s-label textarea{display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:14px;}
 .s-label textarea{resize:vertical;line-height:1.5;}
