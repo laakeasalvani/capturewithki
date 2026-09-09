@@ -273,8 +273,14 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
    by a developer. Nothing new is stored — this only makes producible what was
    already being kept.
    --------------------------------------------------------------------------- */
-.c-reveal{margin-top:14px;}
+ /* Sits between the meta grid and the action row, so it needs air on both
+    sides. .s-actions supplies the pill styling and the 44px mobile target;
+    this only adds the spacing. The panel it opens is a block, so it cannot
+    live inside the flex row — hence the wrapper below rather than nesting. */
+.c-reveal{margin:18px 0 14px;}
 .c-doc-panel{
+  /* Full width: .s-actions is a flex row, and a document is not a button. */
+  flex-basis:100%;
   margin-top:14px;
   padding:20px;
   background:#FAF6EE;

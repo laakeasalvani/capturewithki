@@ -567,12 +567,12 @@ export function initContracts(container) {
       // is a subcollection read per contract, and doing nine of those on every
       // list render would be wasteful for something she opens occasionally.
       (c.documentSnapshot
-        ? '<div class="c-reveal">' +
+        ? '<div class="c-reveal s-actions">' +
             '<button type="button" class="c-toggle-doc s-secondary" aria-expanded="false">' +
               'View the signed contract and signature details' +
             '</button>' +
             '<div class="c-doc-panel" hidden>' +
-              '<div class="c-doc-actions">' +
+              '<div class="c-doc-actions s-actions">' +
                 '<button type="button" class="c-print s-secondary">Print / save as PDF</button>' +
               '</div>' +
               '<div class="c-doc-body"></div>' +
