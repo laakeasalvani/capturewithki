@@ -477,8 +477,7 @@ if (!token) {
     // swallow this case the moment one of them signed.
     if (needsTwo && !allSigned) {
       show('contract');
-      const open = !c1Signed ? box1 : box2;
-      if (open.nameEl) open.nameEl.focus();
+      // Deliberately no focus() — see the note where the page first opens.
       return;
     }
 
@@ -502,7 +501,18 @@ if (!token) {
     }
 
     show('contract');
-    box1.nameEl.focus();
+    // NO focus() here, and none in the two-signer branch above.
+    //
+    // Focusing an input scrolls it into view, and the name box sits below the
+    // whole agreement — so the page opened somewhere near its own bottom, past
+    // the entire contract, with the client looking at a signature field for a
+    // document they had not been shown. On the fixture used to reproduce this
+    // it opened at 4856px of a 6120px page.
+    //
+    // focus({preventScroll:true}) would fix the scrolling and leave a worse
+    // problem: the caret sitting in a field that is nowhere on screen, so
+    // typing goes somewhere the client cannot see. There is nothing to focus
+    // on a page whose first job is to be read.
   }).catch(function () {
     // openContract deliberately returns one identical refusal for every bad
     // token, expired contract, or cancelled one, so a prober can't learn
@@ -523,11 +533,11 @@ BOXES.forEach(function (box) {
 
   box.form.addEventListener('submit', function (e) {
     e.preventDefault();
-    // A disabled button still permits Enter-key form submission, and a name
-    // field is focused on load, so Enter is how many clients will submit.
-    // Without this, a second Enter while the first call is in flight fires
-    // signContract twice and writes two rows into what is meant to be the legal
-    // audit trail.
+    // A disabled button still permits Enter-key form submission, and Enter is
+    // how many clients will submit once their caret is already in the name
+    // field. Without this, a second Enter while the first call is in flight
+    // fires signContract twice and writes two rows into what is meant to be the
+    // legal audit trail.
     if (box.btn.disabled || box.signed) return;
     const typedName = box.nameEl.value.trim();
     if (!box.consentEl.checked || !typedName) {
