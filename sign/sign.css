@@ -73,7 +73,12 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 100px;max-width:760px;mar
 
 .s-field{margin-bottom:20px;}
 .s-label{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
-#sName{
+/* Every name field, not one of them by id.
+   This was #sName, which styled the first signature box and left the second
+   one as a bare browser default — a small unstyled box under an identical
+   label, on the page where a client signs a contract. Selecting on .s-field
+   means a third signature line would be right automatically. */
+.s-field input{
   width:100%;padding:12px 14px;min-height:48px;
   border:1px solid var(--khaki);border-radius:8px;background:#fff;
   font-family:var(--sans);font-size:16px;color:var(--ink);
