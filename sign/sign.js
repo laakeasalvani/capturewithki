@@ -123,6 +123,13 @@ function renderSignatureRecord(data) {
   }
 }
 
+// Her timezone, not the reader's — and it must match the one the server uses
+// for her countersignature (BUSINESS_TZ in functions/index.js). Left as the
+// browser's own zone, a client signing at 23:00 Pacific saw themselves dated a
+// day BEFORE the photographer on the same document, and a client abroad saw a
+// different date again from the one stored in the audit record.
+const BUSINESS_TZ = 'America/Los_Angeles';   // Portland, Oregon
+
 function formatSignedAt(ms) {
   if (typeof ms !== 'number') return 'recently';
   try {
@@ -130,6 +137,12 @@ function formatSignedAt(ms) {
       year: 'numeric', month: 'long', day: 'numeric', timeZone: BUSINESS_TZ
     });
   } catch (e) {
+    // Noisy on purpose. This catch exists for an unparseable date, but it
+    // will happily swallow a ReferenceError too — and it did: a deleted
+    // BUSINESS_TZ turned every date on a signed contract into the word
+    // "recently", which looks like a deliberate choice rather than a fault.
+    // A silent fallback on a legal document is worse than a loud one.
+    console.warn('[sign] could not format a date:', e && e.message);
     return 'recently';
   }
 }
