@@ -293,9 +293,21 @@ function showConfirmed(status, signedAt, opts) {
   // rendered here instead, from what openContract returned (or, on the visit
   // where the signature was just made, from what was typed into the form).
   // textContent, never innerHTML: the name is the client's own input.
+  // Both names when both signed. Naming only the last one told a couple
+  // "Signed by Sam Rivera" on an agreement Jordan had signed too — the very
+  // thing a second signature was added to record. The names come from the
+  // signature panel, which is populated either from openContract's read or
+  // from the slot the server reported, so this cannot drift from what was
+  // actually stored.
   const who = typeof o.typedName === 'string' ? o.typedName.trim() : '';
-  if (who) {
-    signedByEl.textContent = 'Signed by ' + who + ' on ' + formatSignedAt(signedAt) + '.';
+  const dash = '\u2014';
+  const n1 = sigClientName ? sigClientName.textContent.trim() : '';
+  const n2 = (sigClient2Block && !sigClient2Block.hidden && sigClient2Name)
+    ? sigClient2Name.textContent.trim() : '';
+  const both = (n1 && n1 !== dash && n2 && n2 !== dash) ? n1 + ' and ' + n2 : '';
+
+  if (both || who) {
+    signedByEl.textContent = 'Signed by ' + (both || who) + ' on ' + formatSignedAt(signedAt) + '.';
     signedByEl.hidden = false;
   } else {
     signedByEl.textContent = '';
