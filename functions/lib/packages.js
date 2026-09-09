@@ -1,6 +1,10 @@
 //
-// Pure and browser-safe — int/contracts.js imports this to validate before saving,
-// the same way it imports contracts.js. No node-only modules.
+// Pure — no node-only modules, so nothing here is tied to the server runtime.
+// `functions/index.js` is what imports it: createContract runs validatePackage
+// before writing a draft, and sendContract re-checks requiredSpecsFor against
+// the stored specs before rendering. `int/contracts.js` does NOT import this
+// file (it takes computeFeeBlock from contracts.js and formatCents from
+// contract-email.js) — this comment used to claim it did.
 
 export const TEMPLATE_KEYS = ['wedding', 'elopement', 'portrait'];
 

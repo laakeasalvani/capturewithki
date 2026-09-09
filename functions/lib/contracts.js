@@ -97,9 +97,14 @@ export function validateClientDetails(input) {
   if (trimmedString(d.clientPhone).length > MAX_PHONE) {
     errors.push('That phone number is too long.');
   }
-  if (trimmedString(d.eventDate).length > MAX_EVENT_DATE) {
-    errors.push('That event date is too long.');
-  }
+  // Required, not merely length-capped. Without this a contract can be created
+  // with no event date at all, and then sendContract refuses it forever —
+  // missingRequiredFields lists event_date, there is no edit control, no void,
+  // and firestore.rules forbids delete. That draft is permanent and dead.
+  // Refusing here means createContract never writes it in the first place.
+  const eventDate = trimmedString(d.eventDate);
+  if (!eventDate) errors.push('An event date is required.');
+  else if (eventDate.length > MAX_EVENT_DATE) errors.push('That event date is too long.');
 
   return { ok: errors.length === 0, errors: errors };
 }
@@ -174,7 +179,13 @@ export const STATUSES = ['draft', 'sent', 'opened', 'signed', 'paid', 'void', 'c
 // signed can never reach `void`.
 const TRANSITIONS = {
   draft:     ['sent', 'void'],
-  sent:      ['opened', 'void'],
+  // 'signed' as well as 'opened'. openContract stamps sent -> opened
+  // best-effort and swallows a failed write, so a client can legitimately be
+  // sitting on a contract still marked 'sent'. Without this, that swallowed
+  // failure turns into a refusal of their valid signature — and a client
+  // holding a valid token is entitled to sign whether or not the open was
+  // ever recorded.
+  sent:      ['opened', 'signed', 'void'],
   opened:    ['signed', 'void'],
   signed:    ['paid', 'cancelled'],
   paid:      ['cancelled'],

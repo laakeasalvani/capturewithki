@@ -137,6 +137,12 @@ export function signedCopyEmail(o) {
     'You can view your signed copy here, any time:',
     url,
     '',
+    // Nothing else in this system ever told the client how to pay. The signing
+    // page says the date is held once the retainer reaches Khiara, which is
+    // what her contract says, but that is not an instruction — and there is no
+    // payment page today. So this says who makes the next move.
+    'Khiara will be in touch with the payment details for your retainer.',
+    '',
     'Khiara',
     'CaptureWithKi'
   ].join('\n');
@@ -160,6 +166,9 @@ export function signedCopyEmail(o) {
                'color:#fff;padding:12px 20px;text-decoration:none;display:inline-block;">' +
               'View signed copy' +
             '</a>' +
+          '</td></tr>' +
+          '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:24px;">' +
+            'Khiara will be in touch with the payment details for your retainer.' +
           '</td></tr>' +
           '<tr><td style="font-family:' + SANS + ';font-size:14px;color:' + C.muted + ';padding-top:24px;">' +
             'This link is your permanent record of the signed agreement.' +

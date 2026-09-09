@@ -74,6 +74,19 @@ test('the signed-copy email links back to the permanent record', () => {
   assert.ok(mail.html.includes('https://capturewithki.com/sign/?t=abc'));
 });
 
+// Nothing anywhere told the client HOW to pay. There is no payment page today,
+// so the only true answer is that Khiara makes the next move — and it has to
+// survive in the plain-text body, which is what a text-only mail client shows.
+test('the signed copy says who will be in touch about paying the retainer', () => {
+  const mail = signedCopyEmail({
+    clientName: 'Jordan Rivera',
+    contractUrl: 'https://capturewithki.com/sign/?t=abc',
+    signedAt: new Date(Date.UTC(2026, 8, 4, 19, 30))
+  });
+  assert.ok(/payment details/i.test(mail.text));
+  assert.ok(/payment details/i.test(mail.html));
+});
+
 // ---------------------------------------------------------------------------
 // The chase ladder (Task 6, narrowed by Task 4 to the signature alone)
 // ---------------------------------------------------------------------------

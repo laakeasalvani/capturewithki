@@ -29,7 +29,7 @@ import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
   computeFeeBlock, validateClientDetails, missingRequiredFields
 } from './lib/contracts.js';
-import { validatePackage } from './lib/packages.js';
+import { validatePackage, requiredSpecsFor } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import {
   readyToSignEmail, signedCopyEmail, formatCents,
@@ -661,11 +661,28 @@ export const sendContract = onCall(
     const tpl = tplSnap.data();
 
     // A placeholder contract reaching a real client would be worse than no system at
-    // all — she would believe she had an agreement and have nothing. functions/seed/
-    // ships a placeholder template marked isDraft, and this is what keeps it unsendable.
+    // all — she would believe she had an agreement and have nothing. The templates are
+    // hand-loaded with isDraft:true and flipped to false only once Khiara has read the
+    // exact text (see docs/superpowers/2026-09-08-contracts-handover.md), and this is
+    // what keeps a still-unread one unsendable.
     if (tpl.isDraft === true) {
       throw new HttpsError('failed-precondition',
         'That contract template is still marked a draft. Replace it with the real agreement first.');
+    }
+
+    // validatePackage runs at CREATE time. templateKey and specs are stored
+    // separately and this feature is hand-loaded into Firestore, so re-check the
+    // pairing here. String(undefined) is "undefined" — not blank, not an unfilled
+    // placeholder — so neither existing guard would catch it, and the client would
+    // sign "...includes: undefined hours of coverage." Checked before the fields
+    // object below is built, so a specs object that is missing entirely cannot
+    // throw on contract.specs.packageName either.
+    for (const specName of requiredSpecsFor(contract.templateKey)) {
+      const v = contract.specs ? contract.specs[specName] : undefined;
+      if (v === undefined || v === null || String(v).trim() === '') {
+        throw new HttpsError('failed-precondition',
+          'This contract is missing a package detail: ' + specName + '. Check the package.');
+      }
     }
 
     // Stamped in BEFORE the snapshot is hashed, so her countersignature is covered
@@ -906,6 +923,18 @@ export const openContract = onCall(
       eventDate: contract.eventDate,
       status: contract.status,
       signedAt: contract.signedAt ? contract.signedAt.toMillis() : null,
+      // Millis, exactly like signedAt above. markRetainerReceived sets this
+      // field and deliberately leaves status at 'signed', so without it her
+      // dashboard said "Booked — date held" while this client's page went on
+      // saying the date would be held once the retainer reached Khiara —
+      // forever, including after it had.
+      retainerReceivedAt: contract.retainerReceivedAt
+        ? contract.retainerReceivedAt.toMillis() : null,
+      // Who actually typed their name. The signed page IS the client's
+      // permanent record (signedCopyEmail calls it that), and a record that
+      // does not say who signed it is not much of one. Read off the signature
+      // block signContract wrote; null until then.
+      typedName: contract.signature ? contract.signature.typedName : null,
       // Signed, and no payment recorded. This is what puts a pay button on the
       // page after an abandoned checkout — the client's only remaining route
       // back to Stripe, since no reminder email can carry a signing link.

@@ -139,8 +139,32 @@ test('line items must be present, sane, and finite in number', () => {
 });
 
 test('client details are validated on their own, not only as part of a full contract', () => {
-  const good = { clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com' };
+  const good = {
+    clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com', eventDate: '2027-06-12'
+  };
   assert.equal(validateClientDetails(good).ok, true);
+});
+
+// A contract created without an event date is not merely incomplete, it is a
+// permanent dead draft: sendContract refuses it forever (event_date is in
+// REQUIRED_FIELDS), there is no edit control, no void, and firestore.rules
+// forbids delete. So it is refused here, before createContract writes anything.
+test('a blank event date is refused, because the draft it would create can never be sent or deleted', () => {
+  const base = { clientName: 'Jordan Rivera', clientEmail: 'jordan@example.com' };
+  assert.equal(validateClientDetails({ ...base, eventDate: '' }).ok, false);
+  assert.equal(validateClientDetails({ ...base, eventDate: '   ' }).ok, false);
+  assert.equal(validateClientDetails(base).ok, false);
+  assert.equal(validateClientDetails({ ...base, eventDate: null }).ok, false);
+  // And a real one passes — the point is to refuse the blank, not the field.
+  assert.equal(validateClientDetails({ ...base, eventDate: 'June 14, 2027' }).ok, true);
+  assert.equal(validateClientDetails({ ...base, eventDate: '2027-06-12' }).ok, true);
+});
+
+// The whole reason a blank is refused rather than length-capped: the message
+// has to name what is wrong, in her words, not just fail.
+test('the refusal names the event date', () => {
+  const result = validateClientDetails({ clientName: 'J', clientEmail: 'a@b.co' });
+  assert.ok(result.errors.some((e) => /event date/i.test(e)));
 });
 
 // An empty name is the dangerous one: renderTemplate substitutes a present-but-empty
@@ -153,16 +177,18 @@ test('an empty client name is refused, because a blank one would render invisibl
 });
 
 test('an unusable client email is refused, because a sent contract cannot be resent', () => {
-  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'nope' }).ok, false);
-  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: '' }).ok, false);
-  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b' }).ok, false);
-  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b.co' }).ok, true);
+  const d = '2027-06-12';
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'nope', eventDate: d }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: '', eventDate: d }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b', eventDate: d }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b.co', eventDate: d }).ok, true);
 });
 
 test('over-long fields are refused, not silently truncated into the signed document', () => {
-  const base = { clientName: 'J', clientEmail: 'a@b.co' };
+  const base = { clientName: 'J', clientEmail: 'a@b.co', eventDate: '2027-06-12' };
   assert.equal(validateClientDetails({ ...base, clientName: 'x'.repeat(10000) }).ok, false);
   assert.equal(validateClientDetails({ ...base, eventLocation: 'x'.repeat(10000) }).ok, false);
+  assert.equal(validateClientDetails({ ...base, eventDate: 'x'.repeat(10000) }).ok, false);
 });
 
 test('hostile and malformed input is survived, not crashed on', () => {
@@ -171,9 +197,14 @@ test('hostile and malformed input is survived, not crashed on', () => {
   assert.equal(validateClientDetails('nope').ok, false);
   assert.equal(validateClientDetails(42).ok, false);
   assert.equal(validateClientDetails({ clientName: { a: 1 }, clientEmail: 'a@b.co' }).ok, false);
+  const d = '2027-06-12';
   // Legitimate and must PASS — escaping is rendering's job, not validation's.
-  assert.equal(validateClientDetails({ clientName: "Siobhán O'Brien-Núñez", clientEmail: 'a@b.co' }).ok, true);
-  assert.equal(validateClientDetails({ clientName: '<script>alert(1)</script>', clientEmail: 'a@b.co' }).ok, true);
+  assert.equal(validateClientDetails({ clientName: "Siobhán O'Brien-Núñez", clientEmail: 'a@b.co', eventDate: d }).ok, true);
+  assert.equal(validateClientDetails({ clientName: '<script>alert(1)</script>', clientEmail: 'a@b.co', eventDate: d }).ok, true);
+  // A non-string event date is not a date. trimmedString gives '' for it, and
+  // '' is refused — the same way a non-string name is.
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b.co', eventDate: { a: 1 } }).ok, false);
+  assert.equal(validateClientDetails({ clientName: 'J', clientEmail: 'a@b.co', eventDate: 20270612 }).ok, false);
 });
 
 // A zero-total contract is almost certainly a mistake, and an implausible
@@ -266,6 +297,10 @@ test('every status is accounted for', () => {
 test('a contract moves forward through the normal path', () => {
   assert.equal(canTransition('draft', 'sent'), true);
   assert.equal(canTransition('sent', 'opened'), true);
+  // openContract stamps sent -> opened best-effort and swallows a failed
+  // write, so a client can legitimately hold a valid token on a contract
+  // still marked 'sent'. Their signature must not be refused for that.
+  assert.equal(canTransition('sent', 'signed'), true);
   assert.equal(canTransition('opened', 'signed'), true);
   assert.equal(canTransition('signed', 'paid'), true);
 });
