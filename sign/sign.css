@@ -91,3 +91,43 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 100px;max-width:760px;mar
 @media (max-width:480px){
   .s-contract-head .s-title{text-align:left;}
 }
+
+/* ---------------------------------------------------------------------------
+   The signature block.
+
+   The document is frozen and hashed before it is sent, so the signature can
+   never be part of it — sign.js fills these slots in the browser instead. An
+   unsigned contract therefore shows an em dash here, not a blank line, which
+   is the honest thing: nobody has signed yet.
+   --------------------------------------------------------------------------- */
+.s-contract .sig-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.4rem 0;
+}
+/* The generic rule above borders every table in the contract. A signature
+   area is not a data grid — drop the box and keep one rule under the headers. */
+.s-contract .sig-table,
+.s-contract .sig-table th,
+.s-contract .sig-table td { border: none; }
+.s-contract .sig-table th { border-bottom: 1px solid var(--line); }
+.s-contract .sig-table th {
+  text-align: left;
+  font-family: var(--sans);
+  font-size: .78rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 1rem .5rem 0;
+  }
+.s-contract .sig-table td {
+  padding: .55rem 1rem .55rem 0;
+  vertical-align: top;
+}
+/* The typed name IS the signature, so it should not look like body text. */
+.s-contract .sig-ink {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.25em;
+  color: var(--ink);
+}

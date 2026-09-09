@@ -83,6 +83,38 @@ function formatCents(cents) {
   return (negative ? '-$' : '$') + grouped + '.' + rest;
 }
 
+// The signature is applied to the document at DISPLAY time and is never merged
+// into the stored snapshot.
+//
+// That snapshot is hashed the moment it is sent, and that hash is the whole
+// proof that the client signed exactly what they were shown. Writing their name
+// into it after the fact would break the one thing it exists to establish. So
+// the template carries empty slots, the hash covers the document WITH those
+// slots empty, and this fills them in the browser.
+//
+// Before this existed the signature block rendered as blank lines — including
+// Khiara's own — so a printed copy of a signed agreement looked signed by
+// nobody, with the evidence living only in a database row.
+function applySignatures(data) {
+  function fill(slot, value) {
+    const nodes = bodyEl.querySelectorAll('[data-sig="' + slot + '"]');
+    for (const el of nodes) el.textContent = value;   // textContent: the name is the client's own input
+  }
+
+  if (data.typedName && data.signedAt) {
+    const when = formatSignedAt(data.signedAt);
+    fill('c1-sig', data.typedName);
+    fill('c1-name', data.typedName);
+    fill('c1-date', when);
+  }
+
+  // No second client on this booking: remove the block rather than leave it
+  // showing em dashes under a "CLIENT 2" heading, which reads as a party who
+  // failed to sign instead of one who was never required to.
+  const c2 = bodyEl.querySelector('[data-sig-block="client2"]');
+  if (c2 && !(data.client2Name && data.client2Name.trim())) c2.remove();
+}
+
 function formatSignedAt(ms) {
   if (typeof ms !== 'number') return 'recently';
   try {
@@ -257,6 +289,7 @@ if (!token) {
     // admin-authored template's own. innerHTML is correct HERE and only
     // because of that — never point it at anything a client can write.
     bodyEl.innerHTML = data.documentSnapshot || '';
+    applySignatures(data);
 
     if (data.status === 'signed' || data.status === 'paid' || data.signedAt) {
       // The real status, read from the document, decides the message —

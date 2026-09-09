@@ -949,6 +949,11 @@ export const openContract = onCall(
       // does not say who signed it is not much of one. Read off the signature
       // block signContract wrote; null until then.
       typedName: contract.signature ? contract.signature.typedName : null,
+      // Needed so the page can hide the Client 2 signature block entirely when
+      // there is no second client. Leaving it visible on a signed agreement
+      // shows an empty signature line under a named heading, which reads as a
+      // party who failed to sign rather than one who was never required to.
+      client2Name: contract.client2Name || '',
       // Signed, and no payment recorded. This is what puts a pay button on the
       // page after an abandoned checkout — the client's only remaining route
       // back to Stripe, since no reminder email can carry a signing link.
