@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20260909071214';
+    var BUILD = '20260909163554';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -184,8 +184,15 @@ p:last-child{margin-bottom:0;}
 /* The curtain used to lift itself on a 1.5s animation regardless of whether
    Khiara's words had arrived. If Firestore took longer — which it does on a
    cold first visit — the page underneath was still showing the ORIGINAL
-   wording baked into this file ("Hawai'i", not "Portland"), and a first-time
-   visitor read the old site for a moment. It now waits to be told. */
+   wording baked into this file, and a first-time visitor read the old site for
+   a moment. It now waits to be told.
+
+   The fallback wording in this file has since been brought into line with the
+   CMS (Portland, Oregon — it used to say Honolulu), so a visitor who never
+   reaches Firestore at all now reads the right thing rather than a site that
+   moved two years ago. Keep it that way: if you change her location, change it
+   in BOTH places, because whichever one you forget is the one a stranger
+   eventually sees. */
 .curtain{
   position:fixed;inset:0;z-index:90;background:var(--cream);
   display:flex;align-items:center;justify-content:center;
@@ -576,7 +583,7 @@ img.cms-img-pending{visibility:hidden;}
     </div>
 
     <div class="hero-bar">
-      <p class="script" data-cms-id="home.location" data-cms-type="text">Based in Honolulu, Hawai&#699;i<br>available worldwide</p>
+      <p class="script" data-cms-id="home.location" data-cms-type="text"><br></p>
       <div class="strip">
         <button class="arrow prev" id="prev" aria-label="Previous frame"></button>
         <div class="frames" id="frames"></div>
@@ -593,7 +600,7 @@ img.cms-img-pending{visibility:hidden;}
         <!-- h1, not h2: the Home page had no top-level heading at all, which
              costs it in search results and leaves screen readers without a
              landmark. Keeps its class and CMS id, so nothing else changes. -->
-        <h1 class="h2" data-cms-id="home.heading" data-cms-type="text">Wedding photographer in Hawai&#699;i and beyond</h1>
+        <h1 class="h2" data-cms-id="home.heading" data-cms-type="text">Wedding + Lifestyle photographer in Portland, Oregon and beyond</h1>
         <p data-cms-id="home.paragraph1" data-cms-type="text">I photograph weddings as living, breathing stories &mdash; not staged perfection, but composed moments shaped by light, emotion, and attention. My work leans editorial and warm at once: fashion-inspired framing, real feeling underneath.</p>
         <p data-cms-id="home.paragraph2" data-cms-type="text">I love modern celebrations, thoughtful details, and couples who care about how the day looks as much as how it felt.</p>
         <a href="#" class="link" data-go="about">Learn more</a>
@@ -658,7 +665,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="copy">
         <h2 class="h2" data-cms-id="about.heading" data-cms-type="text">A bit about me</h2>
         <p data-cms-id="about.paragraph1" data-cms-type="text">I grew up in Beaverton, Oregon, where I fell in love with capturing amazing shots and life&#8217;s greatest moments &mdash; a sunset over the backyard, a friend&#8217;s genuine laugh, the five seconds right after a joke lands. That love turned into a camera in my hand more often than not, and eventually into a career telling other people&#8217;s stories.</p>
-        <p data-cms-id="about.paragraph2" data-cms-type="text">These days I&#8217;m based in Honolulu, photographing weddings, elopements, and portraits across Hawai&#8217;i and beyond. My style is warm, a little editorial, and always focused on the moments that actually matter &mdash; not the posed ones, but the real ones. The laugh before the vows. The look between two people who forgot anyone else was watching.</p>
+        <p data-cms-id="about.paragraph2" data-cms-type="text"><br></p>
         <p data-cms-id="about.paragraph3" data-cms-type="text">If you&#8217;re looking for someone who&#8217;ll treat your day like it matters just as much to me as it does to you, that&#8217;s exactly what you&#8217;ll get.</p>
         <a href="#" class="link" data-go="contact">Start a conversation</a>
       </div>
@@ -976,7 +983,7 @@ img.cms-img-pending{visibility:hidden;}
     <div class="faq">
       <details open>
         <summary data-cms-id="testimonials.faq1.q" data-cms-type="text">Do you travel?</summary>
-        <p data-cms-id="testimonials.faq1.a" data-cms-type="text">Often. Travel within O&#699;ahu is included. Neighbor islands and mainland trips are quoted per trip &mdash; usually flights, one to two nights of lodging, and ground transit at cost.</p>
+        <p data-cms-id="testimonials.faq1.a" data-cms-type="text">Absolutely! I&#8217;d love to travel to capture your special moments. For out of state, let&#8217;s chat about the details and accommodations. Travel fees may apply for in state locations.</p>
       </details>
       <details>
         <summary data-cms-id="testimonials.faq2.q" data-cms-type="text">Can we split payments?</summary>
@@ -1013,7 +1020,7 @@ img.cms-img-pending{visibility:hidden;}
     <div class="contact-wrap">
       <div>
         <div class="detail"><div class="k" data-cms-id="contact.detail1.k" data-cms-type="text">Email</div><div class="v" data-cms-id="contact.detail1.v" data-cms-type="text">hello@capturewithki.com</div></div>
-        <div class="detail"><div class="k" data-cms-id="contact.detail2.k" data-cms-type="text">Based in</div><div class="v" data-cms-id="contact.detail2.v" data-cms-type="text">Honolulu, Hawai&#699;i</div></div>
+        <div class="detail"><div class="k" data-cms-id="contact.detail2.k" data-cms-type="text">Based in</div><div class="v" data-cms-id="contact.detail2.v" data-cms-type="text">Portland, Oregon</div></div>
         <div class="detail"><div class="k" data-cms-id="contact.detail3.k" data-cms-type="text">Instagram</div><div class="v" data-cms-id="contact.detail3.v" data-cms-type="text">@capturewithki</div></div>
         <div class="detail"><div class="k" data-cms-id="contact.detail4.k" data-cms-type="text">Response time</div><div class="v" data-cms-id="contact.detail4.v" data-cms-type="text">Within 48 hours</div></div>
         <div class="frame marked" style="aspect-ratio:4/5;margin-top:38px;"><img src="images/contact-photo.jpg" alt="" data-cms-id="contact.photo" data-cms-type="image"></div>
