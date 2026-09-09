@@ -115,11 +115,18 @@ function applySignatures(data) {
   if (c2 && !(data.client2Name && data.client2Name.trim())) c2.remove();
 }
 
+// Her timezone, not the reader's — and it must match the one the server uses
+// for her countersignature (BUSINESS_TZ in functions/index.js). Left as the
+// browser's own zone, a client signing at 23:00 Pacific saw themselves dated a
+// day BEFORE the photographer on the same document, and a client abroad saw a
+// different date again from the one stored in the audit record.
+const BUSINESS_TZ = 'America/Los_Angeles';   // Portland, Oregon
+
 function formatSignedAt(ms) {
   if (typeof ms !== 'number') return 'recently';
   try {
-    return new Date(ms).toLocaleDateString(undefined, {
-      year: 'numeric', month: 'long', day: 'numeric'
+    return new Date(ms).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric', timeZone: BUSINESS_TZ
     });
   } catch (e) {
     return 'recently';

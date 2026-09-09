@@ -65,8 +65,21 @@ const PHOTOGRAPHER_NAME = 'Khiara Salvani';
 
 // e.g. "September 8, 2026" — used only for her countersignature date, which
 // is a merge field in the document text, not a stored Firestore Timestamp.
+// Every date printed on a contract is in HER timezone, never the server's and
+// never the reader's.
+//
+// Without this the Cloud Function formatted her countersignature in UTC while
+// the browser formatted the client's signature in whatever zone the client was
+// sitting in. A contract signed at 23:00 Pacific therefore showed the client
+// signing on the 8th and the photographer on the 9th — the client appearing to
+// sign a day BEFORE the document was offered to them. A client abroad would
+// have seen a third answer again.
+const BUSINESS_TZ = 'America/Los_Angeles';   // Portland, Oregon
+
 function formatLongDate(d) {
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: BUSINESS_TZ
+  });
 }
 
 initializeApp();
