@@ -265,3 +265,87 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
   .c-send-from,.c-resend{min-height:44px;}
   .c-li-remove{width:44px;height:44px;font-size:15px;}
 }
+
+/* ---------------------------------------------------------------------------
+   The signed contract and its certificate, inside the contract card.
+
+   All of this already existed in Firestore and could previously only be read
+   by a developer. Nothing new is stored — this only makes producible what was
+   already being kept.
+   --------------------------------------------------------------------------- */
+.c-reveal{margin-top:14px;}
+.c-doc-panel{
+  margin-top:14px;
+  padding:20px;
+  background:#FAF6EE;
+  border:1px solid var(--line,#DCD0BC);
+}
+.c-doc-actions{margin-bottom:16px;}
+/* The agreement itself. Constrained so a long contract does not turn the card
+   into an endless scroll — she is usually checking a clause, not re-reading. */
+.c-doc-body{
+  max-height:460px;
+  overflow-y:auto;
+  padding:18px;
+  background:#fff;
+  border:1px solid var(--line,#DCD0BC);
+  font-size:13px;
+  line-height:1.55;
+}
+.c-doc-body h1{font-size:17px;}
+.c-doc-body h2{font-size:13px;letter-spacing:.06em;margin-top:1.4em;}
+.c-doc-body table{width:100%;border-collapse:collapse;}
+.c-doc-body td,.c-doc-body th{border:1px solid var(--line,#DCD0BC);padding:4px 6px;}
+
+.c-cert-block{margin-top:22px;}
+.c-cert-block h3{font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 6px;}
+.c-cert-party{margin-top:14px;}
+.c-cert-party h4{margin:0 0 6px;font-size:13px;}
+.c-cert{margin:0;font-size:13px;}
+.c-cert > div{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);}
+.c-cert dt{flex:0 0 150px;color:var(--muted,#6B6560);}
+.c-cert dd{margin:0;word-break:break-word;}
+/* A 71-character hash must wrap rather than stretch the card. */
+.c-hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;}
+
+.c-audit{margin:8px 0 0;padding-left:0;list-style:none;font-size:13px;}
+.c-audit li{display:flex;gap:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05);}
+.c-audit-when{flex:0 0 190px;color:var(--muted,#6B6560);}
+.c-audit-what{font-weight:500;}
+.c-audit-who{color:var(--muted,#6B6560);}
+
+@media (max-width:640px){
+  .c-cert > div{flex-direction:column;gap:0;}
+  .c-cert dt{flex:none;}
+  .c-audit li{flex-direction:column;gap:0;}
+  .c-audit-when{flex:none;}
+}
+
+/* ---------------------------------------------------------------------------
+   Printing one contract.
+
+   Hides the whole dashboard except the card being printed, so what comes out
+   of the printer is the agreement and its certificate — not the tool around
+   them. This is the closest thing to the signed PDF until that is built, and
+   the browser's "Save as PDF" turns it into a real file she can send.
+   --------------------------------------------------------------------------- */
+@media print{
+  body.c-printing > *{display:none !important;}
+  body.c-printing .c-print-me,
+  body.c-printing .c-print-me *{display:revert !important;}
+  body.c-printing .c-print-me{
+    position:absolute;left:0;top:0;width:100%;
+    margin:0;padding:0;border:none;background:#fff;
+  }
+  /* Controls are meaningless on paper. */
+  body.c-printing .c-print-me .c-doc-actions,
+  body.c-printing .c-print-me .c-toggle-doc,
+  body.c-printing .c-print-me .s-actions{display:none !important;}
+  /* The scroll box must become the full document on paper, or it prints one
+     screenful and silently drops the rest of a legal agreement. */
+  body.c-printing .c-print-me .c-doc-body{
+    max-height:none !important;overflow:visible !important;border:none;padding:0;
+  }
+  body.c-printing .c-print-me .c-doc-panel{border:none;padding:0;background:#fff;}
+  body.c-printing .c-cert-block{break-inside:avoid;}
+}

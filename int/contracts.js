@@ -562,6 +562,25 @@ export function initContracts(container) {
         '<div><dt>Signed by</dt><dd class="c-signed-by"></dd></div>' +
         '<div><dt>Retainer received</dt><dd>' + (c.retainerReceivedAt ? esc(fmtWhen(c.retainerReceivedAt)) : 'Not yet') + '</dd></div>' +
       '</dl>' +
+      // The exact document the client signed, plus the evidence, wherever she
+      // already is. Collapsed by default and loaded on demand: the audit trail
+      // is a subcollection read per contract, and doing nine of those on every
+      // list render would be wasteful for something she opens occasionally.
+      (c.documentSnapshot
+        ? '<div class="c-reveal">' +
+            '<button type="button" class="c-toggle-doc s-secondary" aria-expanded="false">' +
+              'View the signed contract and signature details' +
+            '</button>' +
+            '<div class="c-doc-panel" hidden>' +
+              '<div class="c-doc-actions">' +
+                '<button type="button" class="c-print s-secondary">Print / save as PDF</button>' +
+              '</div>' +
+              '<div class="c-doc-body"></div>' +
+              '<div class="c-doc-cert"></div>' +
+              '<div class="c-doc-audit"></div>' +
+            '</div>' +
+          '</div>'
+        : '') +
       (c.status === 'draft'
         ? '<div class="s-actions">' +
             '<button type="button" class="c-resend">Send</button>' +
@@ -577,6 +596,90 @@ export function initContracts(container) {
           '</div>'
         : '') +
     '</article>';
+  }
+
+
+  // ---------------------------------------------------------------------
+  // The signed contract and its evidence, shown where she already works.
+  //
+  // Everything here already existed in Firestore and could only be reached
+  // by asking a developer to read a database record — which is exactly the
+  // moment you least want that dependency. Nothing new is stored; this only
+  // makes producible what was already being kept.
+  // ---------------------------------------------------------------------
+
+  function certRowsHtml(label, sig, when) {
+    if (!sig) return '';
+    return '<div class="c-cert-party">' +
+      '<h4>' + esc(label) + '</h4>' +
+      '<dl class="c-cert">' +
+        '<div><dt>Typed name</dt><dd>' + esc(sig.typedName || '—') + '</dd></div>' +
+        '<div><dt>Signed at</dt><dd>' + esc(when) + '</dd></div>' +
+        '<div><dt>IP address</dt><dd>' + esc(sig.ip || 'unknown') + '</dd></div>' +
+        '<div><dt>Device</dt><dd>' + esc(sig.userAgent || 'unknown') + '</dd></div>' +
+        '<div><dt>Consent given</dt><dd>' + (sig.consentGiven ? 'Yes' : 'NO') + '</dd></div>' +
+        '<div><dt>Consent wording</dt><dd>' + esc(sig.consentTextVersion || '—') + '</dd></div>' +
+        // The binding between the signature and the exact words signed. If a
+        // template is edited later this no longer matches the new text, which
+        // is what proves the signed version was not swapped.
+        '<div><dt>Document fingerprint</dt><dd class="c-hash">' + esc(sig.documentHash || '—') + '</dd></div>' +
+      '</dl>' +
+    '</div>';
+  }
+
+  function certHtml(c) {
+    const two = !!(c.signature && c.signature2);
+    let out = '<section class="c-cert-block">' +
+      '<h3>Signature details</h3>' +
+      '<p class="s-help">This is the record of who signed, when, and what they ' +
+        'signed. It is kept for you — it is not printed on the agreement itself, ' +
+        'the same way an e-signature service keeps a certificate separate from ' +
+        'the contract.</p>';
+    out += certRowsHtml('Photographer', {
+      typedName: 'Khiara Salvani',
+      ip: 'n/a — countersigned by Khiara from her own signed-in account',
+      userAgent: 'n/a',
+      consentGiven: true,
+      consentTextVersion: 'offered these terms',
+      documentHash: c.documentHash
+    }, fmtWhen(c.sentAt));
+    out += certRowsHtml(two ? 'Client 1' : 'Client', c.signature, fmtWhen(c.signedAt));
+    if (c.signature2) out += certRowsHtml('Client 2', c.signature2, fmtWhen(c.signed2At));
+    if (two && c.signature.ip && c.signature.ip === c.signature2.ip) {
+      out += '<p class="s-help">Both signatures came from the same IP address. ' +
+        'That is expected when a couple signs together on one device, and is a ' +
+        'known limit of using a single link for both.</p>';
+    }
+    return out + '</section>';
+  }
+
+  function auditHtml(events) {
+    if (!events.length) return '';
+    const label = {
+      created: 'Contract created', sent: 'Sent to the client',
+      opened: 'Opened by the client', signed: 'Signed',
+      'signed-client2': 'Signed by the second client',
+      'retainer-received': 'Retainer marked received',
+      'retainer-unmarked': 'Retainer mark removed',
+      paid: 'Payment recorded', 'paid-reconciled': 'Payment found by reconciliation',
+      refunded: 'Refunded', voided: 'Voided'
+    };
+    return '<section class="c-cert-block">' +
+      '<h3>What happened, and when</h3>' +
+      '<ol class="c-audit">' +
+        events.map(function (e) {
+          return '<li><span class="c-audit-when">' + esc(fmtWhen(e.at)) + '</span>' +
+            '<span class="c-audit-what">' + esc(label[e.event] || e.event) + '</span>' +
+            (e.typedName ? '<span class="c-audit-who">' + esc(e.typedName) + '</span>' : '') +
+          '</li>';
+        }).join('') +
+      '</ol></section>';
+  }
+
+  async function loadAudit(contractId) {
+    const snap = await getDocs(collection(db, 'contracts', contractId, 'audit'));
+    return snap.docs.map(function (d) { return d.data(); })
+      .sort(function (a, b) { return (toMillis(a.at) || 0) - (toMillis(b.at) || 0); });
   }
 
   function renderContracts() {
@@ -595,8 +698,64 @@ export function initContracts(container) {
       // so both are set via textContent here, never interpolated into the
       // innerHTML template strings above.
       card.querySelector('.c-card-name').textContent = c.clientName || '(no name)';
+      // BOTH signers. Naming only the first left a two-signer contract
+      // reading as though one partner had signed it alone.
+      const n1 = c.signature && c.signature.typedName;
+      const n2 = c.signature2 && c.signature2.typedName;
       card.querySelector('.c-signed-by').textContent =
-        c.signature && c.signature.typedName ? c.signature.typedName : '—';
+        n1 && n2 ? n1 + ' and ' + n2 : (n1 || '—');
+
+      const toggle = card.querySelector('.c-toggle-doc');
+      if (toggle) {
+        const panel = card.querySelector('.c-doc-panel');
+        const bodyBox = card.querySelector('.c-doc-body');
+        const certBox = card.querySelector('.c-doc-cert');
+        const auditBox = card.querySelector('.c-doc-audit');
+        let loaded = false;
+        toggle.addEventListener('click', async function () {
+          const opening = panel.hidden;
+          panel.hidden = !opening;
+          toggle.setAttribute('aria-expanded', String(opening));
+          toggle.textContent = opening
+            ? 'Hide the signed contract'
+            : 'View the signed contract and signature details';
+          if (!opening || loaded) return;
+          loaded = true;
+
+          // documentSnapshot was rendered server-side by renderTemplate, which
+          // escaped every client-supplied value; what remains is the
+          // admin-authored template's own markup. innerHTML is correct here
+          // and ONLY because of that — the same reasoning as sign.js.
+          bodyBox.innerHTML = c.documentSnapshot || '';
+          certBox.innerHTML = certHtml(c);
+          auditBox.innerHTML = '<p class="s-help">Loading the history\u2026</p>';
+          try {
+            auditBox.innerHTML = auditHtml(await loadAudit(c.id));
+          } catch (err) {
+            // Never blocks the document itself. The contract and the
+            // signatures are the part she needs; the event log is context.
+            auditBox.innerHTML = '<p class="s-help">Could not load the history.</p>';
+          }
+        });
+
+        const printBtn = card.querySelector('.c-print');
+        if (printBtn) {
+          printBtn.addEventListener('click', function () {
+            // Marks THIS card as the one to print. The print stylesheet hides
+            // everything else on the page, so what comes out is the agreement
+            // and its certificate — not the dashboard around it.
+            document.body.classList.add('c-printing');
+            card.classList.add('c-print-me');
+            const clear = function () {
+              document.body.classList.remove('c-printing');
+              card.classList.remove('c-print-me');
+              window.removeEventListener('afterprint', clear);
+            };
+            window.addEventListener('afterprint', clear);
+            window.print();
+          });
+        }
+      }
 
       const resendBtn = card.querySelector('.c-resend');
       if (resendBtn) {
