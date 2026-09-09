@@ -77,7 +77,9 @@
   </section>
 
   <!-- Shown after signing just now, and shown instead of the form again if a
-       client returns to a link they already signed.
+       client returns to a link they already signed. The agreement above stays
+       on screen in BOTH cases — sign.js re-shows #sContract — because this
+       page is what signedCopyEmail calls the client's permanent record.
 
        The heading and the pay block are BOTH filled in by sign.js, because
        this panel is shown in two very different states: paid (booked, done)
@@ -85,13 +87,21 @@
        told an unpaid client the opposite of the truth, on the same screen
        every other surface in this system uses to say the date is not held.
 
-       The emailed-copy line is deliberately not absolute either: signContract
-       swallows a failed confirmation email by design, so this page cannot
-       promise one arrived. -->
+       The emailed-copy line is hidden by default and unhidden by sign.js only
+       on the visit where the signature was just made. It was a fixed line, so
+       a client returning months later was told a copy was "on its way" when
+       nothing was being sent. It is deliberately not absolute even then:
+       signContract swallows a failed confirmation email by design, so this
+       page cannot promise one arrived. -->
   <section id="sConfirm" class="s-panel" hidden>
     <h1 class="s-title" id="sConfirmTitle">You're all set</h1>
     <p class="s-copy" id="sConfirmText"></p>
-    <p class="s-copy">A copy is on its way to your email.</p>
+    <!-- Who signed and when. Filled in by sign.js with textContent, never
+         innerHTML — the name is the client's own typed input. Deliberately
+         NOT part of the frozen documentSnapshot, which is hashed and must
+         never be rewritten after sending. -->
+    <p class="s-copy" id="sSignedBy" hidden></p>
+    <p class="s-copy" id="sEmailedCopy" hidden>A copy is on its way to your email.</p>
 
     <!-- The way back to checkout after an abandoned one: a closed tab, a
          declined card, a dead phone, a tap on back. Shown only when

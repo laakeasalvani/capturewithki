@@ -25,6 +25,8 @@ const signBtn = document.getElementById('sSignBtn');
 const signErrorEl = document.getElementById('sSignError');
 const confirmTitleEl = document.getElementById('sConfirmTitle');
 const confirmTextEl = document.getElementById('sConfirmText');
+const signedByEl = document.getElementById('sSignedBy');
+const emailedCopyEl = document.getElementById('sEmailedCopy');
 const payBox = document.getElementById('sPay');
 const payNoteEl = document.getElementById('sPayNote');
 const payBtn = document.getElementById('sPayBtn');
@@ -107,7 +109,13 @@ function signedMessage(status, signedAt, opts) {
   // paymentsOn, so a client whose retainer already came through does not
   // get told the date "will be held" if Stripe is later switched off.
   // Checked first, above the payments-off branch, for exactly that reason.
-  if (status === 'paid') {
+  //
+  // o.retainerReceived counts the same. When Khiara marks a retainer that
+  // arrived some other way, markRetainerReceived stamps retainerReceivedAt
+  // and deliberately leaves status at 'signed' — so status alone left the two
+  // parties disagreeing: her dashboard said "Booked — date held" while this
+  // sentence went on saying the date would be held once the retainer arrived.
+  if (status === 'paid' || o.retainerReceived) {
     return signedLine + ' Your retainer has been received — your date is held.';
   }
 
@@ -115,9 +123,12 @@ function signedMessage(status, signedAt, opts) {
   // payment link, or a retry, because none of those exist to fail or
   // succeed. This states only what the contract itself says — that the
   // date is held once the retainer reaches Khiara some other way — and
-  // never that it is held now.
+  // never that it is held now. It does say HOW the retainer gets paid,
+  // because nothing else on this page or in any email ever told the client
+  // that, and "reaches Khiara" on its own is not an instruction.
   if (!o.paymentsOn) {
-    return signedLine + ' Your date will be held once your retainer reaches Khiara.';
+    return signedLine + ' Your date will be held once your retainer reaches Khiara. ' +
+      'She will be in touch with the payment details.';
   }
 
   // Named in the message itself, not only on the button, so the amount owed
@@ -149,7 +160,7 @@ function showConfirmed(status, signedAt, opts) {
   // contract is not paid, the title is simply "Signed": there is no payment
   // state to describe, so nothing here may imply one ("retainer still due"
   // names a payment path that does not exist right now).
-  if (status === 'paid') {
+  if (status === 'paid' || o.retainerReceived) {
     confirmTitleEl.textContent = 'You’re all set';
   } else if (!o.paymentsOn) {
     confirmTitleEl.textContent = 'Signed';
@@ -182,7 +193,34 @@ function showConfirmed(status, signedAt, opts) {
     payBox.hidden = true;
   }
 
+  // Who signed, and when. This appears nowhere in the frozen documentSnapshot
+  // — that is hashed at send time and must never be rewritten — so it is
+  // rendered here instead, from what openContract returned (or, on the visit
+  // where the signature was just made, from what was typed into the form).
+  // textContent, never innerHTML: the name is the client's own input.
+  const who = typeof o.typedName === 'string' ? o.typedName.trim() : '';
+  if (who) {
+    signedByEl.textContent = 'Signed by ' + who + ' on ' + formatSignedAt(signedAt) + '.';
+    signedByEl.hidden = false;
+  } else {
+    signedByEl.textContent = '';
+    signedByEl.hidden = true;
+  }
+
+  // Only true on the visit where the signature was just made. On every later
+  // visit to this link nothing is being sent, and saying a copy is on its way
+  // is simply false.
+  emailedCopyEl.hidden = o.justSigned !== true;
+
   show('confirm');
+
+  // The agreement itself must stay on screen. #contract-body lives inside
+  // #sContract, so show('confirm') hides it — and this page is what
+  // signedCopyEmail calls the client's permanent record. Hiding the document
+  // on the page that IS the record defeats the whole point of it. The signing
+  // form goes away instead: it is already signed and must not be offered again.
+  contractPanel.hidden = false;
+  form.hidden = true;
 }
 
 const token = tokenFromUrl();
@@ -230,7 +268,11 @@ if (!token) {
       showConfirmed(data.status, data.signedAt, {
         paidHint: paidHintFromUrl(),
         needsPayment: data.needsPayment === true,
-        paymentsOn: paymentsOn
+        paymentsOn: paymentsOn,
+        // A retainer Khiara recorded by hand. Read from the document, exactly
+        // like status — never inferred from anything on the URL.
+        retainerReceived: typeof data.retainerReceivedAt === 'number',
+        typedName: data.typedName
       });
       return;
     }
@@ -284,7 +326,10 @@ form.addEventListener('submit', function (e) {
       // checkoutUrl is null because payments are off — the normal state
       // today, not a failure. Nothing went wrong, so nothing here may
       // apologise, offer a retry, or mention payment at all.
-      showConfirmed(null, data.signedAt, { needsPayment: false, paymentsOn: false });
+      showConfirmed(null, data.signedAt, {
+        needsPayment: false, paymentsOn: false,
+        typedName: typedName, justSigned: true
+      });
       return;
     }
     // Payments ARE on and the provider was still unreachable (or, on a
@@ -293,7 +338,10 @@ form.addEventListener('submit', function (e) {
     // date is held. needsPayment is true because we have just this second
     // signed and nothing has been paid, so the pay button is offered as
     // the retry.
-    showConfirmed(null, data.signedAt, { checkoutFailed: true, needsPayment: true, paymentsOn: true });
+    showConfirmed(null, data.signedAt, {
+      checkoutFailed: true, needsPayment: true, paymentsOn: true,
+      typedName: typedName, justSigned: true
+    });
   }).catch(function () {
     signErrorEl.textContent = 'Something went wrong sending your signature. Please try again.';
     updateSignBtn();
