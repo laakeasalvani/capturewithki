@@ -799,17 +799,26 @@ export function initContracts(container) {
     // Searching reaches everywhere, including the past. Hiding a contract she
     // has explicitly gone looking for by name would be the one moment this
     // organisation actively got in her way.
-    const pastOpen = showPast || !!needle;
+    //
+    // Which also means that while a search is running there is nothing for the
+    // toggle to do — the past section is forced open regardless of it. Render a
+    // plain heading in its place rather than a button reading "Hide past
+    // contracts" that refuses to hide anything when pressed.
+    const searching = !!needle;
+    const pastOpen = showPast || searching;
 
     listBox.innerHTML =
       sectionHtml('Needs you', 'Not sent, not signed, or the retainer has not come in.', needs, 'needs') +
       sectionHtml('Upcoming', 'Signed and paid, soonest first.', upcoming, 'upcoming') +
       (past.length
         ? '<section class="c-group c-group-past">' +
-            '<button type="button" class="c-past-toggle s-secondary" aria-expanded="' + pastOpen + '">' +
-              (pastOpen ? 'Hide past contracts' : 'Show past contracts') +
-              ' <span class="c-group-count">' + past.length + '</span>' +
-            '</button>' +
+            (searching
+              ? '<h3 class="c-group-head">Past' +
+                  '<span class="c-group-count">' + past.length + '</span></h3>'
+              : '<button type="button" class="c-past-toggle s-secondary" aria-expanded="' + pastOpen + '">' +
+                  (pastOpen ? 'Hide past contracts' : 'Show past contracts') +
+                  ' <span class="c-group-count">' + past.length + '</span>' +
+                '</button>') +
             '<div class="c-past-list"' + (pastOpen ? '' : ' hidden') + '>' +
               past.map(cardHtml).join('') +
             '</div>' +
@@ -819,7 +828,10 @@ export function initContracts(container) {
     const pastToggle = listBox.querySelector('.c-past-toggle');
     if (pastToggle) {
       pastToggle.addEventListener('click', function () {
-        showPast = !pastOpen;
+        // The toggle only exists when no search is running, so this is a plain
+        // flip. Deriving it from pastOpen instead would make the button inert
+        // the moment a search forced that value true.
+        showPast = !showPast;
         renderContracts();
       });
     }
