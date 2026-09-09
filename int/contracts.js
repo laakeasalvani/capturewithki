@@ -231,12 +231,27 @@ export function initContracts(container) {
     composerBox.innerHTML =
       '<h3 class="c-block-title">' + (inquiry ? 'New contract' : 'New contract, no inquiry') + '</h3>' +
       '<label class="s-label">Client name(s)<input type="text" id="cName" maxlength="200"></label>' +
-      // Optional — a portrait client has no second party. Left empty, the
-      // contract renders "Client 2: Not applicable". Until this field existed
-      // there was no way to fill it in at all, so every wedding and elopement
-      // said "Not applicable" for a couple.
-      '<label class="s-label">Client 2 name (optional)' +
-        '<input type="text" id="cClient2" maxlength="200" placeholder="The second person signing, if there is one">' +
+      // Asked outright rather than inferred from whether a name got typed.
+      // It used to be a single optional "Client 2 name" box, which meant the
+      // number of signatures was a side effect of remembering to fill a field
+      // in — and a wedding whose second partner she forgot to name silently
+      // became a one-signature agreement.
+      '<fieldset class="c-signers">' +
+        '<legend>How many signatures does this contract need?</legend>' +
+        '<label class="c-signer-opt">' +
+          '<input type="radio" name="cSigners" value="1" checked> One signature' +
+        '</label>' +
+        '<label class="c-signer-opt">' +
+          '<input type="radio" name="cSigners" value="2"> Two signatures' +
+        '</label>' +
+      '</fieldset>' +
+      // Required once she picks two, because the agreement itself prints
+      // "Client 2: <name>" and is frozen and hashed at send. A contract sent
+      // with two signature lines and no name for the second party would be an
+      // executed document that never says who the second party is.
+      '<label class="s-label" id="cClient2Wrap" hidden>Second signer&#8217;s full name' +
+        '<input type="text" id="cClient2" maxlength="200" placeholder="As it should appear on the agreement">' +
+        '<span class="s-status" id="cClient2Error"></span>' +
       '</label>' +
       '<label class="s-label">Client email<input type="email" id="cEmail" maxlength="254"></label>' +
       '<label class="s-label">Client phone (optional)<input type="text" id="cPhone" maxlength="40"></label>' +
@@ -299,6 +314,29 @@ export function initContracts(container) {
 
     const nameEl = composerBox.querySelector('#cName');
     const client2El = composerBox.querySelector('#cClient2');
+    const client2Wrap = composerBox.querySelector('#cClient2Wrap');
+    const client2ErrorEl = composerBox.querySelector('#cClient2Error');
+    const signerRadios = composerBox.querySelectorAll('input[name="cSigners"]');
+
+    function signerCount() {
+      const picked = composerBox.querySelector('input[name="cSigners"]:checked');
+      return picked && picked.value === '2' ? 2 : 1;
+    }
+
+    // Show the name box only when it is needed, and EMPTY it on the way back to
+    // one signature. Leaving a stale name behind would send a two-signer
+    // agreement she thought she had switched off — client2Name is what the rest
+    // of the system reads to decide how many signatures a contract needs.
+    function syncSigners() {
+      const two = signerCount() === 2;
+      client2Wrap.hidden = !two;
+      if (!two) {
+        client2El.value = '';
+        client2ErrorEl.textContent = '';
+      }
+    }
+    signerRadios.forEach(function (r) { r.addEventListener('change', syncSigners); });
+    syncSigners();
     const emailEl = composerBox.querySelector('#cEmail');
     const phoneEl = composerBox.querySelector('#cPhone');
     const dateEl = composerBox.querySelector('#cDate');
@@ -437,6 +475,17 @@ export function initContracts(container) {
       const clientEmail = emailEl.value.trim();
       if (!clientName) { statusEl.textContent = 'Type the client’s name first.'; nameEl.focus(); return; }
       if (!clientEmail) { statusEl.textContent = 'Type the client’s email first.'; emailEl.focus(); return; }
+      // Two signature lines with nobody named on the second one would print
+      // "Client 2:" followed by nothing into a document that is then frozen and
+      // hashed. Caught here rather than server-side so she can still fix it.
+      const client2Name = client2El.value.trim();
+      if (signerCount() === 2 && !client2Name) {
+        client2ErrorEl.textContent = 'The agreement prints this name, so it cannot be blank.';
+        statusEl.textContent = 'Name the second signer, or switch back to one signature.';
+        client2El.focus();
+        return;
+      }
+      client2ErrorEl.textContent = '';
       if (!state.pkg) { statusEl.textContent = 'Choose a package first.'; return; }
       if (state.priceInvalid) {
         statusEl.textContent = 'Fix the package price first — it has to be a whole dollar amount above zero.';
@@ -471,7 +520,10 @@ export function initContracts(container) {
           // createContract has always accepted and stored these three; nothing
           // collected them, so they were dead fields until now. All three are
           // optional server-side and stay optional here.
-          client2Name: client2El.value.trim(),
+          // Blank whenever she picked one signature — syncSigners clears the
+          // box, and this is the field the whole system reads to decide how
+          // many signature lines a contract has.
+          client2Name: client2Name,
           clientEmail: clientEmail,
           clientPhone: phoneEl.value.trim(),
           // ISO day. The server derives the printed wording from it.

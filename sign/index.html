@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sign.css?v=20260909173452">
+<link rel="stylesheet" href="sign.css?v=20260909175402">
 </head>
 <body>
 
@@ -49,36 +49,65 @@
 
     <div id="contract-body" class="s-contract"></div>
 
-    <form id="sSignForm" class="s-signform" novalidate>
+    <!-- The consent disclosure is shared, because it describes the one
+         agreement. The CONSENT ITSELF is not: each signer ticks their own box
+         below, because each of them is separately consenting to sign
+         electronically and the record has to show that per person. -->
+    <div class="s-consent">
+      <h2 class="s-subtitle">Signing this electronically</h2>
+      <p class="s-copy">By checking the box below, you agree to sign this
+        agreement electronically, and you agree that your electronic
+        signature is as legally binding as a signature on paper. You may
+        request a paper copy of this agreement at any time — just reply to
+        the email that brought you here. You may also withdraw this consent
+        at any point before you sign, the same way.</p>
+    </div>
 
-      <!-- Named signer. On a two-signer contract both partners sign on this
-           one link in turn, so the form has to say plainly whose turn it is —
-           otherwise the second partner sees a form they have already watched
-           someone fill in. -->
-      <p class="s-copy s-whosigns" id="sWhoSigns" hidden></p>
+    <!-- One box per signature, BOTH on the page from the start when the
+         agreement needs two.
 
-      <div class="s-consent">
-        <h2 class="s-subtitle">Signing this electronically</h2>
-        <p class="s-copy">By checking the box below, you agree to sign this
-          agreement electronically, and you agree that your electronic
-          signature is as legally binding as a signature on paper. You may
-          request a paper copy of this agreement at any time — just reply to
-          the email that brought you here. You may also withdraw this consent
-          at any point before you sign, the same way.</p>
-        <label class="s-check" for="sConsent">
-          <input type="checkbox" id="sConsent">
-          <span>I agree to sign this document electronically, as described
-            above.</span>
-        </label>
-      </div>
+         This replaced a single form that turned round and asked the second
+         partner once the first had signed. That flow required them to be
+         together at one device, and read like being asked to sign twice.
+         Here each box stands alone: either partner can sign whenever they are
+         ready, from their own phone, and the same link keeps working for the
+         other one afterwards. Each signature keeps its own timestamp, IP and
+         user agent, which is what makes them separately provable.
 
+         Separate <form> elements rather than one form with two buttons, so
+         pressing Enter in a name box submits that signature and not the other
+         person's. -->
+    <form class="s-signbox" id="sBox1" novalidate>
+      <p class="s-signbox-role" id="sRole1">Your signature</p>
+      <label class="s-check" for="sConsent">
+        <input type="checkbox" id="sConsent">
+        <span>I agree to sign this document electronically, as described
+          above.</span>
+      </label>
       <div class="s-field">
         <label class="s-label" for="sName">Type your full legal name</label>
         <input id="sName" type="text" autocomplete="name" spellcheck="false" maxlength="200">
       </div>
-
       <button type="submit" id="sSignBtn" class="s-btn" disabled>I agree and sign</button>
       <p class="s-note" id="sSignError" role="status" aria-live="polite"></p>
+      <p class="s-signbox-done" id="sDone1" hidden></p>
+    </form>
+
+    <!-- Shown only when the contract actually names a second signer. -->
+    <form class="s-signbox" id="sBox2" novalidate hidden>
+      <p class="s-signbox-role" id="sRole2">Second signature</p>
+      <label class="s-check" for="sConsent2">
+        <input type="checkbox" id="sConsent2">
+        <span>I agree to sign this document electronically, as described
+          above.</span>
+      </label>
+      <div class="s-field">
+        <label class="s-label" for="sName2">Type your full legal name</label>
+        <input id="sName2" type="text" autocomplete="name" spellcheck="false" maxlength="200">
+      </div>
+      <button type="submit" id="sSignBtn2" class="s-btn" disabled>I agree and sign</button>
+      <p class="s-note" id="sSignError2" role="status" aria-live="polite"></p>
+      <p class="s-signbox-done" id="sDone2" hidden></p>
     </form>
 
     <!-- The signature record.
@@ -164,6 +193,6 @@
      stale code. On the marketing site that is a cosmetic risk; on
      the page where somebody signs a contract it is not.
      bin/stamp-version.sh rewrites these. -->
-<script type="module" src="sign.js?v=20260909173452"></script>
+<script type="module" src="sign.js?v=20260909175402"></script>
 </body>
 </html>

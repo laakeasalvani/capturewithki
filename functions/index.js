@@ -1041,6 +1041,12 @@ export const signContract = onCall(
     const token = typeof d.token === 'string' ? d.token.trim() : '';
     const typedName = typeof d.typedName === 'string' ? d.typedName.trim().slice(0, 200) : '';
     const consent = d.consent === true;
+    // Which signature line this is. Both boxes are on screen at once now, so
+    // the page has to say which one was filled in — it is no longer derivable
+    // from how far the contract has got. Validated against the contract below;
+    // an absent or unrecognised value falls back to the old turn-taking rule
+    // so a cached copy of the previous page still works.
+    const requestedSlot = d.slot === 'client1' || d.slot === 'client2' ? d.slot : null;
 
     // Checked before touching Firestore, same as openContract.
     if (!isValidTokenShape(token)) throw new HttpsError('permission-denied', CONTRACT_DENIED);
@@ -1101,11 +1107,46 @@ export const signContract = onCall(
       };
     }
 
-    // Whose turn. Order is enforced rather than chosen by the caller: the
-    // page only offers Client 2's form once Client 1 has signed, so a request
-    // arriving in the other order came from something other than the page.
-    const slot = c1Done ? 'client2' : 'client1';
-    const willComplete = slot === 'client2' || !needsTwo;
+    // Whose signature this is.
+    //
+    // Order is NO LONGER enforced. Both signature boxes are on the page from
+    // the start, so either partner can reach for theirs first — and refusing
+    // the one who happened to be ready would be a wall with no explanation on
+    // screen. The owner chose this deliberately over locking the second box.
+    //
+    // Falling back to the old rule when no slot is given keeps a client sitting
+    // on a cached copy of the previous page working: that page only ever showed
+    // one form at a time, in order, so the derived answer is still right for it.
+    const slot = requestedSlot || (c1Done ? 'client2' : 'client1');
+
+    // A single-signer contract has no second line to sign. Without this, a
+    // caller could invent one and write a signature2 onto a document whose
+    // frozen text names only one party.
+    if (slot === 'client2' && !needsTwo) {
+      throw new HttpsError('invalid-argument', 'This agreement only needs one signature.');
+    }
+
+    // That specific line is already signed. Idempotent for the same reasons as
+    // the fully-signed check above, but per-slot: with both boxes live, a
+    // double-tap on one of them must not overwrite a signature — including its
+    // timestamp, IP and user agent, which are the evidence that it happened
+    // when and where it says.
+    if ((slot === 'client1' && c1Done) || (slot === 'client2' && c2Done)) {
+      return {
+        ok: true,
+        signedAt: (slot === 'client2' ? contract.signed2At : contract.signedAt).toMillis(),
+        checkoutUrl: null,
+        complete: false,
+        awaitingSigner: slot === 'client1' ? 'client2' : 'client1',
+        signedSlot: slot,
+        alreadySigned: true
+      };
+    }
+
+    // Complete once the OTHER line is already done — which, now that either may
+    // be signed first, is a question about the other slot rather than about
+    // which slot this is.
+    const willComplete = !needsTwo || (slot === 'client1' ? c2Done : c1Done);
 
     // Only checked when this signature actually completes the agreement.
     // Client 1 signing a two-signer contract leaves the status alone, because
@@ -1149,12 +1190,21 @@ export const signContract = onCall(
       consentTextVersion: 'esign-disclosure-v1'
     };
 
+    // Status moves to 'signed' only when nobody else still has to sign, and
+    // that is now decided by willComplete for BOTH slots. It used to be
+    // hardcoded on the client2 branch, which was safe only while client2 could
+    // not be reached before client1 — with either order allowed, a second
+    // partner signing first would otherwise have marked the whole agreement
+    // signed while client 1's line was still blank.
+    const signedNow = willComplete ? { status: 'signed' } : {};
     const contractUpdate = slot === 'client2'
-      ? { signed2At: FieldValue.serverTimestamp(), signature2: signatureRecord, status: 'signed' }
+      ? Object.assign(
+          { signed2At: FieldValue.serverTimestamp(), signature2: signatureRecord },
+          signedNow
+        )
       : Object.assign(
           { signedAt: FieldValue.serverTimestamp(), signature: signatureRecord },
-          // Status moves to 'signed' only when nobody else still has to sign.
-          needsTwo ? {} : { status: 'signed' }
+          signedNow
         );
 
     batch.update(ref, contractUpdate);
@@ -1238,15 +1288,20 @@ export const signContract = onCall(
     }
     }
 
-    console.log('[signContract] signed:', slot, ref.id, willComplete ? '(complete)' : '(awaiting client 2)');
+    // Whichever line is still blank — not always client2, now that either may
+    // be signed first.
+    const stillWaiting = willComplete ? null : (slot === 'client1' ? 'client2' : 'client1');
+
+    console.log('[signContract] signed:', slot, ref.id,
+      willComplete ? '(complete)' : '(awaiting ' + stillWaiting + ')');
     return {
       ok: true,
       signedAt: Date.now(),
       checkoutUrl: checkoutUrl,
-      // The page needs to know whether to thank them or to turn round and ask
-      // the second partner to sign.
+      // The page needs to know whether to thank them or to leave the other
+      // signature box open and waiting.
       complete: willComplete,
-      awaitingSigner: willComplete ? null : 'client2',
+      awaitingSigner: stillWaiting,
       signedSlot: slot
     };
   }

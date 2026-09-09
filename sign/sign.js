@@ -26,13 +26,33 @@ const sigClientDate = document.getElementById('sSigClientDate');
 const sigClient2Block = document.getElementById('sSigClient2Block');
 const sigClient2Name = document.getElementById('sSigClient2Name');
 const sigClient2Date = document.getElementById('sSigClient2Date');
-const whoSignsEl = document.getElementById('sWhoSigns');
-
-const form = document.getElementById('sSignForm');
-const consentEl = document.getElementById('sConsent');
-const nameEl = document.getElementById('sName');
-const signBtn = document.getElementById('sSignBtn');
-const signErrorEl = document.getElementById('sSignError');
+// One descriptor per signature line. Everything below drives off this list
+// rather than off a "whose turn is it" variable, because both boxes are live at
+// once and either may be used first.
+const BOXES = [
+  {
+    slot: 'client1',
+    form: document.getElementById('sBox1'),
+    roleEl: document.getElementById('sRole1'),
+    consentEl: document.getElementById('sConsent'),
+    nameEl: document.getElementById('sName'),
+    btn: document.getElementById('sSignBtn'),
+    errorEl: document.getElementById('sSignError'),
+    doneEl: document.getElementById('sDone1')
+  },
+  {
+    slot: 'client2',
+    form: document.getElementById('sBox2'),
+    roleEl: document.getElementById('sRole2'),
+    consentEl: document.getElementById('sConsent2'),
+    nameEl: document.getElementById('sName2'),
+    btn: document.getElementById('sSignBtn2'),
+    errorEl: document.getElementById('sSignError2'),
+    doneEl: document.getElementById('sDone2')
+  }
+];
+const box1 = BOXES[0];
+const box2 = BOXES[1];
 const confirmTitleEl = document.getElementById('sConfirmTitle');
 const confirmTextEl = document.getElementById('sConfirmText');
 const signedByEl = document.getElementById('sSignedBy');
@@ -56,11 +76,8 @@ let retainerCents = null;
 // still branch on it.
 let paymentsOn = false;
 
-// Which partner the form is currently collecting. Both sign on this one link
-// in turn, so after Client 1 signs the form comes back for Client 2 — and the
-// sign handler needs to know which of them it just recorded without a fresh
-// read from the server.
-let awaitingSigner = 'client1';
+// What each signature line is called on screen. Both boxes are live at once, so
+// there is no "current" signer to track — each box knows its own slot.
 let client1Label = 'Client';
 let client2Label = '';
 
@@ -165,33 +182,63 @@ function renderSignatureRecord(data) {
 // gets the same behaviour on their turn without writing over the signature the
 // first one already made. textContent, never innerHTML, like every other path
 // that touches this panel: it is the client's own unescaped input.
-function previewSignature() {
-  if (!nameEl || !sigRecord || sigRecord.hidden) return;
-  const slot = awaitingSigner === 'client2' ? sigClient2Name : sigClientName;
-  if (!slot) return;
-  const typed = nameEl.value.trim();
+function previewSignature(box) {
+  if (!box || !box.nameEl || !sigRecord || sigRecord.hidden) return;
+  // Each box writes to its OWN line in the panel. With both boxes live, keying
+  // this off a shared "whose turn" value would let one partner's typing
+  // overwrite the other's signature as it was being made.
+  const inkEl = box.slot === 'client2' ? sigClient2Name : sigClientName;
+  if (!inkEl) return;
+  // Never over an already-recorded signature. A signed line is evidence; only
+  // the still-blank one is a preview.
+  if (box.signed) return;
+  const typed = box.nameEl.value.trim();
   // Back to the dash rather than a blank line if they clear the box — a blank
   // reads as a party who failed to sign, the same reasoning as elsewhere here.
-  slot.textContent = typed || '—';
+  inkEl.textContent = typed || '—';
 }
 
-// Points the form at whichever partner still has to sign, and names them.
-// Without this the second partner is shown a form they just watched somebody
-// else fill in, with no indication it is now their turn.
-function askSigner(who) {
-  awaitingSigner = who;
-  const name = who === 'client2' ? client2Label : client1Label;
-  whoSignsEl.hidden = false;
-  whoSignsEl.textContent = who === 'client2'
-    ? name + ', it is your turn to sign. Your partner has signed above.'
-    : name + ', please read the agreement above and sign below.';
-  nameEl.value = '';
-  consentEl.checked = false;
-  signBtn.disabled = true;
-  signErrorEl.textContent = '';
-  // The box was just emptied, so empty the preview with it. Without this the
-  // second partner is handed a form showing a name they did not type.
-  previewSignature();
+// One box's button is enabled only by that box's own consent and name.
+function updateSignBtn(box) {
+  const nameOk = box.nameEl.value.trim().length > 0;
+  box.btn.disabled = !(box.consentEl.checked && nameOk);
+}
+
+// Puts one signature box into the right state: hidden, open for signing, or
+// locked because that line is already signed.
+//
+// A signed box is left ON SCREEN rather than removed. This page is the client's
+// permanent record, and a couple coming back to it should see both signatures
+// where they made them — and the partner who has not signed yet should be able
+// to see that the other one has.
+function renderBox(box, opts) {
+  const o = opts || {};
+  box.form.hidden = !o.show;
+  if (!o.show) return;
+
+  box.roleEl.textContent = o.label || 'Signature';
+  box.signed = !!o.signedName;
+
+  if (box.signed) {
+    box.consentEl.checked = true;
+    box.consentEl.disabled = true;
+    box.nameEl.value = o.signedName;
+    box.nameEl.disabled = true;
+    box.btn.hidden = true;
+    box.errorEl.textContent = '';
+    box.doneEl.hidden = false;
+    box.doneEl.textContent = 'Signed by ' + o.signedName +
+      (typeof o.signedAt === 'number' ? ' on ' + formatSignedAt(o.signedAt) : '') + '.';
+    box.form.classList.add('s-signbox-done-state');
+  } else {
+    box.consentEl.disabled = false;
+    box.nameEl.disabled = false;
+    box.btn.hidden = false;
+    box.doneEl.hidden = true;
+    box.errorEl.textContent = '';
+    box.form.classList.remove('s-signbox-done-state');
+    updateSignBtn(box);
+  }
 }
 
 // Her timezone, not the reader's — and it must match the one the server uses
@@ -355,8 +402,11 @@ function showConfirmed(status, signedAt, opts) {
   // signedCopyEmail calls the client's permanent record. Hiding the document
   // on the page that IS the record defeats the whole point of it. The signing
   // form goes away instead: it is already signed and must not be offered again.
+  // Both boxes, not one — on a two-signer agreement this panel is only reached
+  // once both have signed, and leaving either box on screen would offer a
+  // signature line on a fully executed document.
   contractPanel.hidden = false;
-  form.hidden = true;
+  BOXES.forEach(function (b) { if (b.form) b.form.hidden = true; });
 }
 
 const token = tokenFromUrl();
@@ -399,14 +449,36 @@ if (!token) {
 
     renderSignatureRecord(data);
 
-    // One of two signatures is not a signed contract. A two-signer agreement
-    // waiting on the second partner must NOT reach the confirm panel — it
-    // shows the form again, addressed to them. Checked before the signed
-    // branch below, which keys on signedAt and would otherwise swallow this
-    // case the moment Client 1 signed.
-    if (data.awaitingSigner === 'client2') {
+    const needsTwo = !!(data.client2Name && data.client2Name.trim());
+    const c1Signed = !!data.typedName;
+    const c2Signed = !!data.typedName2;
+    const allSigned = needsTwo ? (c1Signed && c2Signed) : c1Signed;
+
+    // Lay both boxes out from what is actually recorded, rather than from a
+    // "whose turn" value. Either line may have been signed first, so each one
+    // is asked about independently.
+    renderBox(box1, {
+      show: true,
+      label: needsTwo ? client1Label : 'Your signature',
+      signedName: c1Signed ? data.typedName : null,
+      signedAt: data.signedAt
+    });
+    renderBox(box2, {
+      show: needsTwo,
+      label: client2Label,
+      signedName: c2Signed ? data.typedName2 : null,
+      signedAt: data.signed2At
+    });
+
+    // Some of two signatures is not a signed contract. A two-signer agreement
+    // still waiting on either partner must NOT reach the confirm panel — it
+    // keeps both boxes on screen, one of them already filled in. Checked before
+    // the signed branch below, which keys on signedAt and would otherwise
+    // swallow this case the moment one of them signed.
+    if (needsTwo && !allSigned) {
       show('contract');
-      askSigner('client2');
+      const open = !c1Signed ? box1 : box2;
+      if (open.nameEl) open.nameEl.focus();
       return;
     }
 
@@ -430,8 +502,7 @@ if (!token) {
     }
 
     show('contract');
-    askSigner('client1');
-    nameEl.focus();
+    box1.nameEl.focus();
   }).catch(function () {
     // openContract deliberately returns one identical refusal for every bad
     // token, expired contract, or cancelled one, so a prober can't learn
@@ -442,92 +513,108 @@ if (!token) {
   });
 }
 
-function updateSignBtn() {
-  const nameOk = nameEl.value.trim().length > 0;
-  signBtn.disabled = !(consentEl.checked && nameOk);
-}
-consentEl.addEventListener('change', updateSignBtn);
-nameEl.addEventListener('input', updateSignBtn);
-nameEl.addEventListener('input', previewSignature);
+// Each box drives its own button, its own preview, and its own submit. Nothing
+// here consults a shared "whose turn" value: with both boxes live, that is the
+// thing that would let one partner's actions land on the other's line.
+BOXES.forEach(function (box) {
+  box.consentEl.addEventListener('change', function () { updateSignBtn(box); });
+  box.nameEl.addEventListener('input', function () { updateSignBtn(box); });
+  box.nameEl.addEventListener('input', function () { previewSignature(box); });
 
-form.addEventListener('submit', function (e) {
-  e.preventDefault();
-  // A disabled button still permits Enter-key form submission, and the name field
-  // is focused on load, so Enter is how many clients will submit. Without this,
-  // a second Enter while the first call is in flight fires signContract twice and
-  // writes two 'signed' rows into what is meant to be the legal audit trail.
-  if (signBtn.disabled) return;
-  const typedName = nameEl.value.trim();
-  if (!consentEl.checked || !typedName) {
-    updateSignBtn();
-    return;
-  }
-
-  // Disabled immediately: without this, a double-tap on a slow connection
-  // fires signContract twice. The function is idempotent so the second call
-  // is harmless, but the client would see two spinners and assume it failed.
-  signBtn.disabled = true;
-  signErrorEl.textContent = 'Signing…';
-
-  signContract({ token: token, typedName: typedName, consent: true }).then(function (res) {
-    const data = res.data || {};
-    signErrorEl.textContent = '';
-
-    // The panel is drawn from openContract's read, which happened before this
-    // signature existed — so without this it went on saying "Not yet signed"
-    // on a contract the client had just signed, immediately below the words
-    // confirming they had. There is no fresh read on this path, so update it
-    // from what we know: the name they typed and the timestamp the server
-    // returned.
-    // Into the slot the SERVER says it recorded, not the one this page
-    // assumed. signedSlot is authoritative — the server decides whose turn it
-    // was from what is already on the contract, so trusting a local guess here
-    // could write Client 2's name into Client 1's line.
-    if (sigRecord && !sigRecord.hidden) {
-      const toClient2 = data.signedSlot === 'client2';
-      const nameSlot = toClient2 ? sigClient2Name : sigClientName;
-      const dateSlot = toClient2 ? sigClient2Date : sigClientDate;
-      nameSlot.textContent = typedName;
-      dateSlot.textContent = formatSignedAt(data.signedAt);
-    }
-    // One of two signatures. Turn the form round and ask the second partner
-    // rather than telling this couple the agreement is done — it is not, and
-    // signContract has deliberately left the status alone to say so.
-    if (data.complete === false) {
-      askSigner('client2');
-      signBtn.disabled = true;
-      window.scrollTo({ top: whoSignsEl.getBoundingClientRect().top + window.scrollY - 20,
-                        behavior: 'smooth' });
+  box.form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    // A disabled button still permits Enter-key form submission, and a name
+    // field is focused on load, so Enter is how many clients will submit.
+    // Without this, a second Enter while the first call is in flight fires
+    // signContract twice and writes two rows into what is meant to be the legal
+    // audit trail.
+    if (box.btn.disabled || box.signed) return;
+    const typedName = box.nameEl.value.trim();
+    if (!box.consentEl.checked || !typedName) {
+      updateSignBtn(box);
       return;
     }
 
-    if (data.checkoutUrl) {
-      window.location.href = data.checkoutUrl;
-      return;
-    }
-    if (!paymentsOn) {
-      // checkoutUrl is null because payments are off — the normal state
-      // today, not a failure. Nothing went wrong, so nothing here may
-      // apologise, offer a retry, or mention payment at all.
-      showConfirmed(null, data.signedAt, {
-        needsPayment: false, paymentsOn: false,
-        typedName: typedName, justSigned: true
+    // Disabled immediately: without this, a double-tap on a slow connection
+    // fires signContract twice. The function is idempotent per slot so the
+    // second call is harmless, but the client would see two spinners and
+    // assume it failed.
+    box.btn.disabled = true;
+    box.errorEl.textContent = 'Signing…';
+
+    // slot is sent explicitly. It can no longer be derived from how far the
+    // contract has got, because either box may be used first.
+    signContract({ token: token, typedName: typedName, consent: true, slot: box.slot })
+      .then(function (res) {
+        const data = res.data || {};
+        box.errorEl.textContent = '';
+
+        // The panel was drawn from openContract's read, which happened before
+        // this signature existed — so without this it goes on saying "Not yet
+        // signed" on a line the client has just signed, immediately below the
+        // words confirming they did.
+        //
+        // Into the slot the SERVER says it recorded, not the one this page
+        // asked for. signedSlot stays authoritative even though the page now
+        // names the slot: if the two ever disagree, the server's answer is the
+        // one that matches what was actually written.
+        const recorded = data.signedSlot === 'client2' ? box2 : box1;
+        if (sigRecord && !sigRecord.hidden) {
+          const toClient2 = data.signedSlot === 'client2';
+          const nameSlot = toClient2 ? sigClient2Name : sigClientName;
+          const dateSlot = toClient2 ? sigClient2Date : sigClientDate;
+          nameSlot.textContent = typedName;
+          dateSlot.textContent = formatSignedAt(data.signedAt);
+        }
+
+        // Lock the box that was just used, leaving the other one exactly as it
+        // was. It keeps its own half-typed name if the other partner is
+        // mid-signature on the same screen.
+        renderBox(recorded, {
+          show: true,
+          label: recorded.roleEl.textContent,
+          signedName: typedName,
+          signedAt: data.signedAt
+        });
+
+        // Some of two signatures. Say nothing about the agreement being done —
+        // it is not, and signContract has deliberately left the status alone to
+        // say so. The other box simply stays open.
+        if (data.complete === false) {
+          const waiting = recorded === box1 ? box2 : box1;
+          if (waiting.form && !waiting.form.hidden && !waiting.signed) {
+            waiting.form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return;
+        }
+
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+          return;
+        }
+        if (!paymentsOn) {
+          // checkoutUrl is null because payments are off — the normal state
+          // today, not a failure. Nothing went wrong, so nothing here may
+          // apologise, offer a retry, or mention payment at all.
+          showConfirmed(null, data.signedAt, {
+            needsPayment: false, paymentsOn: false,
+            typedName: typedName, justSigned: true
+          });
+          return;
+        }
+        // Payments ARE on and the provider was still unreachable (or, on a
+        // replay, no new session was made). Say something true rather than
+        // something reassuring: the agreement IS signed, and do not imply the
+        // date is held.
+        showConfirmed(null, data.signedAt, {
+          checkoutFailed: true, needsPayment: true, paymentsOn: true,
+          typedName: typedName, justSigned: true
+        });
+      }).catch(function () {
+        box.errorEl.textContent =
+          'Something went wrong sending your signature. Please try again.';
+        updateSignBtn(box);
       });
-      return;
-    }
-    // Payments ARE on and the provider was still unreachable (or, on a
-    // replay, no new session was made). Say something true rather than
-    // something reassuring: the agreement IS signed, and do not imply the
-    // date is held. needsPayment is true because we have just this second
-    // signed and nothing has been paid, so the pay button is offered as
-    // the retry.
-    showConfirmed(null, data.signedAt, {
-      checkoutFailed: true, needsPayment: true, paymentsOn: true,
-      typedName: typedName, justSigned: true
-    });
-  }).catch(function () {
-    signErrorEl.textContent = 'Something went wrong sending your signature. Please try again.';
-    updateSignBtn();
   });
 });
 

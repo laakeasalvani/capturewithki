@@ -409,3 +409,21 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
   .c-card-name{flex:1 1 100%;}
   .c-chevron{margin-left:auto;}
 }
+
+/* How many signatures. A fieldset rather than a select: two options that
+   change what else the form asks for should both be visible at once, not
+   hidden behind a click. */
+.c-signers{
+  border:1px solid var(--line);border-radius:6px;
+  padding:10px 12px 12px;margin:0 0 14px;
+}
+.c-signers legend{font-size:12px;color:var(--muted);padding:0 4px;}
+.c-signer-opt{
+  display:inline-flex;align-items:center;gap:7px;
+  margin-right:18px;font-size:14px;color:var(--ink);cursor:pointer;
+}
+/* The radio must not inherit .s-label input's full-width block rule, which
+   would stretch it across the row and drop the label beneath it. */
+.c-signer-opt input[type="radio"]{
+  display:inline-block;width:auto;margin:0;padding:0;
+}
