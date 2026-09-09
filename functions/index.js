@@ -189,7 +189,10 @@ export const submitInquiry = onCall(
       // The banner photo lives on the same settings document as the wording.
       // clientEmailHtml drops the banner if it is missing or fails its check.
       const banner = template && template.clientImage;
-      await sendEmail({ apiKey: key, to: inquiry.email, subject: m.subject, text: m.text,
+      // Same defect, same fix: a client replying to their own thank-you note
+      // was writing to an address with no mailbox behind it.
+      await sendEmail({ apiKey: key, to: inquiry.email, replyTo: OWNER_EMAIL,
+                        subject: m.subject, text: m.text,
                         html: clientEmailHtml(inquiry, template, banner) });
       clientSent = true;
       console.log('[submitInquiry] client email accepted by Resend');
@@ -831,6 +834,11 @@ export const sendContract = onCall(
       await sendEmail({
         apiKey: key,
         to: contract.clientEmail,
+        // Replies reach her. The From address is hello@capturewithki.com, and
+        // capturewithki.com has NO MX record — it can send mail and cannot
+        // receive any — so without this a client hitting Reply on their own
+        // contract was writing into nowhere and Khiara never saw it.
+        replyTo: OWNER_EMAIL,
         subject: mail.subject,
         text: mail.text,
         html: mail.html
@@ -1275,6 +1283,8 @@ export const signContract = onCall(
       await sendEmail({
         apiKey: key,
         to: contract.clientEmail,
+        // Same reason as sendContract: the From address cannot receive mail.
+        replyTo: OWNER_EMAIL,
         subject: mail.subject,
         text: mail.text,
         html: mail.html
@@ -2451,7 +2461,8 @@ export const chaseContracts = onSchedule(
       try {
         if (action.kind === 'sign-reminder') {
           const m = signReminderEmail(c);
-          await sendEmail({ apiKey: key, to: c.clientEmail, subject: m.subject, text: m.text, html: m.html });
+          await sendEmail({ apiKey: key, to: c.clientEmail, replyTo: OWNER_EMAIL,
+                            subject: m.subject, text: m.text, html: m.html });
           await ref.update({
             signReminderCount: (c.signReminderCount || 0) + 1,
             lastReminderAt: FieldValue.serverTimestamp()
