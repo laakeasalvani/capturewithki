@@ -34,7 +34,7 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
-  computeFeeBlock, validateClientDetails, missingRequiredFields
+  computeFeeBlock, validateClientDetails, missingRequiredFields, resolvePackagePrice
 } from './lib/contracts.js';
 import { validatePackage, requiredSpecsFor } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
@@ -553,11 +553,18 @@ export const createContract = onCall(
       throw new HttpsError('invalid-argument', clientCheck.errors.join(' '));
     }
 
+    // The package price is a default she can override on this booking. Her
+    // weddings are advertised "starting from", so the catalogue figure is a
+    // floor, not the price. resolvePackagePrice does the checking, in lib/
+    // where it can be tested — this number ends up in a signed document.
+    const price = resolvePackagePrice(pkg.priceCents, d.packagePriceCents);
+    if (!price.ok) throw new HttpsError('invalid-argument', price.error);
+
     // Retainer is 30% of the PACKAGE PRICE only, never the total — travel is
     // billed but does not inflate the deposit. See computeFeeBlock's own
     // comment in lib/contracts.js.
     const fees = computeFeeBlock({
-      packagePriceCents: pkg.priceCents,
+      packagePriceCents: price.cents,
       travelFeesCents: Number.isInteger(d.travelFeesCents) ? d.travelFeesCents : 0
     });
     if (fees.totalCents <= 0) throw new HttpsError('invalid-argument', 'That total is not valid.');

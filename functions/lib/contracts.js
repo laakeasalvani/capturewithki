@@ -199,6 +199,37 @@ export function canTransition(from, to) {
   return TRANSITIONS[from].indexOf(to) !== -1;
 }
 
+// The package price is a DEFAULT, not a fixed price.
+//
+// Her weddings are advertised "starting from $750 / $1,000 / $1,200", and a
+// wedding genuinely varies — more hours, a second location, add-ons. A system
+// that could only print the catalogue figure would either make that wording a
+// lie or force a new package for every quote.
+//
+// So the price that reaches the contract is the one she confirms on THIS
+// booking, pre-filled from the package. This lives here rather than in the
+// callable because it decides a number in a signed legal document, and
+// index.js is not unit-tested by this project's convention.
+export function resolvePackagePrice(packagePriceCents, overrideCents) {
+  const blank = overrideCents === undefined || overrideCents === null || overrideCents === '';
+  if (blank) {
+    if (!Number.isInteger(packagePriceCents) || packagePriceCents <= 0) {
+      return { ok: false, error: 'That package has no usable price.' };
+    }
+    return { ok: true, cents: packagePriceCents, overridden: false };
+  }
+
+  // Checked, never coerced. Number('') is 0 and Number('x') is NaN, and either
+  // one silently becomes a wrong figure on a contract somebody signs.
+  if (!Number.isInteger(overrideCents) || overrideCents <= 0) {
+    return { ok: false, error: 'That price must be a whole number of cents above zero.' };
+  }
+  if (overrideCents > MAX_TOTAL_CENTS) {
+    return { ok: false, error: 'That price looks wrong — is it in cents?' };
+  }
+  return { ok: true, cents: overrideCents, overridden: overrideCents !== packagePriceCents };
+}
+
 // The retainer is 30% of the PACKAGE PRICE, never of the total. Her contracts list
 // "Package Price" and "Travel Fees" as separate lines and label the retainer "(30%)",
 // and the owner's decision is that travel is billed but does not inflate the deposit.

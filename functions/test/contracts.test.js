@@ -4,7 +4,7 @@ import {
   DEFAULT_RETAINER_PERCENT, sumLineItems,
   computeRetainerCents, computeBalanceCents,
   isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
-  renderTemplate, STATUSES, canTransition, missingRequiredFields
+  renderTemplate, STATUSES, canTransition, missingRequiredFields, resolvePackagePrice
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -413,4 +413,65 @@ test('optional fields are not required', () => {
     package_name: 'P', package_price: '$1', retainer: '$1', remaining_balance: '$1'
   };
   assert.deepEqual(missingRequiredFields({ ...full, client_phone: '', client_2_name: '' }), []);
+});
+
+// ---------------------------------------------------------------------------
+// resolvePackagePrice — the package figure is a default she can override,
+// because her weddings are advertised "starting from".
+// ---------------------------------------------------------------------------
+
+test('with no override, the package price is used', () => {
+  const r = resolvePackagePrice(120000, undefined);
+  assert.equal(r.ok, true);
+  assert.equal(r.cents, 120000);
+  assert.equal(r.overridden, false);
+});
+
+test('an empty override is not zero — it means "use the package price"', () => {
+  // A blank input field arrives as '' or null. Treating either as the NUMBER
+  // zero would quietly produce a free contract.
+  for (const blank of [undefined, null, '']) {
+    const r = resolvePackagePrice(120000, blank);
+    assert.equal(r.ok, true, 'failed for ' + JSON.stringify(blank));
+    assert.equal(r.cents, 120000);
+  }
+});
+
+test('a real override wins and is reported as overridden', () => {
+  const r = resolvePackagePrice(120000, 160000);
+  assert.equal(r.ok, true);
+  assert.equal(r.cents, 160000);
+  assert.equal(r.overridden, true);
+});
+
+test('an override equal to the package price is not an override', () => {
+  assert.equal(resolvePackagePrice(120000, 120000).overridden, false);
+});
+
+test('a nonsense override is refused, never coerced', () => {
+  // Every one of these would otherwise become a wrong figure on a signed contract.
+  for (const bad of [0, -1, 12.5, '120000', 'abc', NaN, Infinity, {}]) {
+    assert.equal(resolvePackagePrice(120000, bad).ok, false, 'accepted ' + String(bad));
+  }
+});
+
+test('an implausible override is refused, in case dollars were typed as cents', () => {
+  assert.equal(resolvePackagePrice(120000, MAX_TOTAL_CENTS + 1).ok, false);
+  assert.equal(resolvePackagePrice(120000, MAX_TOTAL_CENTS).ok, true);
+});
+
+test('a package with no usable price is refused when nothing overrides it', () => {
+  for (const bad of [undefined, null, 0, -5, 12.5, '120000']) {
+    assert.equal(resolvePackagePrice(bad, undefined).ok, false, 'accepted ' + String(bad));
+  }
+  // ...but an override rescues it, which is how a quote-only package would work.
+  assert.equal(resolvePackagePrice(undefined, 160000).ok, true);
+});
+
+test('the retainer follows the overridden price, not the catalogue one', () => {
+  // The whole point: a Grand quoted at $1,600 must take 30% of $1,600.
+  const price = resolvePackagePrice(120000, 160000);
+  const fees = computeFeeBlock({ packagePriceCents: price.cents, travelFeesCents: 0 });
+  assert.equal(fees.retainerCents, 48000);
+  assert.equal(fees.retainerCents + fees.balanceCents, fees.totalCents);
 });

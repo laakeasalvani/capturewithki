@@ -231,6 +231,16 @@ export function initContracts(container) {
       '</label>' +
       '<p class="s-help" id="cWhichAgreement"></p>' +
 
+      // The catalogue figure is a DEFAULT. Her weddings are advertised
+      // "starting from", so this booking's real price is whatever she quoted.
+      // Pre-filled when a package is chosen; change it and everything below
+      // follows, including the retainer.
+      '<label class="s-label">Package price for this booking, in whole dollars' +
+        '<input type="text" inputmode="numeric" id="cPrice" placeholder="0" maxlength="10">' +
+      '</label>' +
+      '<p class="s-help">Pre-filled from the package. Change it for a bigger day or a custom quote.</p>' +
+      '<p class="c-li-error" id="cPriceError" hidden>Package price has to be a whole dollar amount above zero (no cents).</p>' +
+
       '<label class="s-label">Travel fee, in whole dollars (optional)' +
         '<input type="text" inputmode="numeric" id="cTravel" placeholder="0" maxlength="10">' +
       '</label>' +
@@ -269,6 +279,8 @@ export function initContracts(container) {
     const balanceDueErrorEl = composerBox.querySelector('#cBalanceDueError');
     const packageEl = composerBox.querySelector('#cPackage');
     const whichAgreementEl = composerBox.querySelector('#cWhichAgreement');
+    const priceEl = composerBox.querySelector('#cPrice');
+    const priceErrorEl = composerBox.querySelector('#cPriceError');
     const travelEl = composerBox.querySelector('#cTravel');
     const travelErrorEl = composerBox.querySelector('#cTravelError');
     const feePackageEl = composerBox.querySelector('#cFeePackage');
@@ -314,8 +326,15 @@ export function initContracts(container) {
       const travelInvalid = travelCents === null;
       travelErrorEl.hidden = !travelInvalid;
 
+      // Blank means "use the package price", NOT zero — a blank field must
+      // never quietly produce a free contract.
+      const priceRaw = priceEl.value.trim();
+      const priceCents = priceRaw === '' ? (pkg ? pkg.priceCents : 0) : wholeDollarsToCents(priceRaw);
+      const priceInvalid = priceRaw !== '' && (priceCents === null || priceCents <= 0);
+      priceErrorEl.hidden = !priceInvalid;
+
       const fees = computeFeeBlock({
-        packagePriceCents: pkg ? pkg.priceCents : 0,
+        packagePriceCents: priceInvalid ? 0 : priceCents,
         travelFeesCents: travelInvalid ? 0 : travelCents
       });
 
@@ -343,12 +362,23 @@ export function initContracts(container) {
 
       return {
         pkg: pkg, travelCents: travelCents, travelInvalid: travelInvalid, fees: fees,
+        priceCents: priceCents, priceInvalid: priceInvalid, priceOverridden: priceRaw !== '',
         balanceDueDate: balanceDueDate, balanceDueEmpty: balanceDueEmpty,
         eventDate: eventDate, eventDateEmpty: eventDateEmpty
       };
     }
 
-    packageEl.addEventListener('change', recompute);
+    // Choosing a package pre-fills its price. Overwriting whatever she has
+    // typed is correct here: she just chose a DIFFERENT package, so a price
+    // carried over from the previous one would be wrong and silently so.
+    packageEl.addEventListener('change', function () {
+      const pkg = selectedPackage();
+      priceEl.value = pkg && Number.isInteger(pkg.priceCents)
+        ? String(Math.round(pkg.priceCents / 100))
+        : '';
+      recompute();
+    });
+    priceEl.addEventListener('input', recompute);
     travelEl.addEventListener('input', recompute);
     // Only auto-fills while she hasn't touched the field herself — see
     // balanceDueTouched above. An unparseable event date clears the default
@@ -377,6 +407,11 @@ export function initContracts(container) {
       if (!clientName) { statusEl.textContent = 'Type the client’s name first.'; nameEl.focus(); return; }
       if (!clientEmail) { statusEl.textContent = 'Type the client’s email first.'; emailEl.focus(); return; }
       if (!state.pkg) { statusEl.textContent = 'Choose a package first.'; return; }
+      if (state.priceInvalid) {
+        statusEl.textContent = 'Fix the package price first — it has to be a whole dollar amount above zero.';
+        priceEl.focus();
+        return;
+      }
       if (state.travelInvalid) {
         statusEl.textContent = 'Fix the travel fee first — it has to be a whole dollar amount.';
         travelEl.focus();
@@ -414,6 +449,10 @@ export function initContracts(container) {
           eventLocation: locationEl.value.trim(),
           balanceDueDate: state.balanceDueDate,
           packageId: state.pkg.id,
+          // The price SHE confirmed on this booking, not the catalogue figure.
+          // Sent only when she actually typed one; otherwise the server falls
+          // back to the package's own price.
+          packagePriceCents: state.priceOverridden ? state.priceCents : undefined,
           travelFeesCents: state.travelCents
         });
         contractId = res.data.contractId;
