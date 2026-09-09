@@ -123,9 +123,24 @@ export function initContracts(container) {
   }
 
   async function loadPackages() {
-    const snap = await getDocs(query(collection(db, 'packages'), orderBy('order', 'asc')));
+    // Deliberately NO orderBy. Firestore silently EXCLUDES any document missing
+    // the field being ordered on — so one package hand-created without `order`
+    // would vanish from this picker with no error, no warning, and nothing in
+    // the console. These nine documents are created by hand, which makes that
+    // slip likely rather than theoretical, and an invisible package looks
+    // identical to an empty collection.
+    //
+    // Fetch everything and sort here instead: a package with no `order` sinks
+    // to the bottom of the list rather than disappearing from it.
+    const snap = await getDocs(collection(db, 'packages'));
     const out = [];
     snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+    out.sort(function (a, b) {
+      const ao = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+      const bo = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return String(a.label || '').localeCompare(String(b.label || ''));
+    });
     return out;
   }
 
