@@ -1,6 +1,14 @@
 # Contracts & payments — what happens before this goes live
 
-Branch: `contracts-and-payments`. 34 commits, 227 tests passing, **nothing deployed**.
+Branch: `contracts-and-payments`. **Nothing deployed.**
+
+> **The hand-load procedure has moved.** `functions/seed/` is deleted — its
+> `packages.json` predated the package schema and produced packages
+> `validatePackage` refuses forever, and its steps pointed at a template
+> document id nothing looks up. The one correct procedure for loading the
+> templates and packages into Firestore is
+> `docs/superpowers/2026-09-08-contracts-handover.md`. Follow that, not this
+> file, for anything to do with seeding.
 
 Everything below was deliberately NOT done during the build, because
 `capturewithki-69dd3` is production and there is no staging project. A subagent with
@@ -14,13 +22,16 @@ with the full picture.
    her directly. Test-mode keys work the moment the account exists — only the final
    live charge waits on identity verification.
 2. **Buy a contract.** A purchased photographer template or an Oregon attorney's
-   review. Neither Laakea nor Claude writes the clauses. `functions/seed/` ships a
-   placeholder that a guard makes physically unsendable.
+   review. Neither Laakea nor Claude writes the clauses. Templates are hand-loaded
+   with `isDraft: true`, which a guard in `sendContract` makes physically unsendable
+   until she has read the exact text — see
+   `docs/superpowers/2026-09-08-contracts-handover.md`.
 3. **Confirm the prices.** The live site's own markup says its pricing is fake —
    `index.html:110` ("Pricing is placeholder") and `index.html:693` ("PLACEHOLDER
-   PRICING — replace every figure below before launch"). `functions/seed/seed.md`
-   lists eight prices needing her confirmation. Nothing may be seeded until she
-   states real numbers, or clients sign contracts carrying invented figures.
+   PRICING — replace every figure below before launch").
+   `docs/superpowers/2026-09-08-contracts-handover.md` lists the nine packages
+   needing her confirmed prices. Nothing may be loaded until she states real
+   numbers, or clients sign contracts carrying invented figures.
 
 ## Deploy order — this sequence matters
 
@@ -32,8 +43,11 @@ with the full picture.
 3. In the Rules Playground, confirm: a signed contract allows a `status`-only update;
    denies a `totalCents` update; denies a `signature` update; an UNSENT contract
    allows anything; delete is denied always.
-4. Seed `contractTemplates/placeholder` (isDraft:true) and `packages` — see
-   `functions/seed/seed.md`, whose CONFIRM-WITH-KHIARA section gates the steps.
+4. Load `contractTemplates/wedding`, `/elopement` and `/portrait` (each
+   `isDraft: true`) and the `packages` documents — see
+   `docs/superpowers/2026-09-08-contracts-handover.md`, whose section 1 gates the
+   steps on answers only Khiara can give. The document ids are those three exact
+   keys; `sendContract` looks templates up by `templateKey` and nothing else.
 5. Deploy the functions.
 6. **Before testing any legitimate webhook**, curl a forged signature at the deployed
    `stripeWebhook` and confirm **HTTP 400**. If that ever returns 200, anyone who
@@ -74,4 +88,4 @@ with the full picture.
   charges once regardless, and closing it means undoing the decide-don't-write split
   that makes `markContractPaid` testable without Firestore.
 - **`index.js` has no unit tests**, matching this project's existing convention. The
-  `lib/` modules carry all 227.
+  `lib/` modules carry all of them.

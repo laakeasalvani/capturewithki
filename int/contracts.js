@@ -188,9 +188,24 @@ export function initContracts(container) {
     composerBox.innerHTML =
       '<h3 class="c-block-title">' + (inquiry ? 'New contract' : 'New contract, no inquiry') + '</h3>' +
       '<label class="s-label">Client name(s)<input type="text" id="cName" maxlength="200"></label>' +
+      // Optional — a portrait client has no second party. Left empty, the
+      // contract renders "Client 2: Not applicable". Until this field existed
+      // there was no way to fill it in at all, so every wedding and elopement
+      // said "Not applicable" for a couple.
+      '<label class="s-label">Client 2 name (optional)' +
+        '<input type="text" id="cClient2" maxlength="200" placeholder="The second person signing, if there is one">' +
+      '</label>' +
       '<label class="s-label">Client email<input type="email" id="cEmail" maxlength="254"></label>' +
       '<label class="s-label">Client phone (optional)<input type="text" id="cPhone" maxlength="40"></label>' +
       '<label class="s-label">Event date<input type="text" id="cDate" maxlength="40" placeholder="e.g. June 14, 2027"></label>' +
+      '<p class="c-li-error" id="cDateError" hidden>Set an event date before sending — a contract created without one can never be sent and cannot be deleted.</p>' +
+      // Optional, and genuinely so: a time may not be settled when the
+      // contract goes out. Left empty they render "To be confirmed". But the
+      // wedding and elopement agreements promise N hours of coverage, so
+      // leaving these blank when they ARE known states an obligation with no
+      // start to count from.
+      '<label class="s-label">Start time (optional)<input type="text" id="cStartTime" maxlength="40" placeholder="e.g. 2:00 PM"></label>' +
+      '<label class="s-label">End time (optional)<input type="text" id="cEndTime" maxlength="40" placeholder="e.g. 10:00 PM"></label>' +
       '<label class="s-label">Event location<input type="text" id="cLocation" maxlength="300" placeholder="Venue or city — this is not on the inquiry form yet"></label>' +
 
       '<label class="s-label">Balance due date<input type="text" id="cBalanceDue" maxlength="40" placeholder="e.g. May 29, 2027"></label>' +
@@ -227,9 +242,13 @@ export function initContracts(container) {
     composerBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     const nameEl = composerBox.querySelector('#cName');
+    const client2El = composerBox.querySelector('#cClient2');
     const emailEl = composerBox.querySelector('#cEmail');
     const phoneEl = composerBox.querySelector('#cPhone');
     const dateEl = composerBox.querySelector('#cDate');
+    const dateErrorEl = composerBox.querySelector('#cDateError');
+    const startTimeEl = composerBox.querySelector('#cStartTime');
+    const endTimeEl = composerBox.querySelector('#cEndTime');
     const locationEl = composerBox.querySelector('#cLocation');
     const balanceDueEl = composerBox.querySelector('#cBalanceDue');
     const balanceDueErrorEl = composerBox.querySelector('#cBalanceDueError');
@@ -296,13 +315,21 @@ export function initContracts(container) {
       balanceDueErrorEl.hidden = !balanceDueEmpty;
       feeBalanceDueDateEl.textContent = balanceDueDate || '—';
 
+      // Same shape as the balance-due check above, and for a worse reason:
+      // createContract now refuses a blank event date outright, so this is
+      // what shows her why before she presses the button.
+      const eventDate = dateEl.value.trim();
+      const eventDateEmpty = !eventDate;
+      dateErrorEl.hidden = !eventDateEmpty;
+
       whichAgreementEl.textContent = pkg
         ? 'This will send the ' + templateLabel(pkg.templateKey) + ' agreement.'
         : 'Choose a package to see which agreement it will send.';
 
       return {
         pkg: pkg, travelCents: travelCents, travelInvalid: travelInvalid, fees: fees,
-        balanceDueDate: balanceDueDate, balanceDueEmpty: balanceDueEmpty
+        balanceDueDate: balanceDueDate, balanceDueEmpty: balanceDueEmpty,
+        eventDate: eventDate, eventDateEmpty: eventDateEmpty
       };
     }
 
@@ -340,6 +367,11 @@ export function initContracts(container) {
         travelEl.focus();
         return;
       }
+      if (state.eventDateEmpty) {
+        statusEl.textContent = 'Set an event date first.';
+        dateEl.focus();
+        return;
+      }
       if (state.balanceDueEmpty) {
         statusEl.textContent = 'Set a balance due date first.';
         balanceDueEl.focus();
@@ -355,9 +387,15 @@ export function initContracts(container) {
         const res = await createContractFn({
           inquiryId: inquiry ? inquiry.id : null,
           clientName: clientName,
+          // createContract has always accepted and stored these three; nothing
+          // collected them, so they were dead fields until now. All three are
+          // optional server-side and stay optional here.
+          client2Name: client2El.value.trim(),
           clientEmail: clientEmail,
           clientPhone: phoneEl.value.trim(),
-          eventDate: dateEl.value.trim(),
+          eventDate: state.eventDate,
+          startTime: startTimeEl.value.trim(),
+          endTime: endTimeEl.value.trim(),
           eventLocation: locationEl.value.trim(),
           balanceDueDate: state.balanceDueDate,
           packageId: state.pkg.id,
