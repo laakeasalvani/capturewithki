@@ -17,6 +17,12 @@ const confirmPanel = document.getElementById('sConfirm');
 const clientNameEl = document.getElementById('sClientName');
 const metaEl = document.getElementById('sMeta');
 const bodyEl = document.getElementById('contract-body');
+const sigRecord = document.getElementById('sSigRecord');
+const sigPhotogName = document.getElementById('sSigPhotogName');
+const sigPhotogDate = document.getElementById('sSigPhotogDate');
+const sigClientRole = document.getElementById('sSigClientRole');
+const sigClientName = document.getElementById('sSigClientName');
+const sigClientDate = document.getElementById('sSigClientDate');
 
 const form = document.getElementById('sSignForm');
 const consentEl = document.getElementById('sConsent');
@@ -83,44 +89,39 @@ function formatCents(cents) {
   return (negative ? '-$' : '$') + grouped + '.' + rest;
 }
 
-// The signature is applied to the document at DISPLAY time and is never merged
-// into the stored snapshot.
+// The signature record, shown in its own panel below the form.
 //
-// That snapshot is hashed the moment it is sent, and that hash is the whole
-// proof that the client signed exactly what they were shown. Writing their name
-// into it after the fact would break the one thing it exists to establish. So
-// the template carries empty slots, the hash covers the document WITH those
-// slots empty, and this fills them in the browser.
+// It is deliberately NOT part of the agreement text. The document is frozen
+// and hashed the moment it is sent, so a signature can never be written into
+// it without breaking the one thing that hash exists to prove. Every
+// e-signature service draws the same line: the agreement is fixed, the
+// signature is a record attached to it.
 //
-// Before this existed the signature block rendered as blank lines — including
-// Khiara's own — so a printed copy of a signed agreement looked signed by
-// nobody, with the evidence living only in a database row.
-function applySignatures(data) {
-  function fill(slot, value) {
-    const nodes = bodyEl.querySelectorAll('[data-sig="' + slot + '"]');
-    for (const el of nodes) el.textContent = value;   // textContent: the name is the client's own input
-  }
+// Her half is real from the start — she countersigns before the contract goes
+// out, so it is filled in even while the client is still reading.
+function renderSignatureRecord(data) {
+  if (!sigRecord) return;
+  sigRecord.hidden = false;
+
+  // textContent throughout: these are names, one of which the client typed.
+  sigPhotogName.textContent = data.photographerName || 'Khiara Salvani';
+  sigPhotogDate.textContent = typeof data.photographerSignedAt === 'number'
+    ? formatSignedAt(data.photographerSignedAt)
+    : '\u2014';
+
+  const hasClient2 = !!(data.client2Name && data.client2Name.trim());
+  sigClientRole.textContent = hasClient2 ? 'Client 1' : 'Client';
 
   if (data.typedName && data.signedAt) {
-    const when = formatSignedAt(data.signedAt);
-    fill('c1-sig', data.typedName);
-    fill('c1-name', data.typedName);
-    fill('c1-date', when);
+    sigClientName.textContent = data.typedName;
+    sigClientDate.textContent = formatSignedAt(data.signedAt);
+  } else {
+    // A dash and a plain statement, never a blank line. A blank reads as a
+    // party who failed to sign; this reads as one who has not signed yet.
+    sigClientName.textContent = '\u2014';
+    sigClientDate.textContent = 'Not yet signed';
   }
-
-  // No second client on this booking: remove the block rather than leave it
-  // showing em dashes under a "CLIENT 2" heading, which reads as a party who
-  // failed to sign instead of one who was never required to.
-  const c2 = bodyEl.querySelector('[data-sig-block="client2"]');
-  if (c2 && !(data.client2Name && data.client2Name.trim())) c2.remove();
 }
-
-// Her timezone, not the reader's — and it must match the one the server uses
-// for her countersignature (BUSINESS_TZ in functions/index.js). Left as the
-// browser's own zone, a client signing at 23:00 Pacific saw themselves dated a
-// day BEFORE the photographer on the same document, and a client abroad saw a
-// different date again from the one stored in the audit record.
-const BUSINESS_TZ = 'America/Los_Angeles';   // Portland, Oregon
 
 function formatSignedAt(ms) {
   if (typeof ms !== 'number') return 'recently';
@@ -296,7 +297,7 @@ if (!token) {
     // admin-authored template's own. innerHTML is correct HERE and only
     // because of that — never point it at anything a client can write.
     bodyEl.innerHTML = data.documentSnapshot || '';
-    applySignatures(data);
+    renderSignatureRecord(data);
 
     if (data.status === 'signed' || data.status === 'paid' || data.signedAt) {
       // The real status, read from the document, decides the message —

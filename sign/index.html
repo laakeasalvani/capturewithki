@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sign.css?v=20260909060641">
+<link rel="stylesheet" href="sign.css?v=20260909061542">
 </head>
 <body>
 
@@ -74,6 +74,37 @@
       <button type="submit" id="sSignBtn" class="s-btn" disabled>I agree and sign</button>
       <p class="s-note" id="sSignError" role="status" aria-live="polite"></p>
     </form>
+
+    <!-- The signature record.
+
+         Deliberately NOT part of the agreement text. The document is frozen
+         and hashed the moment it is sent, so a signature can never be inside
+         it without breaking the proof of what was shown. This is the same
+         separation every e-signature service makes: the agreement is fixed,
+         the signature is a record attached to it.
+
+         It sits AFTER the form because that is the order the document itself
+         describes — the last thing the contract says is "by signing below",
+         and now there is something below.
+
+         Khiara's half is real from the moment the contract is sent: she
+         countersigns before it goes out. The client's half fills in when they
+         sign, and shows a dash until then rather than a blank line. -->
+    <section class="s-sigrecord" id="sSigRecord" hidden>
+      <h2 class="s-subtitle">Signatures</h2>
+      <div class="s-sigrecord-grid">
+        <div>
+          <p class="s-sigrecord-role">Photographer</p>
+          <p class="s-sigrecord-ink" id="sSigPhotogName">&mdash;</p>
+          <p class="s-sigrecord-date" id="sSigPhotogDate">&mdash;</p>
+        </div>
+        <div>
+          <p class="s-sigrecord-role" id="sSigClientRole">Client</p>
+          <p class="s-sigrecord-ink" id="sSigClientName">&mdash;</p>
+          <p class="s-sigrecord-date" id="sSigClientDate">Not yet signed</p>
+        </div>
+      </div>
+    </section>
   </section>
 
   <!-- Shown after signing just now, and shown instead of the form again if a
@@ -121,6 +152,6 @@
      stale code. On the marketing site that is a cosmetic risk; on
      the page where somebody signs a contract it is not.
      bin/stamp-version.sh rewrites these. -->
-<script type="module" src="sign.js?v=20260909060641"></script>
+<script type="module" src="sign.js?v=20260909061542"></script>
 </body>
 </html>

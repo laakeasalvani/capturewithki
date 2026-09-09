@@ -93,41 +93,52 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 100px;max-width:760px;mar
 }
 
 /* ---------------------------------------------------------------------------
-   The signature block.
+   The signature record.
 
-   The document is frozen and hashed before it is sent, so the signature can
-   never be part of it — sign.js fills these slots in the browser instead. An
-   unsigned contract therefore shows an em dash here, not a blank line, which
-   is the honest thing: nobody has signed yet.
+   Its own panel below the form, not part of the agreement text. The document
+   is frozen and hashed when it is sent, so the signature cannot live inside it
+   without breaking the proof of what was shown — the same separation every
+   e-signature service makes.
    --------------------------------------------------------------------------- */
-.s-contract .sig-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1.4rem 0;
+.s-sigrecord{
+  margin:34px 0 8px;
+  padding:22px 24px;
+  background:var(--paper);
+  border:1px solid var(--line);
 }
-/* The generic rule above borders every table in the contract. A signature
-   area is not a data grid — drop the box and keep one rule under the headers. */
-.s-contract .sig-table,
-.s-contract .sig-table th,
-.s-contract .sig-table td { border: none; }
-.s-contract .sig-table th { border-bottom: 1px solid var(--line); }
-.s-contract .sig-table th {
-  text-align: left;
-  font-family: var(--sans);
-  font-size: .78rem;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 0 1rem .5rem 0;
-  }
-.s-contract .sig-table td {
-  padding: .55rem 1rem .55rem 0;
-  vertical-align: top;
+.s-sigrecord .s-subtitle{margin:0 0 18px;}
+.s-sigrecord-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:26px;
 }
-/* The typed name IS the signature, so it should not look like body text. */
-.s-contract .sig-ink {
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 1.25em;
-  color: var(--ink);
+.s-sigrecord-role{
+  margin:0 0 6px;
+  font-family:var(--sans);
+  font-size:11px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+/* The typed name IS the signature, so it must not read as body text. */
+.s-sigrecord-ink{
+  margin:0;
+  font-family:var(--display);
+  font-style:italic;
+  font-size:24px;
+  line-height:1.25;
+  color:var(--ink);
+  word-break:break-word;
+}
+.s-sigrecord-date{
+  margin:4px 0 0;
+  font-family:var(--sans);
+  font-size:13px;
+  color:var(--muted);
+}
+/* One column on a phone: two 24px script names side by side wrap badly, and a
+   name is the last thing that should be broken across lines here. */
+@media (max-width:560px){
+  .s-sigrecord{padding:18px;}
+  .s-sigrecord-grid{grid-template-columns:1fr;gap:20px;}
 }

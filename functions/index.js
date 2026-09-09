@@ -967,6 +967,12 @@ export const openContract = onCall(
       // shows an empty signature line under a named heading, which reads as a
       // party who failed to sign rather than one who was never required to.
       client2Name: contract.client2Name || '',
+      // Her half of the signature record. It used to live inside the document
+      // as merge fields; the signature block is now a separate panel below the
+      // form, so the page needs these directly. She countersigns at send time,
+      // which is why sentAt is the date shown against her name.
+      photographerName: PHOTOGRAPHER_NAME,
+      photographerSignedAt: contract.sentAt ? contract.sentAt.toMillis() : null,
       // Signed, and no payment recorded. This is what puts a pay button on the
       // page after an abandoned checkout — the client's only remaining route
       // back to Stripe, since no reminder email can carry a signing link.
