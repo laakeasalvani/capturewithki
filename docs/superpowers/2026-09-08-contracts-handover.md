@@ -43,6 +43,44 @@ type. Nothing can send a portrait contract until she fills this in:
 
 ---
 
+### d. Wedding prices are a floor, not a price — and the code cannot hold a floor
+
+Her site reads *"Starting from $750 / $1,000 / $1,200"* for The Intimate, The Classic and
+The Grand. A contract cannot say "starting from": `createContract` sets
+`packagePriceCents: pkg.priceCents` (`functions/index.js:560`) and the only money the
+caller may supply is `travelFeesCents`.
+
+So confirming the three wedding numbers is not enough. She has to decide:
+
+- **Fixed price per package** — the three figures become real prices, the "starting
+  from" wording comes off the site, and nothing needs building; or
+- **Quoted per booking** — someone builds a per-contract price field first. Nothing
+  ships a wedding contract until that exists.
+
+Elopement ($300) and the five portrait sessions are single figures already and do not
+have this problem.
+
+### e. The portrait specs exist on her SITE even though the PDF is blank
+
+`index.html` carries all four required specs for every session type. These are
+candidates for her to confirm or correct, **not values to load as-is** — the pricing
+above them is flagged placeholder in her own markup:
+
+| Session | Minutes | Edited images | Locations | Outfit changes |
+|---|---|---|---|---|
+| Couples | 60 | 30–50 | 1 | 1 |
+| Engagement | 60 | 75+ | 1 | 2 |
+| Family | 60 | 50+ | 1 | **missing** |
+| Maternity | 60 | 50+ | 1 | 1 |
+| Senior | 30–45 | 25+ | 1 | 2 |
+
+Two real gaps remain: **Family has no outfit-change figure anywhere**, and
+`specs.outfitChanges` is required for the portrait template, so a Family contract is
+refused until she gives one. And Senior's *"Add a friend: +$25, +15 min"* has no field
+in the schema — decide whether it becomes a separate package or is dropped.
+
+---
+
 ## 2. The contract templates are NOT in this repository, deliberately
 
 **This repository is public.** That was verified during the build — an unauthenticated
@@ -96,7 +134,7 @@ five portrait.
 |---|---|
 | `label` | what SHE picks from, e.g. "The Grand — 8 Hours" |
 | `templateKey` | exactly `wedding`, `elopement` or `portrait` |
-| `priceCents` | **cents, not dollars.** $1,200 is `120000`. Confirmed prices only |
+| `priceCents` | **cents, not dollars.** $1,200 is `120000`. Confirmed prices only. This is the ONLY price a contract can carry — `createContract` reads `pkg.priceCents` and there is no per-contract override, so a "starting from" figure cannot be represented. See §1d |
 | `order` | display order |
 | `active` | `true` |
 | `specs.packageName` | what the CONTRACT says, e.g. "The Grand 8-Hour Package" |
@@ -125,9 +163,33 @@ is refused when she tries to use it, with a message naming the field.
    dashboard shows it correctly at each step
 5. Only then flip a template's `isDraft` to `false`
 
-**Payments are off** and no Stripe secret is needed. `PAYMENT_PROVIDER` is unset, which
-means `'off'`. The Stripe implementation is still in the repo, dormant — switching it on
-later is that one environment variable plus keys, not a rebuild.
+**Payments are off**, but the Stripe secrets must still EXIST or the functions deploy
+fails outright:
+
+```
+Error: In non-interactive mode but have no value for the secret STRIPE_SECRET_KEY
+```
+
+Four functions bind `STRIPE_SECRET_KEY` at deploy time (`signContract`,
+`startRetainerPayment`, `stripeWebhook`, `chaseContracts`) and two bind
+`STRIPE_WEBHOOK_SECRET`. That binding is deliberate — see the comment at
+`functions/index.js:971`. Deploy-time binding is not the same as needing a valid key:
+`getStripe()` in `lib/stripe.js` is lazy and only reachable through `getProvider()`'s
+`stripe` branch, which `PAYMENT_PROVIDER` unset never takes.
+
+Both secrets were therefore created on 2026-09-08 holding deliberately invalid
+placeholders, never read while payments are off:
+
+```
+STRIPE_SECRET_KEY      = payments-are-off-not-a-real-key
+STRIPE_WEBHOOK_SECRET  = payments-are-off-not-a-real-webhook-secret
+```
+
+**Turning payments on means replacing BOTH** via `firebase functions:secrets:set`, then
+setting `PAYMENT_PROVIDER` and redeploying. A real key alone will not do it, and the
+placeholder will not announce itself — a Stripe call would fail at runtime, not at
+deploy. The Stripe implementation is otherwise dormant in the repo, so switching on is
+configuration, not a rebuild.
 
 ---
 
