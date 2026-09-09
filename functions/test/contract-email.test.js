@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import {
   formatCents, readyToSignEmail, signedCopyEmail,
-  signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail
+  signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail,
+  ownerSignedNoticeEmail
 } from '../lib/contract-email.js';
 
 // A stand-in for a Firestore Timestamp: chaseContracts hands these builders
@@ -200,4 +201,69 @@ test('a newline in the client name cannot forge either owner-alert subject', () 
     sentAt: fakeTimestamp(new Date(Date.UTC(2026, 8, 1)))
   });
   assert.equal(alert2.subject.includes('\n'), false);
+});
+
+// ---------------------------------------------------------------------------
+// Telling Khiara a contract has been signed.
+// ---------------------------------------------------------------------------
+
+const signed = {
+  clientName: 'Jordan Rivera',
+  clientEmail: 'jordan@example.com',
+  clientPhone: '555 0101',
+  eventDate: 'June 12, 2027',
+  totalCents: 120000,
+  retainerCents: 36000
+};
+
+test('she is told who signed, and both partners are named', () => {
+  const one = ownerSignedNoticeEmail(signed);
+  assert.match(one.subject, /Jordan Rivera signed their contract/);
+
+  const two = ownerSignedNoticeEmail({ ...signed, client2Name: 'Sam Rivera' });
+  assert.match(two.subject, /Jordan Rivera and Sam Rivera signed their contract/);
+  assert.match(two.html, /Jordan Rivera and Sam Rivera/);
+});
+
+// The whole point of this email. A signed contract with no retainer does NOT
+// hold the date, and she is the only one who can record that it arrived.
+test('an unpaid retainer says the date is NOT held', () => {
+  const m = ownerSignedNoticeEmail(signed);
+  assert.match(m.text, /has NOT been recorded/);
+  assert.match(m.text, /date is not held/);
+  assert.doesNotMatch(m.text, /The date is held\./);
+});
+
+test('a recorded retainer says the date IS held', () => {
+  const m = ownerSignedNoticeEmail({ ...signed, retainerReceivedAt: new Date() });
+  assert.match(m.text, /The date is held\./);
+  assert.doesNotMatch(m.text, /NOT been recorded/);
+});
+
+test('the money and the date are in the email, not just a link', () => {
+  const m = ownerSignedNoticeEmail(signed);
+  assert.match(m.text, /June 12, 2027/);
+  assert.match(m.text, /\$1,200\.00/);
+  assert.match(m.text, /\$360\.00/);
+  assert.match(m.text, /jordan@example\.com/);
+});
+
+test('a hostile client name cannot inject markup into her inbox', () => {
+  const m = ownerSignedNoticeEmail({ ...signed, clientName: '<script>alert(1)</script>' });
+  assert.doesNotMatch(m.html, /<script>/);
+  assert.match(m.html, /&lt;script&gt;/);
+});
+
+test('missing details degrade to words rather than blanks or undefined', () => {
+  const m = ownerSignedNoticeEmail({ clientName: 'Jordan Rivera' });
+  assert.doesNotMatch(m.text, /undefined/);
+  assert.doesNotMatch(m.subject, /undefined/);
+  assert.match(m.text, /not given/);
+  assert.match(m.text, /not set/);
+});
+
+// A subject carrying a newline would let a crafted name forge headers.
+test('the subject is a single line whatever the name contains', () => {
+  const m = ownerSignedNoticeEmail({ ...signed, clientName: 'Jordan\nBcc: someone@evil.com' });
+  assert.doesNotMatch(m.subject, /\n/);
 });

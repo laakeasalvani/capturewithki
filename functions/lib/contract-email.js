@@ -349,3 +349,78 @@ export function unsignedEscalationEmail(c) {
 
   return { subject: subject, text: text, html: html };
 }
+
+// Telling HER a contract has been signed.
+//
+// This did not exist. signContract emailed the signed copy to the client and
+// nobody told Khiara anything — so the only mail she ever received about a
+// contract was an alarm saying a client had NOT opened it or had NOT signed
+// it. She was told when nothing happened and told nothing when the thing she
+// was waiting for did, which is exactly backwards: a signed contract is the
+// one that needs her to act.
+//
+// It leads with the retainer, because that is the action. A signed contract
+// with no retainer recorded does NOT hold the date — the same wording the
+// dashboard and the client's own page use, so all three agree.
+export function ownerSignedNoticeEmail(c) {
+  const d = c || {};
+  const name = oneLine(d.clientName);
+  const second = oneLine(d.client2Name);
+  const who = second ? name + ' and ' + second : name;
+  const email = oneLine(d.clientEmail);
+  const phone = oneLine(d.clientPhone) || 'not given';
+  const eventDate = oneLine(d.eventDate) || 'not set';
+  const total = formatCents(d.totalCents) || '—';
+  const retainer = formatCents(d.retainerCents) || '—';
+  const paid = !!d.retainerReceivedAt;
+
+  const subject = who + ' signed their contract';
+  const action = paid
+    ? 'The retainer is recorded. The date is held.'
+    : 'The retainer has NOT been recorded yet, so the date is not held. '
+      + 'Mark it received in the dashboard once it reaches you.';
+
+  const text = [
+    who + ' signed their agreement.',
+    '',
+    'Event date: ' + eventDate,
+    'Total: ' + total,
+    'Retainer: ' + retainer,
+    '',
+    action,
+    '',
+    'Email: ' + email,
+    'Phone: ' + phone,
+    '',
+    DASHBOARD_URL
+  ].join('\n');
+
+  const html =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ' +
+      'style="background:' + C.bg + ';padding:24px 0;"><tr><td align="center">' +
+      '<table role="presentation" width="560" cellpadding="0" cellspacing="0" ' +
+        'style="background:' + C.paper + ';border:1px solid ' + C.line + ';padding:32px;">' +
+        '<tr><td style="font-family:' + SERIF + ';font-size:20px;color:' + C.ink + ';">' +
+          escapeHtml(who) + ' signed their contract' +
+        '</td></tr>' +
+        '<tr><td style="font-family:' + SANS + ';font-size:14px;color:' + C.muted + ';padding-top:16px;">' +
+          'Event date: ' + escapeHtml(eventDate) + '<br>' +
+          'Total: ' + escapeHtml(total) + '<br>' +
+          'Retainer: ' + escapeHtml(retainer) +
+        '</td></tr>' +
+        '<tr><td style="font-family:' + SANS + ';font-size:15px;font-weight:bold;color:' +
+          (paid ? C.ink : '#a4342a') + ';padding-top:16px;">' +
+          escapeHtml(action) +
+        '</td></tr>' +
+        '<tr><td style="font-family:' + SANS + ';font-size:14px;color:' + C.muted + ';padding-top:16px;">' +
+          escapeHtml(email) + '<br>' + escapeHtml(phone) +
+        '</td></tr>' +
+        '<tr><td style="padding-top:24px;">' +
+          '<a href="' + DASHBOARD_URL + '" style="font-family:' + SANS + ';font-size:15px;background:' +
+            C.khaki + ';color:#fff;padding:12px 20px;text-decoration:none;display:inline-block;">' +
+            'Open the dashboard</a>' +
+        '</td></tr>' +
+      '</table></td></tr></table>';
+
+  return { subject: subject, text: text, html: html };
+}

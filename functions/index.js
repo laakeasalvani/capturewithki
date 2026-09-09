@@ -41,7 +41,8 @@ import { validatePackage, requiredSpecsFor } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import {
   readyToSignEmail, signedCopyEmail, formatCents,
-  signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail
+  signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail,
+  ownerSignedNoticeEmail
 } from './lib/contract-email.js';
 import { dueActions } from './lib/chase.js';
 import { fakePayAllowed, markContractPaid, getProvider, providerName, paymentsEnabled } from './lib/payments.js';
@@ -1295,6 +1296,31 @@ export const signContract = onCall(
       // signing did not work. The opposite of sendContract's rollback — the
       // difference is that here the important thing already succeeded.
       console.warn('[signContract] confirmation email failed:', describeError(err));
+    }
+
+    // And tell HER. Sent separately rather than as a cc on the client's copy,
+    // because the two say different things: theirs confirms the agreement,
+    // hers names the action — record the retainer, or the date is not held.
+    //
+    // Its own try/catch, so a failure delivering her notice cannot swallow the
+    // client's confirmation or the other way round. Swallowed for the same
+    // reason as above: the signature is already committed, and nothing about
+    // an email failing may make a signed contract look unsigned. The dashboard
+    // remains the source of truth she can always check.
+    try {
+      const notice = ownerSignedNoticeEmail(contract);
+      await sendEmail({
+        apiKey: key,
+        to: OWNER_EMAIL,
+        // So she can answer the client straight from the notification.
+        replyTo: contract.clientEmail,
+        subject: notice.subject,
+        text: notice.text,
+        html: notice.html
+      });
+      console.log('[signContract] owner notified:', ref.id);
+    } catch (err) {
+      console.warn('[signContract] owner notice failed:', describeError(err));
     }
     }
 
