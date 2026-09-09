@@ -23,6 +23,10 @@ const sigPhotogDate = document.getElementById('sSigPhotogDate');
 const sigClientRole = document.getElementById('sSigClientRole');
 const sigClientName = document.getElementById('sSigClientName');
 const sigClientDate = document.getElementById('sSigClientDate');
+const sigClient2Block = document.getElementById('sSigClient2Block');
+const sigClient2Name = document.getElementById('sSigClient2Name');
+const sigClient2Date = document.getElementById('sSigClient2Date');
+const whoSignsEl = document.getElementById('sWhoSigns');
 
 const form = document.getElementById('sSignForm');
 const consentEl = document.getElementById('sConsent');
@@ -51,6 +55,14 @@ let retainerCents = null;
 // so the post-sign handler below (which gets no fresh read of its own) can
 // still branch on it.
 let paymentsOn = false;
+
+// Which partner the form is currently collecting. Both sign on this one link
+// in turn, so after Client 1 signs the form comes back for Client 2 — and the
+// sign handler needs to know which of them it just recorded without a fresh
+// read from the server.
+let awaitingSigner = 'client1';
+let client1Label = 'Client';
+let client2Label = '';
 
 // One calm sentence for every failure to open checkout, whether the provider
 // refused, the network died, or the function threw. The error code never
@@ -121,6 +133,36 @@ function renderSignatureRecord(data) {
     sigClientName.textContent = '\u2014';
     sigClientDate.textContent = 'Not yet signed';
   }
+
+  // The column only exists when the contract names a second client. Shown
+  // with a dash while waiting, so the couple can see one signature is still
+  // outstanding rather than assuming the agreement is done.
+  sigClient2Block.hidden = !hasClient2;
+  if (hasClient2) {
+    if (data.typedName2 && data.signed2At) {
+      sigClient2Name.textContent = data.typedName2;
+      sigClient2Date.textContent = formatSignedAt(data.signed2At);
+    } else {
+      sigClient2Name.textContent = '\u2014';
+      sigClient2Date.textContent = 'Not yet signed';
+    }
+  }
+}
+
+// Points the form at whichever partner still has to sign, and names them.
+// Without this the second partner is shown a form they just watched somebody
+// else fill in, with no indication it is now their turn.
+function askSigner(who) {
+  awaitingSigner = who;
+  const name = who === 'client2' ? client2Label : client1Label;
+  whoSignsEl.hidden = false;
+  whoSignsEl.textContent = who === 'client2'
+    ? name + ', it is your turn to sign. Your partner has signed above.'
+    : name + ', please read the agreement above and sign below.';
+  nameEl.value = '';
+  consentEl.checked = false;
+  signBtn.disabled = true;
+  signErrorEl.textContent = '';
 }
 
 // Her timezone, not the reader's — and it must match the one the server uses
@@ -310,7 +352,22 @@ if (!token) {
     // admin-authored template's own. innerHTML is correct HERE and only
     // because of that — never point it at anything a client can write.
     bodyEl.innerHTML = data.documentSnapshot || '';
+    // Names for the form's prompt, captured before any branch below returns.
+    client1Label = data.clientName || 'Client';
+    client2Label = (data.client2Name && data.client2Name.trim()) || 'Client 2';
+
     renderSignatureRecord(data);
+
+    // One of two signatures is not a signed contract. A two-signer agreement
+    // waiting on the second partner must NOT reach the confirm panel — it
+    // shows the form again, addressed to them. Checked before the signed
+    // branch below, which keys on signedAt and would otherwise swallow this
+    // case the moment Client 1 signed.
+    if (data.awaitingSigner === 'client2') {
+      show('contract');
+      askSigner('client2');
+      return;
+    }
 
     if (data.status === 'signed' || data.status === 'paid' || data.signedAt) {
       // The real status, read from the document, decides the message —
@@ -332,6 +389,7 @@ if (!token) {
     }
 
     show('contract');
+    askSigner('client1');
     nameEl.focus();
   }).catch(function () {
     // openContract deliberately returns one identical refusal for every bad
@@ -379,10 +437,28 @@ form.addEventListener('submit', function (e) {
     // confirming they had. There is no fresh read on this path, so update it
     // from what we know: the name they typed and the timestamp the server
     // returned.
+    // Into the slot the SERVER says it recorded, not the one this page
+    // assumed. signedSlot is authoritative — the server decides whose turn it
+    // was from what is already on the contract, so trusting a local guess here
+    // could write Client 2's name into Client 1's line.
     if (sigRecord && !sigRecord.hidden) {
-      sigClientName.textContent = typedName;
-      sigClientDate.textContent = formatSignedAt(data.signedAt);
+      const toClient2 = data.signedSlot === 'client2';
+      const nameSlot = toClient2 ? sigClient2Name : sigClientName;
+      const dateSlot = toClient2 ? sigClient2Date : sigClientDate;
+      nameSlot.textContent = typedName;
+      dateSlot.textContent = formatSignedAt(data.signedAt);
     }
+    // One of two signatures. Turn the form round and ask the second partner
+    // rather than telling this couple the agreement is done — it is not, and
+    // signContract has deliberately left the status alone to say so.
+    if (data.complete === false) {
+      askSigner('client2');
+      signBtn.disabled = true;
+      window.scrollTo({ top: whoSignsEl.getBoundingClientRect().top + window.scrollY - 20,
+                        behavior: 'smooth' });
+      return;
+    }
+
     if (data.checkoutUrl) {
       window.location.href = data.checkoutUrl;
       return;

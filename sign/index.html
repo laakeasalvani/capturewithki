@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sign.css?v=20260909062126">
+<link rel="stylesheet" href="sign.css?v=20260909062743">
 </head>
 <body>
 
@@ -50,6 +50,12 @@
     <div id="contract-body" class="s-contract"></div>
 
     <form id="sSignForm" class="s-signform" novalidate>
+
+      <!-- Named signer. On a two-signer contract both partners sign on this
+           one link in turn, so the form has to say plainly whose turn it is —
+           otherwise the second partner sees a form they have already watched
+           someone fill in. -->
+      <p class="s-copy s-whosigns" id="sWhoSigns" hidden></p>
 
       <div class="s-consent">
         <h2 class="s-subtitle">Signing this electronically</h2>
@@ -103,6 +109,12 @@
           <p class="s-sigrecord-ink" id="sSigClientName">&mdash;</p>
           <p class="s-sigrecord-date" id="sSigClientDate">Not yet signed</p>
         </div>
+        <!-- Only shown when the contract actually names a second client. -->
+        <div id="sSigClient2Block" hidden>
+          <p class="s-sigrecord-role">Client 2</p>
+          <p class="s-sigrecord-ink" id="sSigClient2Name">&mdash;</p>
+          <p class="s-sigrecord-date" id="sSigClient2Date">Not yet signed</p>
+        </div>
       </div>
     </section>
   </section>
@@ -152,6 +164,6 @@
      stale code. On the marketing site that is a cosmetic risk; on
      the page where somebody signs a contract it is not.
      bin/stamp-version.sh rewrites these. -->
-<script type="module" src="sign.js?v=20260909062126"></script>
+<script type="module" src="sign.js?v=20260909062743"></script>
 </body>
 </html>

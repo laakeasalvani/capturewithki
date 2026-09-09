@@ -973,6 +973,17 @@ export const openContract = onCall(
       // which is why sentAt is the date shown against her name.
       photographerName: PHOTOGRAPHER_NAME,
       photographerSignedAt: contract.sentAt ? contract.sentAt.toMillis() : null,
+      // Client 2's half. Both partners sign on this one link in turn, so the
+      // page has to know which of them it is still waiting for.
+      signed2At: contract.signed2At ? contract.signed2At.toMillis() : null,
+      typedName2: contract.signature2 ? contract.signature2.typedName : null,
+      // null once nobody else has to sign. Note this is about SIGNATURES, not
+      // status: a two-signer contract sits at 'opened' with one signature on
+      // it, because one of two is not a signed contract.
+      awaitingSigner: !contract.signedAt
+        ? 'client1'
+        : ((contract.client2Name && String(contract.client2Name).trim() && !contract.signed2At)
+            ? 'client2' : null),
       // Signed, and no payment recorded. This is what puts a pay button on the
       // page after an abandoned checkout — the client's only remaining route
       // back to Stripe, since no reminder email can carry a signing link.
@@ -1050,10 +1061,37 @@ export const signContract = onCall(
     // idempotency key, so calling it again on a replay would mint a second,
     // orphaned session. checkoutUrl is null; a client who lands back on this
     // path after already being redirected once has no need of a second one.
-    if (contract.signedAt) {
-      return { ok: true, signedAt: contract.signedAt.toMillis(), checkoutUrl: null };
+    // Two signers, one link. Both partners sign on the same page in turn,
+    // which is how a couple actually does this — sitting together on one
+    // phone. The trade is weaker attribution than two separate links would
+    // give: on one link, nothing proves the second name was typed by the
+    // second person. Each signature therefore captures its OWN ip, user agent
+    // and server timestamp, so two signings made at different moments or on
+    // different devices are at least distinguishable in the record.
+    const needsTwo = !!(contract.client2Name && String(contract.client2Name).trim());
+    const c1Done = !!contract.signedAt;
+    const c2Done = !!contract.signed2At;
+
+    // Fully signed already. Idempotent for the same reasons as before: a
+    // replayed token, a double-tap, or a client who hits back must never
+    // produce a second signature or a second checkout session.
+    if (c1Done && (!needsTwo || c2Done)) {
+      return {
+        ok: true, signedAt: contract.signedAt.toMillis(),
+        checkoutUrl: null, complete: true, awaitingSigner: null
+      };
     }
-    if (!canTransition(contract.status, 'signed')) {
+
+    // Whose turn. Order is enforced rather than chosen by the caller: the
+    // page only offers Client 2's form once Client 1 has signed, so a request
+    // arriving in the other order came from something other than the page.
+    const slot = c1Done ? 'client2' : 'client1';
+    const willComplete = slot === 'client2' || !needsTwo;
+
+    // Only checked when this signature actually completes the agreement.
+    // Client 1 signing a two-signer contract leaves the status alone, because
+    // one of two signatures is not a signed contract.
+    if (willComplete && !canTransition(contract.status, 'signed')) {
       throw new HttpsError('failed-precondition', CONTRACT_DENIED);
     }
 
@@ -1074,35 +1112,41 @@ export const signContract = onCall(
     // possibility of the two writes splitting.
     const auditRef = ref.collection('audit').doc();
     const batch = db.batch();
-    batch.update(ref, {
-      status: 'signed',
-      // The SERVER's clock, and ONLY EVER a serverTimestamp — never a JS
-      // Date or a number. This project has already been bitten once by
-      // trusting a client clock, in the spam check that would have binned
-      // real clients whose phone ran fast; the stakes here are a contested
-      // contract date. openContract's return path also does
-      // contract.signedAt.toMillis() with no guard that the field really is
-      // a Timestamp — this function is what creates the field, so that
-      // assumption must always hold.
-      signedAt: FieldValue.serverTimestamp(),
-      signature: {
-        typedName: typedName,
-        ip: ip,
-        userAgent: userAgent,
-        // Copied, not referenced, so the signature record stands alone even
-        // if every other field on the contract were altered later.
-        documentHash: contract.documentHash,
-        consentGiven: true,
-        consentTextVersion: 'esign-disclosure-v1'
-      }
-    });
+    // Every timestamp here is a serverTimestamp and ONLY EVER a
+    // serverTimestamp — never a JS Date or a number. This project has already
+    // been bitten once by trusting a client clock, in the spam check that
+    // would have binned real clients whose phone ran fast; the stakes here are
+    // a contested contract date. openContract calls .toMillis() on these
+    // fields with no guard that they really are Timestamps — this function is
+    // what creates them, so that assumption must always hold.
+    const signatureRecord = {
+      typedName: typedName,
+      ip: ip,
+      userAgent: userAgent,
+      // Copied, not referenced, so the signature record stands alone even
+      // if every other field on the contract were altered later.
+      documentHash: contract.documentHash,
+      consentGiven: true,
+      consentTextVersion: 'esign-disclosure-v1'
+    };
+
+    const contractUpdate = slot === 'client2'
+      ? { signed2At: FieldValue.serverTimestamp(), signature2: signatureRecord, status: 'signed' }
+      : Object.assign(
+          { signedAt: FieldValue.serverTimestamp(), signature: signatureRecord },
+          // Status moves to 'signed' only when nobody else still has to sign.
+          needsTwo ? {} : { status: 'signed' }
+        );
+
+    batch.update(ref, contractUpdate);
     batch.set(auditRef, {
-      event: 'signed',
+      event: slot === 'client2' ? 'signed-client2' : 'signed',
       at: FieldValue.serverTimestamp(),
       typedName: typedName,
       ip: ip,
       documentHash: contract.documentHash
     });
+
     try {
       await batch.commit();
     } catch (err) {
@@ -1119,7 +1163,11 @@ export const signContract = onCall(
     // configured — not a failure that happens to look like one. No session
     // is created and checkoutUrl stays null; nothing here is logged as a
     // warning, because nothing has gone wrong.
-    if (paymentsEnabled()) {
+    // willComplete as well as paymentsEnabled: there is nothing to pay for
+    // while one of two signatures is still outstanding, and minting a session
+    // now would hand Client 1 a payment page for an agreement that is not yet
+    // an agreement.
+    if (willComplete && paymentsEnabled()) {
       try {
         // Dispatched through the seam, so this line is identical whether the
         // fake payer or Stripe is configured. Switching between them is
@@ -1144,6 +1192,10 @@ export const signContract = onCall(
       }
     }
 
+    // Only when the agreement is complete. Sending "your signed agreement"
+    // after the first of two signatures would tell the couple it was done
+    // while it was still waiting on one of them.
+    if (willComplete) {
     const mail = signedCopyEmail({
       clientName: contract.clientName,
       contractUrl: SITE_ORIGIN + '/sign/?t=' + token,
@@ -1165,9 +1217,19 @@ export const signContract = onCall(
       // difference is that here the important thing already succeeded.
       console.warn('[signContract] confirmation email failed:', describeError(err));
     }
+    }
 
-    console.log('[signContract] signed:', ref.id);
-    return { ok: true, signedAt: Date.now(), checkoutUrl: checkoutUrl };
+    console.log('[signContract] signed:', slot, ref.id, willComplete ? '(complete)' : '(awaiting client 2)');
+    return {
+      ok: true,
+      signedAt: Date.now(),
+      checkoutUrl: checkoutUrl,
+      // The page needs to know whether to thank them or to turn round and ask
+      // the second partner to sign.
+      complete: willComplete,
+      awaitingSigner: willComplete ? null : 'client2',
+      signedSlot: slot
+    };
   }
 );
 

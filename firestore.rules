@@ -163,7 +163,10 @@ service cloud.firestore {
           'templateId', 'templateVersion',
           'documentSnapshot', 'documentHash', 'tokenHash',
           'sentAt', 'firstOpenedAt', 'signedAt',
-          'signature'
+          // Both signatures. The functions write these through the Admin SDK,
+          // which bypasses rules entirely — this list exists to stop the
+          // DASHBOARD altering a signature after the fact.
+          'signature', 'signed2At', 'signature2'
         ];
       }
 
