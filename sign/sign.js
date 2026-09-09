@@ -149,6 +149,32 @@ function renderSignatureRecord(data) {
   }
 }
 
+// The signature filling in as they type.
+//
+// The point is to make plain that the name they are typing IS the signature,
+// rather than a form field on the way to producing one somewhere else. So the
+// ink appears at full strength, exactly as it will read once signed.
+//
+// Which makes the date line load-bearing. It deliberately still says "Not yet
+// signed" throughout, and this function never touches it — with the ink already
+// looking final, the date is the only thing on the panel still saying the
+// agreement has not been entered into. renderSignatureRecord and the sign
+// handler own that line; this owns nothing but the name.
+//
+// Writes to whichever slot is currently being asked for, so the second partner
+// gets the same behaviour on their turn without writing over the signature the
+// first one already made. textContent, never innerHTML, like every other path
+// that touches this panel: it is the client's own unescaped input.
+function previewSignature() {
+  if (!nameEl || !sigRecord || sigRecord.hidden) return;
+  const slot = awaitingSigner === 'client2' ? sigClient2Name : sigClientName;
+  if (!slot) return;
+  const typed = nameEl.value.trim();
+  // Back to the dash rather than a blank line if they clear the box — a blank
+  // reads as a party who failed to sign, the same reasoning as elsewhere here.
+  slot.textContent = typed || '—';
+}
+
 // Points the form at whichever partner still has to sign, and names them.
 // Without this the second partner is shown a form they just watched somebody
 // else fill in, with no indication it is now their turn.
@@ -163,6 +189,9 @@ function askSigner(who) {
   consentEl.checked = false;
   signBtn.disabled = true;
   signErrorEl.textContent = '';
+  // The box was just emptied, so empty the preview with it. Without this the
+  // second partner is handed a form showing a name they did not type.
+  previewSignature();
 }
 
 // Her timezone, not the reader's — and it must match the one the server uses
@@ -419,6 +448,7 @@ function updateSignBtn() {
 }
 consentEl.addEventListener('change', updateSignBtn);
 nameEl.addEventListener('input', updateSignBtn);
+nameEl.addEventListener('input', previewSignature);
 
 form.addEventListener('submit', function (e) {
   e.preventDefault();
