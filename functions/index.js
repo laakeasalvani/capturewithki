@@ -54,6 +54,23 @@ const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const OWNER_EMAIL = 'capturewithki@gmail.com';
 
+// Everyone who should receive a client-facing email about this contract.
+//
+// Both signers are parties to the agreement, so both get the signing link, any
+// reminder while it is unsigned, and the signed copy once it is done — the
+// owner's decision, and the right one: a second signer with no copy of a
+// document they are bound by has no record of what they agreed to.
+//
+// Deduplicated case-insensitively, because a couple who share an inbox is the
+// normal case and Resend would otherwise deliver two identical emails to the
+// same mailbox. A blank second address is normal, not a fault.
+function contractRecipients(contract) {
+  const first = ((contract && contract.clientEmail) || '').trim();
+  const second = ((contract && contract.client2Email) || '').trim();
+  if (!second || second.toLowerCase() === first.toLowerCase()) return [first];
+  return [first, second];
+}
+
 // Hard-coded, and never taken from request.data. The sign link emailed below
 // is built ONLY from this origin plus the freshly minted token — nothing a
 // caller supplies can reach it, which is what makes it safe to drop into an
@@ -585,6 +602,19 @@ export const createContract = onCall(
       throw new HttpsError('invalid-argument', clientCheck.errors.join(' '));
     }
 
+    // The second signer's address is optional, but a typo in it is not. Left
+    // unchecked, a malformed one becomes a contract that silently reaches only
+    // one of the two people who have to sign it, with nothing anywhere saying
+    // so — the same shape as the spam failure this project has already had.
+    // Deliberately the same loose test validateClientDetails uses.
+    const client2EmailRaw = typeof d.client2Email === 'string' ? d.client2Email.trim() : '';
+    if (client2EmailRaw &&
+        (client2EmailRaw.length > 254 ||
+         !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(client2EmailRaw))) {
+      throw new HttpsError('invalid-argument',
+        'That second email address will not work.');
+    }
+
     // The package price is a default she can override on this booking. Her
     // weddings are advertised "starting from", so the catalogue figure is a
     // floor, not the price. resolvePackagePrice does the checking, in lib/
@@ -619,6 +649,10 @@ export const createContract = onCall(
       // sendContract renders it as "Not applicable" when empty.
       clientName: typeof d.clientName === 'string' ? d.clientName.trim().slice(0, 200) : '',
       client2Name: typeof d.client2Name === 'string' ? d.client2Name.trim().slice(0, 200) : '',
+      // Optional even on a two-signer contract: partners often share an inbox,
+      // and forcing her to invent a second address would be worse than letting
+      // both links go to the first one. Blank is the normal case, not a fault.
+      client2Email: typeof d.client2Email === 'string' ? d.client2Email.trim().slice(0, 254) : '',
       clientEmail: typeof d.clientEmail === 'string' ? d.clientEmail.trim().slice(0, 254) : '',
       clientPhone: typeof d.clientPhone === 'string' ? d.clientPhone.trim().slice(0, MAX_PHONE) : '',
       eventDate: typeof d.eventDate === 'string' ? d.eventDate.trim().slice(0, MAX_EVENT_DATE) : '',
@@ -742,7 +776,13 @@ export const sendContract = onCall(
     const fields = {
       client_1_name: contract.clientName,
       client_2_name: contract.client2Name || 'Not applicable',
-      client_email: contract.clientEmail,
+      // Both addresses when there are two of them. The agreement already names
+      // both parties, and the owner's decision is that it should show how each
+      // one was reachable — this text is frozen and hashed at send, so it is
+      // the permanent answer to that question.
+      client_email: contract.client2Email
+        ? contract.clientEmail + ', ' + contract.client2Email
+        : contract.clientEmail,
       client_phone: contract.clientPhone || 'Not given',
       event_date: contract.eventDate,
       event_location: contract.eventLocation || 'Not given',
@@ -834,7 +874,7 @@ export const sendContract = onCall(
     try {
       await sendEmail({
         apiKey: key,
-        to: contract.clientEmail,
+        to: contractRecipients(contract),
         // Replies reach her. The From address is hello@capturewithki.com, and
         // capturewithki.com has NO MX record — it can send mail and cannot
         // receive any — so without this a client hitting Reply on their own
@@ -1283,7 +1323,7 @@ export const signContract = onCall(
     try {
       await sendEmail({
         apiKey: key,
-        to: contract.clientEmail,
+        to: contractRecipients(contract),
         // Same reason as sendContract: the From address cannot receive mail.
         replyTo: OWNER_EMAIL,
         subject: mail.subject,
@@ -2487,7 +2527,7 @@ export const chaseContracts = onSchedule(
       try {
         if (action.kind === 'sign-reminder') {
           const m = signReminderEmail(c);
-          await sendEmail({ apiKey: key, to: c.clientEmail, replyTo: OWNER_EMAIL,
+          await sendEmail({ apiKey: key, to: contractRecipients(c), replyTo: OWNER_EMAIL,
                             subject: m.subject, text: m.text, html: m.html });
           await ref.update({
             signReminderCount: (c.signReminderCount || 0) + 1,

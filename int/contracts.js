@@ -4,7 +4,8 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js';
 import { computeFeeBlock, DEFAULT_RETAINER_PERCENT, isValidEventDateISO,
-         formatEventDate, isEventPast } from '../functions/lib/contracts.js';
+         formatEventDate, isEventPast, dollarsToCents,
+         centsToInput } from '../functions/lib/contracts.js';
 import { formatCents } from '../functions/lib/contract-email.js';
 import { toMillis } from '../functions/lib/gallery-expiry.js';
 
@@ -54,20 +55,11 @@ function fmtWhen(ts) {
   });
 }
 
-// Travel fee is entered in WHOLE dollars only — no cents, no decimal point.
-// Blank means "no travel fee" (0 cents), which is a normal, valid answer, not
-// an error. Anything else that isn't a clean non-negative whole number is
-// refused (returns null) rather than guessed at, because a guess here becomes
-// a wrong number on a signed legal document. Never round through a float —
-// this never produces a fraction of a cent in the first place.
-function wholeDollarsToCents(raw) {
-  const cleaned = String(raw === undefined || raw === null ? '' : raw).trim().replace(/,/g, '');
-  if (cleaned === '') return 0;
-  if (!/^\d+$/.test(cleaned)) return null;
-  const dollars = Number(cleaned);
-  if (!Number.isSafeInteger(dollars)) return null;
-  return dollars * 100;
-}
+// Amounts are parsed by dollarsToCents in functions/lib/contracts.js, which is
+// unit-tested — this decides a number printed on a document somebody signs, and
+// this file is not covered by the test suite. Blank means zero (a normal answer
+// for travel); anything unusable returns null and is refused rather than
+// guessed at.
 
 // Her public site promises the balance is due up to two weeks before the
 // event, so that is the default offered here. Only offered when eventDate
@@ -253,6 +245,13 @@ export function initContracts(container) {
         '<input type="text" id="cClient2" maxlength="200" placeholder="As it should appear on the agreement">' +
         '<span class="s-status" id="cClient2Error"></span>' +
       '</label>' +
+      // Optional. Partners often share an inbox, and blank simply means both
+      // links go to the first address — which is why this says so on screen
+      // rather than leaving her guessing whether she has missed a required box.
+      '<label class="s-label" id="cClient2EmailWrap" hidden>Second signer&#8217;s email (optional)' +
+        '<input type="email" id="cClient2Email" maxlength="254" placeholder="Leave blank to send both links to the first email">' +
+        '<span class="s-status" id="cClient2EmailError"></span>' +
+      '</label>' +
       '<label class="s-label">Client email<input type="email" id="cEmail" maxlength="254"></label>' +
       '<label class="s-label">Client phone (optional)<input type="text" id="cPhone" maxlength="40"></label>' +
       // A real date, not free text. The contract still reads "June 14, 2027" —
@@ -281,16 +280,16 @@ export function initContracts(container) {
       // "starting from", so this booking's real price is whatever she quoted.
       // Pre-filled when a package is chosen; change it and everything below
       // follows, including the retainer.
-      '<label class="s-label">Package price for this booking, in whole dollars' +
-        '<input type="text" inputmode="numeric" id="cPrice" placeholder="0" maxlength="10">' +
+      '<label class="s-label">Package price for this booking' +
+        '<input type="text" inputmode="decimal" id="cPrice" placeholder="0" maxlength="10">' +
       '</label>' +
       '<p class="s-help">Pre-filled from the package. Change it for a bigger day or a custom quote.</p>' +
-      '<p class="c-li-error" id="cPriceError" hidden>Package price has to be a whole dollar amount above zero (no cents).</p>' +
+      '<p class="c-li-error" id="cPriceError" hidden>Package price has to be an amount above zero, like 175 or 175.50.</p>' +
 
-      '<label class="s-label">Travel fee, in whole dollars (optional)' +
-        '<input type="text" inputmode="numeric" id="cTravel" placeholder="0" maxlength="10">' +
+      '<label class="s-label">Travel fee (optional)' +
+        '<input type="text" inputmode="decimal" id="cTravel" placeholder="0" maxlength="10">' +
       '</label>' +
-      '<p class="c-li-error" id="cTravelError" hidden>Travel fee has to be a whole dollar amount (no cents) — leave it blank for $0.</p>' +
+      '<p class="c-li-error" id="cTravelError" hidden>Travel fee has to be an amount like 50 or 49.99 — leave it blank for $0.</p>' +
 
       '<div class="c-totals" id="cFeeBlock">' +
         '<div class="c-totals-row"><span>Package price</span><strong id="cFeePackage">$0.00</strong></div>' +
@@ -316,6 +315,9 @@ export function initContracts(container) {
     const client2El = composerBox.querySelector('#cClient2');
     const client2Wrap = composerBox.querySelector('#cClient2Wrap');
     const client2ErrorEl = composerBox.querySelector('#cClient2Error');
+    const client2EmailEl = composerBox.querySelector('#cClient2Email');
+    const client2EmailWrap = composerBox.querySelector('#cClient2EmailWrap');
+    const client2EmailErrorEl = composerBox.querySelector('#cClient2EmailError');
     const signerRadios = composerBox.querySelectorAll('input[name="cSigners"]');
 
     function signerCount() {
@@ -330,9 +332,15 @@ export function initContracts(container) {
     function syncSigners() {
       const two = signerCount() === 2;
       client2Wrap.hidden = !two;
+      client2EmailWrap.hidden = !two;
+      // Emptied on the way back to one signature, both of them. A stale value
+      // in a hidden box is how a one-signature contract went out with two
+      // signature lines once already.
       if (!two) {
         client2El.value = '';
         client2ErrorEl.textContent = '';
+        client2EmailEl.value = '';
+        client2EmailErrorEl.textContent = '';
       }
     }
     signerRadios.forEach(function (r) { r.addEventListener('change', syncSigners); });
@@ -391,14 +399,14 @@ export function initContracts(container) {
     // writes another into a signed document.
     function recompute() {
       const pkg = selectedPackage();
-      const travelCents = wholeDollarsToCents(travelEl.value);
+      const travelCents = dollarsToCents(travelEl.value);
       const travelInvalid = travelCents === null;
       travelErrorEl.hidden = !travelInvalid;
 
       // Blank means "use the package price", NOT zero — a blank field must
       // never quietly produce a free contract.
       const priceRaw = priceEl.value.trim();
-      const priceCents = priceRaw === '' ? (pkg ? pkg.priceCents : 0) : wholeDollarsToCents(priceRaw);
+      const priceCents = priceRaw === '' ? (pkg ? pkg.priceCents : 0) : dollarsToCents(priceRaw);
       const priceInvalid = priceRaw !== '' && (priceCents === null || priceCents <= 0);
       priceErrorEl.hidden = !priceInvalid;
 
@@ -442,8 +450,11 @@ export function initContracts(container) {
     // carried over from the previous one would be wrong and silently so.
     packageEl.addEventListener('change', function () {
       const pkg = selectedPackage();
+      // centsToInput, not a divide-and-round: Math.round(17550/100) is 176,
+      // which quietly raised a package price by fifty cents the moment one had
+      // any cents in it.
       priceEl.value = pkg && Number.isInteger(pkg.priceCents)
-        ? String(Math.round(pkg.priceCents / 100))
+        ? centsToInput(pkg.priceCents)
         : '';
       recompute();
     });
@@ -486,6 +497,9 @@ export function initContracts(container) {
       // signature line on a contract she had asked to have one. The CSS is
       // fixed too; this makes the data right even when the interface is not.
       const client2Name = signerCount() === 2 ? client2El.value.trim() : '';
+      // Same rule as the name, for the same reason: the radio decides, not
+      // whatever happens to be sitting in a box.
+      const client2Email = signerCount() === 2 ? client2EmailEl.value.trim() : '';
       if (signerCount() === 2 && !client2Name) {
         client2ErrorEl.textContent = 'The agreement prints this name, so it cannot be blank.';
         statusEl.textContent = 'Name the second signer, or switch back to one signature.';
@@ -493,14 +507,23 @@ export function initContracts(container) {
         return;
       }
       client2ErrorEl.textContent = '';
+      // Optional, but a typo in it means the second signer never gets the link
+      // and nothing anywhere says so. Caught before sending, so she can fix it.
+      if (client2Email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(client2Email)) {
+        client2EmailErrorEl.textContent = 'That email address will not work.';
+        statusEl.textContent = 'Check the second signer\u2019s email, or leave it blank.';
+        client2EmailEl.focus();
+        return;
+      }
+      client2EmailErrorEl.textContent = '';
       if (!state.pkg) { statusEl.textContent = 'Choose a package first.'; return; }
       if (state.priceInvalid) {
-        statusEl.textContent = 'Fix the package price first — it has to be a whole dollar amount above zero.';
+        statusEl.textContent = 'Fix the package price first — it has to be an amount above zero, like 175 or 175.50.';
         priceEl.focus();
         return;
       }
       if (state.travelInvalid) {
-        statusEl.textContent = 'Fix the travel fee first — it has to be a whole dollar amount.';
+        statusEl.textContent = 'Fix the travel fee first — it has to be an amount like 50 or 49.99.';
         travelEl.focus();
         return;
       }
@@ -531,6 +554,9 @@ export function initContracts(container) {
           // box, and this is the field the whole system reads to decide how
           // many signature lines a contract has.
           client2Name: client2Name,
+          // Blank whenever she picked one signature, or simply left it empty —
+          // both mean "send everything to the first address".
+          client2Email: client2Email,
           clientEmail: clientEmail,
           clientPhone: phoneEl.value.trim(),
           // ISO day. The server derives the printed wording from it.

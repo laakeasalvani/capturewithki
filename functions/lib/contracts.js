@@ -249,11 +249,19 @@ export function resolvePackagePrice(packagePriceCents, overrideCents) {
   return { ok: true, cents: overrideCents, overridden: overrideCents !== packagePriceCents };
 }
 
-// The retainer is 30% of the PACKAGE PRICE, never of the total. Her contracts list
-// "Package Price" and "Travel Fees" as separate lines and label the retainer "(30%)",
-// and the owner's decision is that travel is billed but does not inflate the deposit.
-// Computing it from the total would print a number in a signed legal document that
-// does not match the label above it.
+// The retainer is 30% of the TOTAL — package price plus travel.
+//
+// It used to be 30% of the package alone, on the owner's earlier instruction that
+// travel is billed but does not inflate the deposit. He reversed that on
+// 2026-09-09, and the new rule is the one that matches the document: her
+// contracts print "Package Price", "Travel Fees", "Retainer (30%)" and
+// "Remaining Balance" in a column, and under the old rule a $1,200 package with
+// $300 travel printed a $360 retainer labelled "(30%)" directly beneath a
+// $1,500 total — 24% of the figure above it. Now the label is true of the
+// number it sits next to.
+//
+// Only new contracts are affected. A sent one carries its own frozen snapshot
+// and its stored retainerCents, and neither is ever recomputed.
 export function computeFeeBlock(input) {
   const d = input && typeof input === 'object' ? input : {};
   const pkg = d.packagePriceCents;
@@ -267,8 +275,8 @@ export function computeFeeBlock(input) {
     return { packagePriceCents: 0, travelFeesCents: 0, retainerCents: 0, totalCents: 0, balanceCents: 0 };
   }
 
-  const retainerCents = Math.round(pkg * pct / 100);
   const totalCents = pkg + travel;
+  const retainerCents = Math.round(totalCents * pct / 100);
   return {
     packagePriceCents: pkg,
     travelFeesCents: travel,
@@ -320,4 +328,49 @@ export function formatEventDate(iso) {
 export function isEventPast(iso, todayISO) {
   if (!isValidEventDateISO(iso) || !isValidEventDateISO(todayISO)) return false;
   return iso < todayISO;
+}
+
+// Money typed by hand, turned into integer cents.
+//
+// She could previously only enter whole dollars — the old parser rejected any
+// string containing a '.' outright — so a $175.50 session could not be written
+// down at all. Cents are now accepted, and this lives here rather than in
+// int/contracts.js for the same reason resolvePackagePrice does: it decides a
+// number that gets printed into a document somebody signs, and index.js and the
+// dashboard are not unit-tested by this project's convention.
+//
+// Refuses rather than rounds. Silently turning "175.555" into $175.56 puts a
+// figure on a legal document that she did not type and would not notice.
+// Returns null for anything unusable, 0 for blank — the caller distinguishes
+// those, because blank travel means no travel fee and blank price means "use
+// the package's own".
+export function dollarsToCents(raw) {
+  const cleaned = String(raw === undefined || raw === null ? '' : raw)
+    .trim().replace(/^\$/, '').replace(/,/g, '');
+  if (cleaned === '') return 0;
+  // One optional dot, at most two digits after it. No exponents, no leading
+  // '+', no '.5' — an amount on a contract should look like an amount.
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+
+  const dot = cleaned.indexOf('.');
+  const wholePart = dot === -1 ? cleaned : cleaned.slice(0, dot);
+  const centsPart = dot === -1 ? '' : cleaned.slice(dot + 1);
+
+  const dollars = Number(wholePart);
+  if (!Number.isSafeInteger(dollars)) return null;
+  // '5' means fifty cents, not five. Padded, never parsed as written.
+  const cents = Number((centsPart + '00').slice(0, 2));
+
+  const total = dollars * 100 + cents;
+  return Number.isSafeInteger(total) ? total : null;
+}
+
+// The inverse, for pre-filling the box from a stored figure. Whole amounts stay
+// whole — "175", not "175.00" — so the common case still reads as a plain
+// number, and only an amount that actually has cents shows them.
+export function centsToInput(cents) {
+  if (!Number.isInteger(cents) || cents < 0) return '';
+  const whole = Math.floor(cents / 100);
+  const rest = cents % 100;
+  return rest === 0 ? String(whole) : whole + '.' + String(rest).padStart(2, '0');
 }

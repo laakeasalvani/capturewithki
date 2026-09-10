@@ -5,7 +5,8 @@ import {
   computeRetainerCents, computeBalanceCents,
   isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
   renderTemplate, STATUSES, canTransition, missingRequiredFields, resolvePackagePrice,
-  isValidEventDateISO, formatEventDate, isEventPast, closingStatusFor
+  isValidEventDateISO, formatEventDate, isEventPast, closingStatusFor,
+  dollarsToCents, centsToInput
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -344,13 +345,25 @@ test('an unknown status transitions nowhere', () => {
 // Append to functions/test/contracts.test.js
 import { computeFeeBlock } from '../lib/contracts.js';
 
-test('the retainer is 30 percent of the package, and travel does not inflate it', () => {
+// Reversed by the owner on 2026-09-09. It used to be 30% of the package alone,
+// which printed a retainer labelled "(30%)" directly beneath a total it was not
+// 30% of — $360 under a $1,500 total is 24%.
+test('the retainer is 30 percent of the total, travel included', () => {
   const f = computeFeeBlock({ packagePriceCents: 120000, travelFeesCents: 5000 });
   assert.equal(f.packagePriceCents, 120000);
   assert.equal(f.travelFeesCents, 5000);
-  assert.equal(f.retainerCents, 36000);   // 30% of 120000, NOT of 125000
   assert.equal(f.totalCents, 125000);
-  assert.equal(f.balanceCents, 89000);    // 125000 - 36000
+  assert.equal(f.retainerCents, 37500);   // 30% of 125000, travel included
+  assert.equal(f.balanceCents, 87500);    // 125000 - 37500
+});
+
+// The label on the document has to be true of the number beside it.
+test('the retainer really is the stated percentage of the printed total', () => {
+  for (const [pkg, travel] of [[120000, 5000], [75000, 0], [17500, 3333], [100000, 100000]]) {
+    const f = computeFeeBlock({ packagePriceCents: pkg, travelFeesCents: travel });
+    assert.equal(f.retainerCents, Math.round(f.totalCents * 30 / 100),
+      'retainer is not 30% of the total at pkg=' + pkg + ' travel=' + travel);
+  }
 });
 
 // The property that matters, checked against an independent integer oracle so it
@@ -359,9 +372,11 @@ test('retainer plus balance always equals package plus travel', () => {
   for (let pkg = 0; pkg <= 200000; pkg += 1301) {
     for (const travel of [0, 1, 4999, 25000]) {
       const f = computeFeeBlock({ packagePriceCents: pkg, travelFeesCents: travel });
-      const scaled = pkg * 30;
+      // Oracle over the TOTAL, travel included — the rule the document states.
+      const scaled = (pkg + travel) * 30;
       const expected = Math.floor(scaled / 100) + ((scaled % 100) >= 50 ? 1 : 0);
-      assert.equal(f.retainerCents, expected, 'wrong retainer at pkg=' + pkg);
+      assert.equal(f.retainerCents, expected,
+        'wrong retainer at pkg=' + pkg + ' travel=' + travel);
       assert.equal(f.retainerCents + f.balanceCents, pkg + travel,
         'does not sum at pkg=' + pkg + ' travel=' + travel);
     }
@@ -557,5 +572,79 @@ test('every status closingStatusFor offers is one canTransition actually permits
       assert.equal(canTransition(from, to), true,
         from + ' -> ' + to + ' is offered but not permitted');
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Money typed by hand. She could only enter whole dollars before.
+// ---------------------------------------------------------------------------
+
+test('cents are accepted, which is the whole point', () => {
+  assert.equal(dollarsToCents('175.50'), 17550);
+  assert.equal(dollarsToCents('0.99'), 99);
+  assert.equal(dollarsToCents('1200.05'), 120005);
+});
+
+// '.5' is fifty cents. Read as five, every such contract would be 45 cents short.
+test('one decimal place means tenths of a dollar, not cents', () => {
+  assert.equal(dollarsToCents('175.5'), 17550);
+  assert.equal(dollarsToCents('1.1'), 110);
+  assert.equal(dollarsToCents('0.5'), 50);
+});
+
+test('whole dollars still work exactly as before', () => {
+  assert.equal(dollarsToCents('175'), 17500);
+  assert.equal(dollarsToCents('1200'), 120000);
+  assert.equal(dollarsToCents('0'), 0);
+});
+
+test('blank is zero, so a missing travel fee is not an error', () => {
+  assert.equal(dollarsToCents(''), 0);
+  assert.equal(dollarsToCents('   '), 0);
+  assert.equal(dollarsToCents(null), 0);
+  assert.equal(dollarsToCents(undefined), 0);
+});
+
+test('a dollar sign and thousands separators are tolerated', () => {
+  assert.equal(dollarsToCents('$1,200.50'), 120050);
+  assert.equal(dollarsToCents('1,200'), 120000);
+});
+
+// Refused, never rounded. A figure she did not type must not reach a document
+// that somebody signs.
+test('more than two decimal places is refused rather than rounded', () => {
+  assert.equal(dollarsToCents('175.555'), null);
+  assert.equal(dollarsToCents('1.005'), null);
+});
+
+test('nonsense is refused rather than coerced to a number', () => {
+  assert.equal(dollarsToCents('abc'), null);
+  assert.equal(dollarsToCents('12abc'), null);
+  assert.equal(dollarsToCents('-5'), null);
+  assert.equal(dollarsToCents('1.2.3'), null);
+  assert.equal(dollarsToCents('.50'), null);
+  assert.equal(dollarsToCents('1e3'), null);
+  assert.equal(dollarsToCents('+5'), null);
+  assert.equal(dollarsToCents('Infinity'), null);
+});
+
+test('an absurd amount is refused rather than losing precision', () => {
+  assert.equal(dollarsToCents('999999999999999999'), null);
+});
+
+test('the box is pre-filled without inventing decimals', () => {
+  assert.equal(centsToInput(17500), '175');
+  assert.equal(centsToInput(17550), '175.50');
+  assert.equal(centsToInput(99), '0.99');
+  assert.equal(centsToInput(5), '0.05');
+  assert.equal(centsToInput(0), '0');
+  assert.equal(centsToInput(null), '');
+  assert.equal(centsToInput(-1), '');
+});
+
+// The two must agree, or a figure changes just by being displayed and re-saved.
+test('every amount survives a round trip through the box', () => {
+  for (const cents of [0, 5, 99, 100, 5250, 17500, 17550, 120000, 120005, 999999]) {
+    assert.equal(dollarsToCents(centsToInput(cents)), cents, 'round trip failed at ' + cents);
   }
 });
