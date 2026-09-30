@@ -14,12 +14,30 @@ const THUMB_QUALITY = 0.82;
 // uploads in production. Anything undecodable (HEIC, a corrupt file) has no
 // preview rather than blocking the upload — the grid falls back to the
 // original for those, which is slower but never broken.
+// A preview is optional, so it is never allowed to hold up the upload: if the
+// phone has not decoded the photo within THUMB_DEADLINE_MS, the original goes
+// up with no preview rather than the whole batch sitting at "0 of 70".
+const THUMB_DEADLINE_MS = 20000;
+
 function makeThumbnail(file) {
   return new Promise(function (resolve) {
     if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) { resolve(null); return; }
     const url = URL.createObjectURL(file);
     const img = new Image();
+    let settled = false;
+    const timer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      img.onload = img.onerror = null;
+      img.src = '';
+      URL.revokeObjectURL(url);
+      console.warn('[gallery-upload] preview took too long, skipping it for', file.name);
+      resolve(null);
+    }, THUMB_DEADLINE_MS);
     img.onload = function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       URL.revokeObjectURL(url);
       const longest = Math.max(img.naturalWidth, img.naturalHeight);
       const scale = Math.min(1, THUMB_EDGE / longest);
@@ -27,9 +45,21 @@ function makeThumbnail(file) {
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(function (blob) { resolve(blob || null); }, 'image/jpeg', THUMB_QUALITY);
+      img.src = '';
+      canvas.toBlob(function (blob) {
+        // Let go of the canvas now, not whenever the browser gets round to it —
+        // 70 phone photos decoded back to back is how a tab runs out of memory.
+        canvas.width = canvas.height = 0;
+        resolve(blob || null);
+      }, 'image/jpeg', THUMB_QUALITY);
     };
-    img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+    img.onerror = function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
     img.src = url;
   });
 }

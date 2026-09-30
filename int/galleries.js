@@ -356,6 +356,21 @@ export function initGalleries(container) {
     });
   }
 
+  // Nothing she can see may wait forever. A step that never answers — a
+  // dropped connection, a phone that stopped responding — becomes a failure
+  // she is told about, and the batch moves on to the next photo.
+  function withDeadline(promise, ms, what) {
+    let timer;
+    const late = new Promise(function (resolve, reject) {
+      timer = setTimeout(function () {
+        const err = new Error(what + ' took longer than ' + Math.round(ms / 1000) + 's');
+        err.code = 'timeout';
+        reject(err);
+      }, ms);
+    });
+    return Promise.race([promise, late]).finally(function () { clearTimeout(timer); });
+  }
+
   // Uploaded one at a time on purpose. A wedding is hundreds of full-size
   // photos; firing them all at once saturates her connection, makes progress
   // meaningless, and is far more likely to fail partway with no idea where.
@@ -372,26 +387,43 @@ export function initGalleries(container) {
     const guard = function (e) { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', guard);
 
+    // A phone that locks its screen pauses the page, and 70 photos over phone
+    // signal takes minutes. Best effort: not every phone supports it.
+    let wake = null;
+    try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (err) { /* carry on */ }
+    const releaseWake = function () { if (wake) { wake.release().catch(function () {}); wake = null; } };
+
     // Read the starting position once. Asking per photo would be another
     // query per file, and recomputing from a count is the mistake that
     // corrupted every CMS collection.
     let order;
     try {
-      order = await nextPhotoOrder(db, g.id);
+      order = await withDeadline(nextPhotoOrder(db, g.id), 30000, 'Getting ready');
     } catch (err) {
       window.removeEventListener('beforeunload', guard);
+      releaseWake();
       ui.progress.hidden = true;
       flash(ui.status, 'Could not start: ' + (err && (err.code || err.message)));
       return;
     }
 
+    const failedNames = [];
+    let lastReason = '';
     for (const file of files) {
       try {
-        await uploadGalleryPhoto({ db: db, galleryId: g.id, file: file, order: order });
+        // Generous: a 20MB original on weak phone signal can take a couple of
+        // minutes. It exists to catch a stall, not a slow upload.
+        await withDeadline(uploadGalleryPhoto({ db: db, galleryId: g.id, file: file, order: order }),
+          240000, file.name);
         order++;
         done++;
       } catch (err) {
         failed++;
+        failedNames.push(file.name || 'photo');
+        lastReason = (err && (err.code || err.message)) || 'unknown';
+        // The order slot is burned, not reused: a stalled upload may still
+        // finish in the background, and two photos must never share a slot.
+        order++;
         console.warn('[galleries] upload failed for', file.name, err);
       }
       const pct = Math.round(((done + failed) / total) * 100);
@@ -403,12 +435,27 @@ export function initGalleries(container) {
     window.removeEventListener('beforeunload', guard);
     ui.progress.hidden = true;
 
+    releaseWake();
+
+    let message;
+    let ms;
     if (failed) {
-      flash(ui.status, done + ' added, ' + failed + ' failed. Try the failed ones again.', 15000);
+      // Name them: "3 failed" with no names means hunting through 70 photos.
+      const shown = failedNames.slice(0, 5).join(', ') +
+        (failedNames.length > 5 ? ' and ' + (failedNames.length - 5) + ' more' : '');
+      message = done + ' added, ' + failed + ' failed (' + shown + '). Reason: ' +
+        lastReason + '. Add those again.';
+      ms = 60000;
     } else {
-      flash(ui.status, done + ' photo' + (done === 1 ? '' : 's') + ' added.');
+      message = done + ' photo' + (done === 1 ? '' : 's') + ' added.';
+      ms = 8000;
     }
+    // render() rebuilds every card, so a message written before it is thrown
+    // away with the old card — she never saw "70 photos added", nor which ones
+    // failed. Say it on the NEW card.
     await render();
+    const fresh = list.querySelector('.g-card[data-id="' + g.id + '"] .g-card-status');
+    flash(fresh || ui.status, message, ms);
   }
 
   // Firestore has no recursive delete from the browser, so the photo records
