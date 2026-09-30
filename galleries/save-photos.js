@@ -19,8 +19,10 @@
 // touch thumbUrl.
 import { planSaveBatches, totalBytes, imageTypeFor } from './save-plan.js';
 
-// How many photos an iPhone can take in one round. A placeholder until it is
-// measured on a real phone — see the test mode below.
+// How many photos an iPhone can take in one round. Went live unmeasured on
+// 2026-09-29, so deliberately conservative: 300MB is far below what a modern
+// iPhone tab can hold. Raise it only after the test mode below proves a bigger
+// round on a real phone.
 const ROUND_MAX_COUNT = 50;
 const ROUND_MAX_BYTES = 300 * 1024 * 1024;
 
@@ -436,7 +438,7 @@ function createRun(opts) {
 
   // --- test mode ---------------------------------------------------------------
   // Only with ?test=save in the address. Lets Laakea find, on a real iPhone,
-  // how big a round can be before the phone refuses. Remove once measured.
+  // how big a round can be before the phone refuses.
 
   function buildTestSizes() {
     el.testSizes.innerHTML = '';

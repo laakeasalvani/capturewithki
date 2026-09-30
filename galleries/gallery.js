@@ -11,9 +11,9 @@ import { planZipParts, sourceFingerprint, partDocId } from '../functions/lib/gal
 import { deviceKind } from './save-plan.js';
 import { openSaveDialog, formatBytes } from './save-photos.js';
 
-// Saving straight into a phone's photo library (save-photos.js) is only live
-// with ?test=save in the address until the iPhone round size has been measured
-// on a real phone. Everyone else gets the zip exactly as before.
+// Phones save straight into the photo library (save-photos.js); computers get
+// the zip. ?test=save adds the round-size picker and ?device= override, for
+// measuring on a real iPhone how big a round can be.
 const pageParams = new URLSearchParams(location.search);
 const saveTest = pageParams.get('test') === 'save';
 
@@ -260,7 +260,7 @@ function canShareFiles() {
     return false;
   }
 }
-function phoneSave() { return saveTest && saveKind !== 'desktop'; }
+function phoneSave() { return saveKind !== 'desktop'; }
 
 // What the server has actually got for one part. A record whose fingerprint no
 // longer matches was built before she added or removed a photo, so it is a zip
@@ -415,7 +415,7 @@ function setupDownloadAll() {
     dlButton.addEventListener('click', function () {
       // "Try again" after a failed zip goes straight back to building; the size
       // box is for the first tap, not for every retry.
-      if (saveTest && dlButton.textContent.indexOf('Download all') === 0) {
+      if (dlButton.textContent.indexOf('Download all') === 0) {
         openSaveDialog({ photos: photos, kind: saveKind, testMode: saveTest, onDesktopConfirm: startZip });
       } else {
         startZip();
