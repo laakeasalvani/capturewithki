@@ -173,6 +173,7 @@ export function initGalleries(container) {
         '<span class="s-status g-card-status" aria-live="polite"></span>' +
       '</div>' +
       '<div class="g-progress" hidden><div class="g-progress-bar"></div></div>' +
+      '<p class="g-upload-note" hidden aria-live="polite"></p>' +
       '<div class="g-photos" hidden></div>' +
     '</article>';
   }
@@ -201,6 +202,7 @@ export function initGalleries(container) {
     const progress = card.querySelector('.g-progress');
     const bar = card.querySelector('.g-progress-bar');
     const countEl = card.querySelector('.g-count');
+    const note = card.querySelector('.g-upload-note');
 
     card.querySelector('.g-copy').addEventListener('click', function () {
       navigator.clipboard.writeText(galleryLink(g.id))
@@ -348,17 +350,45 @@ export function initGalleries(container) {
       await renderPhotos();
     });
 
-    card.querySelector('.g-upload').addEventListener('change', async function (e) {
+    const uploadInput = card.querySelector('.g-upload');
+
+    // Between tapping the phone's ✓ and the photos reaching this page, the
+    // phone prepares every full-size original (fetching it from iCloud,
+    // converting it) and the page cannot see any of it. With 168 photos that
+    // was long enough for her to decide it "wouldn't let me accept" (screen
+    // recording, 2026-09-30). So the wait is announced before it starts.
+    // Deferred a tick so nothing here can get in the way of the picker opening.
+    uploadInput.addEventListener('click', function () {
+      setTimeout(function () {
+        showNote(note, 'Pick your photos, then tap ✓ (or Add). If you pick a lot, your phone ' +
+          'can take a minute or two to hand them over — stay on this page and it will start by itself.');
+      }, 0);
+    });
+    uploadInput.addEventListener('cancel', function () { note.hidden = true; });
+
+    uploadInput.addEventListener('change', async function (e) {
       const files = Array.prototype.slice.call(e.target.files || []);
       e.target.value = '';
-      if (!files.length) return;
-      await uploadMany(g, files, { status: status, progress: progress, bar: bar, countEl: countEl });
+      if (!files.length) {
+        // Used to return silently, which looks exactly like "nothing happened".
+        showNote(note, 'Your phone did not hand over any photos. Try again with fewer at a time — ' +
+          'about 50 works well on an iPhone. Each batch adds to the same gallery.');
+        return;
+      }
+      await uploadMany(g, files, { note: note, progress: progress, bar: bar, countEl: countEl });
     });
   }
 
   // Nothing she can see may wait forever. A step that never answers — a
   // dropped connection, a phone that stopped responding — becomes a failure
   // she is told about, and the batch moves on to the next photo.
+  function showNote(el, text, ms) {
+    el.textContent = text;
+    el.hidden = false;
+    clearTimeout(el.__t);
+    if (ms) el.__t = setTimeout(function () { el.hidden = true; }, ms);
+  }
+
   function withDeadline(promise, ms, what) {
     let timer;
     const late = new Promise(function (resolve, reject) {
@@ -381,8 +411,9 @@ export function initGalleries(container) {
 
     ui.progress.hidden = false;
     ui.bar.style.width = '0%';
-    const warn = 'Uploading ' + total + ' photo' + (total === 1 ? '' : 's') + '. Keep this page open.';
-    ui.status.textContent = warn;
+    const warn = 'Got ' + total + ' photo' + (total === 1 ? '' : 's') + ' — uploading now. ' +
+      'Keep this page open and your phone unlocked until it finishes.';
+    showNote(ui.note, warn);
 
     const guard = function (e) { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', guard);
@@ -403,7 +434,8 @@ export function initGalleries(container) {
       window.removeEventListener('beforeunload', guard);
       releaseWake();
       ui.progress.hidden = true;
-      flash(ui.status, 'Could not start: ' + (err && (err.code || err.message)));
+      showNote(ui.note, 'Could not start: ' + (err && (err.code || err.message)) +
+        '. Check your internet connection and tap Add photos again.');
       return;
     }
 
@@ -428,8 +460,8 @@ export function initGalleries(container) {
       }
       const pct = Math.round(((done + failed) / total) * 100);
       ui.bar.style.width = pct + '%';
-      ui.status.textContent = warn + ' ' + (done + failed) + ' of ' + total +
-        (failed ? ' (' + failed + ' failed)' : '');
+      showNote(ui.note, warn + ' ' + (done + failed) + ' of ' + total + ' done' +
+        (failed ? ' (' + failed + ' failed)' : '') + '.');
     }
 
     window.removeEventListener('beforeunload', guard);
@@ -454,8 +486,8 @@ export function initGalleries(container) {
     // away with the old card — she never saw "70 photos added", nor which ones
     // failed. Say it on the NEW card.
     await render();
-    const fresh = list.querySelector('.g-card[data-id="' + g.id + '"] .g-card-status');
-    flash(fresh || ui.status, message, ms);
+    const fresh = list.querySelector('.g-card[data-id="' + g.id + '"] .g-upload-note');
+    showNote(fresh || ui.note, message, failed ? 0 : ms);
   }
 
   // Firestore has no recursive delete from the browser, so the photo records

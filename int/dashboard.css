@@ -437,3 +437,11 @@ main{padding:22px 20px 60px;max-width:900px;margin:0 auto;}
 .c-signer-opt input[type="radio"]{
   display:inline-block;width:auto;margin:0;padding:0;
 }
+
+/* Upload messages get their own box under the buttons. The small status text
+   at the end of the button row was easy to miss on a phone — and the wait
+   while the phone hands over a big selection needs to be impossible to miss. */
+.g-upload-note{
+  margin:12px 0 0;padding:12px 14px;border-radius:10px;
+  background:var(--cream);color:var(--ink);font-size:14px;line-height:1.5;
+}
