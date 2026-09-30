@@ -8,6 +8,14 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 // zip still matches the gallery. Two copies of that arithmetic would drift.
 // The file imports nothing from node, which is what makes this safe.
 import { planZipParts, sourceFingerprint, partDocId } from '../functions/lib/gallery-zip.js';
+import { deviceKind } from './save-plan.js';
+import { openSaveDialog, formatBytes } from './save-photos.js';
+
+// Saving straight into a phone's photo library (save-photos.js) is only live
+// with ?test=save in the address until the iPhone round size has been measured
+// on a real phone. Everyone else gets the zip exactly as before.
+const pageParams = new URLSearchParams(location.search);
+const saveTest = pageParams.get('test') === 'save';
 
 const fns = getFunctions(app, 'us-west1');
 const openGallery = httpsCallable(fns, 'openGallery');
@@ -232,11 +240,25 @@ let dlParts = null;
 let dlNote = null;
 let dlHint = null;
 
-function formatBytes(n) {
-  if (typeof n !== 'number' || !isFinite(n) || n <= 0) return '';
-  const mb = n / 1048576;
-  return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+// ios and android save straight to the phone; desktop keeps the zip. An
+// iPhone too old to share files falls back to the zip rather than to nothing.
+// In test mode ?device= can force a path, so each one can be tried anywhere.
+let saveKind = 'desktop';
+function pickSaveKind() {
+  const forced = saveTest ? pageParams.get('device') : null;
+  let kind = /^(ios|android|desktop)$/.test(forced || '') ? forced : deviceKind(navigator);
+  if (kind === 'ios' && !canShareFiles()) kind = 'desktop';
+  return kind;
 }
+function canShareFiles() {
+  try {
+    return !!(navigator.canShare &&
+      navigator.canShare({ files: [new File(['x'], 'x.jpg', { type: 'image/jpeg' })] }));
+  } catch (err) {
+    return false;
+  }
+}
+function phoneSave() { return saveTest && saveKind !== 'desktop'; }
 
 // What the server has actually got for one part. A record whose fingerprint no
 // longer matches was built before she added or removed a photo, so it is a zip
@@ -252,6 +274,17 @@ function zipState(part) {
 
 function renderDownloadAll() {
   if (!dlWrap) return;
+
+  // On a phone the zip is not offered at all, even one already built — the
+  // button opens the save box and that is the whole story.
+  if (phoneSave()) {
+    dlParts.innerHTML = '';
+    dlButton.hidden = false;
+    dlButton.textContent = 'Download all ' + photos.length + (photos.length === 1 ? ' photo' : ' photos');
+    dlNote.textContent = '';
+    dlHint.hidden = true;
+    return;
+  }
 
   const states = zipPlan.map(zipState);
   const multi = zipPlan.length > 1;
@@ -351,6 +384,15 @@ async function askForNextPart() {
   }
 }
 
+function startZip() {
+  zipStarted = true;
+  zipError = '';
+  // A retry has to forget what was asked before, or the failed part would
+  // be skipped over as "already requested" and the button would do nothing.
+  zipRequested = new Set();
+  askForNextPart();
+}
+
 function setupDownloadAll() {
   const head = document.querySelector('.g-gallery-head');
   if (!head) return;
@@ -358,6 +400,7 @@ function setupDownloadAll() {
   zipPlan = planZipParts(photos);
   zipFingerprint = sourceFingerprint(photos);
   if (!zipPlan.length) return;
+  saveKind = pickSaveKind();
 
   if (!dlWrap) {
     dlWrap = document.createElement('div');
@@ -368,12 +411,13 @@ function setupDownloadAll() {
     dlButton.id = 'gDownloadAll';
     dlButton.className = 'g-btn g-download-all';
     dlButton.addEventListener('click', function () {
-      zipStarted = true;
-      zipError = '';
-      // A retry has to forget what was asked before, or the failed part would
-      // be skipped over as "already requested" and the button would do nothing.
-      zipRequested = new Set();
-      askForNextPart();
+      // "Try again" after a failed zip goes straight back to building; the size
+      // box is for the first tap, not for every retry.
+      if (saveTest && dlButton.textContent.indexOf('Download all') === 0) {
+        openSaveDialog({ photos: photos, kind: saveKind, testMode: saveTest, onDesktopConfirm: startZip });
+      } else {
+        startZip();
+      }
     });
 
     dlParts = document.createElement('ul');

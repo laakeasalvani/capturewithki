@@ -136,3 +136,37 @@ main{padding:clamp(28px,6vw,64px) clamp(18px,5vw,48px) 80px;max-width:1400px;mar
 /* .g-note is the error red used by the password form. This one is a hint, not
    a problem, so it borrows the shape and not the colour. */
 .g-dl-hint{color:#6b6b63;margin-top:10px;}
+
+/* The "save everything" box: the size up front, then the one button that
+   matters. Sits over the gallery like the viewer, but on paper, not black —
+   it is a question, not a photo. */
+.g-save{
+  position:fixed;inset:0;z-index:110;background:rgba(23,22,20,.55);
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.g-save-card{
+  width:100%;max-width:420px;max-height:100%;overflow:auto;
+  background:var(--paper);border-radius:14px;padding:26px 22px 18px;text-align:center;
+  box-shadow:0 18px 50px rgba(23,22,20,.25);
+}
+.g-save-title{font-family:var(--display);font-weight:300;font-size:28px;line-height:1.2;margin:0 0 4px;}
+.g-save-size{margin:0 0 12px;font-size:17px;color:var(--ink);}
+.g-save-body{font-size:14px;margin-bottom:6px;}
+.g-save-bar{height:6px;border-radius:3px;background:var(--cream);overflow:hidden;margin-top:14px;}
+.g-save-bar span{display:block;height:100%;width:0;background:var(--khaki);transition:width .25s ease;}
+.g-save-hint{min-height:1.4em;margin:12px 0 0;font-size:13px;color:#6b6b63;}
+.g-save-cancel{
+  margin-top:6px;min-height:44px;padding:0 18px;background:none;border:none;
+  font-family:inherit;font-size:14px;color:var(--muted);cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;
+}
+/* Test mode only (?test=save). Plain on purpose; it is a measuring tool. */
+.g-save-test{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);text-align:left;}
+.g-save-test-head{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+.g-save-test-sizes{display:flex;gap:6px;flex-wrap:wrap;}
+.g-save-test-size{
+  min-width:52px;min-height:40px;border:1px solid var(--khaki);border-radius:20px;
+  background:#fff;color:var(--ink);font-family:inherit;font-size:14px;cursor:pointer;
+}
+.g-save-test-size[aria-pressed="true"]{background:var(--khaki);color:#fff;}
+.g-save-log{margin:10px 0 0;padding-left:20px;font-size:12px;line-height:1.5;color:var(--ink);}
