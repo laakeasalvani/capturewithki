@@ -9,7 +9,7 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 // The file imports nothing from node, which is what makes this safe.
 import { planZipParts, sourceFingerprint, partDocId } from '../functions/lib/gallery-zip.js';
 import { deviceKind } from './save-plan.js';
-import { openSaveDialog, formatBytes } from './save-photos.js';
+import { openSaveDialog, formatBytes, takeCrashedAttempt } from './save-photos.js';
 
 // Phones save straight into the photo library (save-photos.js); computers get
 // the zip. ?test=save adds the round-size picker and ?device= override, for
@@ -97,6 +97,7 @@ form.addEventListener('submit', async function (e) {
     errorEl.textContent = '';
     await loadPhotos(res.data.expiresAt);
     show('gallery');
+    resumeAfterCrash();
   } catch (err) {
     const code = err && err.code;
     errorEl.textContent = code === 'functions/resource-exhausted'
@@ -136,6 +137,8 @@ async function loadPhotos(expiresAt) {
   }
   gridNote.textContent = '';
   setupDownloadAll();
+  selected.clear();
+  renderSelection();
 
   grid.innerHTML = '';
   photos.forEach(function (p, i) {
@@ -170,6 +173,124 @@ async function loadPhotos(expiresAt) {
     grid.replaceChild(wrap, tile);
     wrap.appendChild(tile);
     wrap.appendChild(dl);
+    wrap.appendChild(makeCheckbox(p, i, wrap));
+  });
+}
+
+// --- Picking photos ----------------------------------------------------------
+//
+// A checkbox on every photo, always visible — the owner's choice over a
+// "Select" mode. Once anything is ticked, a bar at the bottom saves just those,
+// through the same box as "Download all": Photos on an iPhone, one file each
+// on Android and on a computer.
+
+const selected = new Set();
+let selBar = null;
+let selText = null;
+
+function makeCheckbox(p, i, wrap) {
+  const box = document.createElement('button');
+  box.type = 'button';
+  box.className = 'g-tile-check';
+  box.setAttribute('role', 'checkbox');
+  box.setAttribute('aria-checked', 'false');
+  box.setAttribute('aria-label', 'Select photo ' + (i + 1));
+  box.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (selected.has(p.id)) selected.delete(p.id); else selected.add(p.id);
+    const on = selected.has(p.id);
+    box.setAttribute('aria-checked', String(on));
+    wrap.classList.toggle('is-selected', on);
+    renderSelection();
+  });
+  return box;
+}
+
+function selectedPhotos() {
+  // Gallery order, not tap order, so they land in Photos the way she arranged them.
+  return photos.filter(function (p) { return selected.has(p.id); });
+}
+
+function clearSelection() {
+  selected.clear();
+  grid.querySelectorAll('.g-tile-check').forEach(function (b) { b.setAttribute('aria-checked', 'false'); });
+  grid.querySelectorAll('.g-tile-wrap.is-selected').forEach(function (w) { w.classList.remove('is-selected'); });
+  renderSelection();
+}
+
+function renderSelection() {
+  if (!selBar) {
+    selBar = document.createElement('div');
+    selBar.className = 'g-selbar';
+    selBar.hidden = true;
+    selText = document.createElement('span');
+    selText.className = 'g-selbar-text';
+    selText.setAttribute('aria-live', 'polite');
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'g-btn g-selbar-save';
+    save.textContent = 'Save';
+    save.addEventListener('click', function () {
+      const chosen = selectedPhotos();
+      if (!chosen.length) return;
+      openSaveDialog({
+        photos: chosen,
+        // A computer saving a selection gets separate files, not a zip.
+        kind: saveKind === 'desktop' ? 'files' : saveKind,
+        mode: 'selected',
+        galleryId: galleryId,
+        testMode: saveTest,
+        onDone: clearSelection
+      });
+    });
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'g-selbar-clear';
+    clear.textContent = 'Clear';
+    clear.addEventListener('click', clearSelection);
+    selBar.appendChild(selText);
+    selBar.appendChild(save);
+    selBar.appendChild(clear);
+    document.body.appendChild(selBar);
+    selBar.saveBtn = save;
+  }
+  const chosen = selectedPhotos();
+  selBar.hidden = chosen.length === 0;
+  document.body.classList.toggle('has-selbar', chosen.length > 0);
+  if (!chosen.length) return;
+  selText.textContent = chosen.length + ' selected · ' +
+    formatBytes(chosen.reduce(function (n, p) { return n + (p.bytes || 0); }, 0));
+  selBar.saveBtn.textContent = 'Save ' + chosen.length + (chosen.length === 1 ? ' photo' : ' photos');
+}
+
+// The phone ran out of memory last time and Safari reloaded the page. Open the
+// box straight away with the message, carrying on in half-size groups from
+// where it broke — the owner's choice, rather than waiting for another tap.
+function resumeAfterCrash() {
+  const a = takeCrashedAttempt(galleryId);
+  if (!a || saveKind !== 'ios' || !photos.length) return;
+  let list = photos;
+  if (a.mode === 'selected') {
+    const ids = new Set(a.ids);
+    list = photos.filter(function (p) { return ids.has(p.id); });
+    if (!list.length) return;
+    list.forEach(function (p) { selected.add(p.id); });
+    grid.querySelectorAll('.g-tile-wrap').forEach(function (w, i) {
+      const on = selected.has(photos[i].id);
+      w.classList.toggle('is-selected', on);
+      const box = w.querySelector('.g-tile-check');
+      if (box) box.setAttribute('aria-checked', String(on));
+    });
+    renderSelection();
+  }
+  openSaveDialog({
+    photos: list,
+    kind: 'ios',
+    mode: a.mode,
+    galleryId: galleryId,
+    testMode: saveTest,
+    recovery: a,
+    onDone: a.mode === 'selected' ? clearSelection : null
   });
 }
 
@@ -416,7 +537,10 @@ function setupDownloadAll() {
       // "Try again" after a failed zip goes straight back to building; the size
       // box is for the first tap, not for every retry.
       if (dlButton.textContent.indexOf('Download all') === 0) {
-        openSaveDialog({ photos: photos, kind: saveKind, testMode: saveTest, onDesktopConfirm: startZip });
+        openSaveDialog({
+          photos: photos, kind: saveKind, mode: 'all', galleryId: galleryId,
+          testMode: saveTest, onDesktopConfirm: startZip
+        });
       } else {
         startZip();
       }

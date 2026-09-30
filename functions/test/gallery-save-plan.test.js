@@ -125,3 +125,55 @@ test('a missing or generic type is worked out from the name', () => {
   assert.equal(imageTypeFor('', 'a.webp'), 'image/webp');
   assert.equal(imageTypeFor('', 'noextension'), 'image/jpeg');
 });
+
+// --- getting back up after the phone runs out of memory ---------------------
+
+import { parseAttempt, recoveryFrom, crashMessage, ATTEMPT_MAX_AGE_MS } from '../../galleries/save-plan.js';
+
+const NOW = Date.UTC(2026, 8, 29, 20, 0, 0);
+function attempt(over) {
+  return Object.assign({ at: NOW - 60000, mode: 'all', from: 0, count: 500, listLength: 500 }, over);
+}
+
+test('a fresh attempt record is read back', () => {
+  const a = parseAttempt(JSON.stringify(attempt()), NOW);
+  assert.equal(a.count, 500);
+  assert.equal(a.mode, 'all');
+});
+
+test('an old, broken or missing record is ignored', () => {
+  assert.equal(parseAttempt(null, NOW), null);
+  assert.equal(parseAttempt('', NOW), null);
+  assert.equal(parseAttempt('{not json', NOW), null);
+  assert.equal(parseAttempt(JSON.stringify(attempt({ at: NOW - ATTEMPT_MAX_AGE_MS - 1 })), NOW), null);
+  assert.equal(parseAttempt(JSON.stringify(attempt({ count: 0 })), NOW), null);
+  assert.equal(parseAttempt(JSON.stringify(attempt({ count: 'x' })), NOW), null);
+  assert.equal(parseAttempt(JSON.stringify(attempt({ from: -1 })), NOW), null);
+  assert.equal(parseAttempt(JSON.stringify(attempt({ mode: 'weird' })), NOW), null);
+  // A record from the future means a wrong clock, not a crash worth acting on.
+  assert.equal(parseAttempt(JSON.stringify(attempt({ at: NOW + 3600000 })), NOW), null);
+});
+
+test('a selection record must carry the photos that were picked', () => {
+  assert.equal(parseAttempt(JSON.stringify(attempt({ mode: 'selected' })), NOW), null);
+  const a = parseAttempt(JSON.stringify(attempt({ mode: 'selected', ids: ['a', 'b'], count: 2, listLength: 2 })), NOW);
+  assert.deepEqual(a.ids, ['a', 'b']);
+});
+
+test('after a crash the next try is half the size, starting where it broke', () => {
+  assert.deepEqual(recoveryFrom(attempt()), { from: 0, maxCount: 250 });
+  assert.deepEqual(recoveryFrom(attempt({ from: 250, count: 250 })), { from: 250, maxCount: 125 });
+  assert.deepEqual(recoveryFrom(attempt({ count: 7 })), { from: 0, maxCount: 3 });
+});
+
+test('halving never reaches zero', () => {
+  assert.deepEqual(recoveryFrom(attempt({ count: 1 })), { from: 0, maxCount: 1 });
+});
+
+test('the message names the real number', () => {
+  assert.equal(crashMessage(attempt()), 'Your phone couldn’t hold all 500 photos at once.');
+  assert.equal(crashMessage(attempt({ count: 56, listLength: 56 })), 'Your phone couldn’t hold all 56 photos at once.');
+  // A second crash is on a half-size round, which is not "all" of anything.
+  assert.equal(crashMessage(attempt({ from: 0, count: 250 })), 'Your phone couldn’t hold 250 photos at once.');
+  assert.equal(crashMessage(attempt({ count: 1, listLength: 3 })), 'Your phone couldn’t hold that photo.');
+});

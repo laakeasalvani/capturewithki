@@ -94,3 +94,46 @@ export function imageTypeFor(serverType, name) {
   const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
   return (m && TYPES_BY_EXT[m[1].toLowerCase()]) || 'image/jpeg';
 }
+
+// --- getting back up after the phone runs out of memory ---------------------
+//
+// When an iPhone runs out of memory mid-save, Safari kills the page and
+// reloads it. Nothing on the page gets a chance to react, so the only way to
+// know it happened is a note written BEFORE the risky part and erased after.
+// If the note is still there when the gallery next opens, the save died.
+
+// Long enough to cover re-typing the password; short enough that a note left
+// by closing Safari mid-save does not greet them days later.
+export const ATTEMPT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+// { at, mode: 'all'|'selected', ids?, from, count, listLength }
+//   from       — position in the list where the round that died began
+//   count      — how many photos that round held
+//   listLength — how many photos the whole save covered
+export function parseAttempt(raw, now) {
+  if (!raw) return null;
+  let a;
+  try { a = JSON.parse(raw); } catch (err) { return null; }
+  if (!a || typeof a !== 'object') return null;
+  if (typeof a.at !== 'number' || a.at > now + 60000 || now - a.at > ATTEMPT_MAX_AGE_MS) return null;
+  if (a.mode !== 'all' && a.mode !== 'selected') return null;
+  if (!Number.isInteger(a.count) || a.count < 1) return null;
+  if (!Number.isInteger(a.from) || a.from < 0) return null;
+  if (!Number.isInteger(a.listLength) || a.listLength < a.count) return null;
+  if (a.mode === 'selected' && (!Array.isArray(a.ids) || !a.ids.length)) return null;
+  return a;
+}
+
+// Pick up where it broke, with rounds half the size of the one that died.
+// Halving again on every further crash is what gets an old phone through.
+export function recoveryFrom(a) {
+  return { from: a.from, maxCount: Math.max(1, Math.floor(a.count / 2)) };
+}
+
+// The number has to be the real one. "All" only when the round that died
+// really was everything; a second crash is on a half-size round.
+export function crashMessage(a) {
+  if (a.count === 1) return 'Your phone couldn’t hold that photo.';
+  return 'Your phone couldn’t hold ' + (a.count === a.listLength && a.from === 0 ? 'all ' : '') +
+    a.count + ' photos at once.';
+}

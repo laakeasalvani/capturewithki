@@ -12,25 +12,28 @@
 //      takes minutes, so the tap that opens the box cannot also open the sheet;
 //      the photos load while the box is up and a second tap saves them.
 //   2. Every photo in a round is held in the page's memory until the sheet
-//      takes it. A 2.5GB wedding does not fit, so big galleries go in rounds.
+//      takes it. The owner wants everything in ONE round, so that is what is
+//      tried first. If the phone runs out of memory, Safari kills and reloads
+//      the page; a note left beforehand (save-plan.js, parseAttempt) survives
+//      that, and the next open carries on in half-size rounds with a message.
+//
+// The same box saves a hand-picked selection (the checkboxes on each photo).
 //
 // The bytes handed over are the ORIGINAL file, exactly as uploaded — fetched
 // from fullUrl and never drawn to a canvas or re-encoded. Nothing here may ever
 // touch thumbUrl.
-import { planSaveBatches, totalBytes, imageTypeFor } from './save-plan.js';
+import {
+  planSaveBatches, totalBytes, imageTypeFor, parseAttempt, recoveryFrom, crashMessage
+} from './save-plan.js';
 
-// How many photos an iPhone can take in one round. Went live unmeasured on
-// 2026-09-29, so deliberately conservative: 300MB is far below what a modern
-// iPhone tab can hold. Raise it only after the test mode below proves a bigger
-// round on a real phone.
-const ROUND_MAX_COUNT = 50;
-const ROUND_MAX_BYTES = 300 * 1024 * 1024;
+const ATTEMPT_KEY = 'cwk-save-attempt:';
 
 const PARALLEL_FETCHES = 3;
 const FETCH_TRIES = 3;
-// Android saves one file at a time. 700ms is what the original one-by-one
-// "Download all" used in production without the browser dropping any.
-const ANDROID_GAP_MS = 700;
+// Android, and a computer saving a selection, get one file at a time. 700ms is
+// what the original one-by-one "Download all" used in production without the
+// browser dropping any.
+const ONE_BY_ONE_GAP_MS = 700;
 
 let el = null;      // the box's elements, built once
 let run = null;     // the current attempt; replaced on every open
@@ -43,7 +46,27 @@ export function formatBytes(n) {
 
 function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
-// opts: { photos, kind: 'ios'|'android'|'desktop', testMode, onDesktopConfirm }
+// A save that died last time on this gallery, or null. Read once and erased,
+// so the message shows once and never loops.
+export function takeCrashedAttempt(galleryId) {
+  try {
+    const key = ATTEMPT_KEY + galleryId;
+    const a = parseAttempt(localStorage.getItem(key), Date.now());
+    localStorage.removeItem(key);
+    return a;
+  } catch (err) {
+    return null; // private browsing or storage blocked: no safety net, no harm
+  }
+}
+
+// opts: {
+//   photos       — what to save, in gallery order (everything, or the selection)
+//   kind         — 'ios' | 'ios-noshare' | 'android' | 'files' | 'desktop'
+//                  ('files' = a computer saving a selection, one file each)
+//   mode         — 'all' | 'selected'
+//   galleryId, testMode, onDesktopConfirm, onDone
+//   recovery     — a crashed attempt from takeCrashedAttempt, to carry on from
+// }
 export function openSaveDialog(opts) {
   build();
   if (run) run.stop();
@@ -72,6 +95,7 @@ function build() {
     '<div class="g-save-card">' +
       '<h2 class="g-save-title" id="gSaveTitle"></h2>' +
       '<p class="g-save-size"></p>' +
+      '<p class="g-save-alert" hidden></p>' +
       '<p class="g-copy g-save-body"></p>' +
       '<div class="g-save-bar" hidden><span></span></div>' +
       '<button type="button" class="g-btn g-save-go"></button>' +
@@ -89,6 +113,7 @@ function build() {
     box: box,
     title: box.querySelector('.g-save-title'),
     size: box.querySelector('.g-save-size'),
+    alert: box.querySelector('.g-save-alert'),
     body: box.querySelector('.g-save-body'),
     bar: box.querySelector('.g-save-bar'),
     barFill: box.querySelector('.g-save-bar span'),
@@ -103,23 +128,37 @@ function build() {
   el.primary.addEventListener('click', function () { if (run) run.tap(); });
   el.cancel.addEventListener('click', closeDialog);
   box.addEventListener('click', function (e) { if (e.target === box) closeDialog(); });
+  // Leaving the page on purpose is not a crash. A crash never gets this event,
+  // which is exactly what makes the note mean something.
+  window.addEventListener('pagehide', function () { if (run) run.forgetAttempt(); });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !box.hidden) closeDialog();
   });
 }
 
 function createRun(opts) {
-  const photos = opts.photos;
+  const list = opts.photos;
   const kind = opts.kind;
+  const mode = opts.mode === 'selected' ? 'selected' : 'all';
+  const recovery = kind === 'ios' && opts.recovery ? opts.recovery : null;
+  // After a crash, carry on from the round that died; the ones before it are
+  // already in Photos.
+  const offset = recovery ? Math.min(recoveryFrom(recovery).from, Math.max(0, list.length - 1)) : 0;
+  const photos = list.slice(offset);
   const total = totalBytes(photos);
-  const sizeText = plural(photos.length, 'photo', 'photos') + ' · ' + formatBytes(total);
+  const sizeText = plural(photos.length, 'photo', 'photos') + (offset ? ' left' : '') +
+    ' · ' + formatBytes(total);
 
   let stopped = false;
   let abort = null;
   let wakeLock = null;
 
   // --- iPhone state
-  let caps = { maxCount: ROUND_MAX_COUNT, maxBytes: ROUND_MAX_BYTES };
+  // No limit: everything in one round, as the owner asked. Only a crash
+  // (or the test picker) makes rounds smaller.
+  let caps = recovery
+    ? { maxCount: recoveryFrom(recovery).maxCount, maxBytes: Infinity }
+    : { maxCount: Infinity, maxBytes: Infinity };
   let batches = [];
   let round = 0;
   let phase = 'loading';   // loading | ready | sharing | done
@@ -130,12 +169,23 @@ function createRun(opts) {
   let note = '';
   let roundStartedAt = 0;
 
-  // --- Android state
+  // --- one-by-one state (Android, or a computer saving a selection)
   let saved = 0;
 
   function start() {
-    el.title.textContent = 'Save all ' + plural(photos.length, 'photo', 'photos');
+    el.title.textContent = mode === 'selected'
+      ? 'Save ' + plural(list.length, 'selected photo', 'selected photos')
+      : 'Save all ' + plural(list.length, 'photo', 'photos');
     el.size.textContent = sizeText;
+    el.alert.hidden = !recovery;
+    if (recovery) {
+      el.alert.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = crashMessage(recovery);
+      el.alert.appendChild(strong);
+      el.alert.appendChild(document.createTextNode(' No problem. We’ll save them in smaller ' +
+        'groups instead. Tap Save for each group, and they’ll all end up in your Photos app.'));
+    }
     el.log.innerHTML = '';
     el.test.hidden = !(opts.testMode && kind === 'ios');
     if (opts.testMode && kind === 'ios') buildTestSizes();
@@ -154,6 +204,27 @@ function createRun(opts) {
     if (abort) abort.abort();
     files = null;
     releaseWake();
+    forgetAttempt();
+  }
+
+  // Written just before a round starts loading, erased the moment that round
+  // ends in any way other than the page dying.
+  function noteAttempt(b) {
+    if (!opts.galleryId) return;
+    try {
+      localStorage.setItem(ATTEMPT_KEY + opts.galleryId, JSON.stringify({
+        at: Date.now(),
+        mode: mode,
+        ids: mode === 'selected' ? list.map(function (p) { return p.id; }) : undefined,
+        from: offset + b.first - 1,
+        count: b.photos.length,
+        listLength: list.length
+      }));
+    } catch (err) { /* storage blocked: no safety net, no harm */ }
+  }
+  function forgetAttempt() {
+    if (!opts.galleryId) return;
+    try { localStorage.removeItem(ATTEMPT_KEY + opts.galleryId); } catch (err) { /* ignore */ }
   }
 
   function replan() {
@@ -169,7 +240,7 @@ function createRun(opts) {
     el.cancel.textContent = phase === 'done' ? 'Close' : 'Cancel';
     if (kind === 'ios') renderIos();
     else if (kind === 'ios-noshare') renderNoShare();
-    else if (kind === 'android') renderAndroid();
+    else if (kind === 'android' || kind === 'files') renderOneByOne();
     else renderDesktop();
   }
 
@@ -197,7 +268,7 @@ function createRun(opts) {
     el.body.textContent = 'These are the full-size originals, exactly as Khiara delivered them. ' +
       'Make sure your phone has at least ' + formatBytes(total) + ' of free space' +
       (multi ? ', and keep this page open — your phone saves them in ' + batches.length +
-        ' rounds of about ' + Math.round(photos.length / batches.length) + '.' : '.');
+        ' groups of about ' + Math.round(photos.length / batches.length) + '.' : '.');
 
     el.bar.hidden = phase !== 'loading';
     if (phase === 'loading' && b) {
@@ -207,8 +278,11 @@ function createRun(opts) {
     // Honest about a round that came up short: "all 60" when only 57 loaded
     // would promise three photos the sheet is never given.
     const short = files && b && files.length < b.photos.length;
-    const label = b && (multi ? 'photos ' + b.first + '–' + b.last
-      : short ? plural(files.length, 'photo', 'photos') : 'all ' + photos.length);
+    // Positions count from the start of the whole save, so after a crash the
+    // button carries on at "photos 251–375" rather than restarting at 1.
+    const label = b && (multi || offset ? 'photos ' + (offset + b.first) + '–' + (offset + b.last)
+      : short ? plural(files.length, 'photo', 'photos')
+        : mode === 'selected' ? plural(photos.length, 'photo', 'photos') : 'all ' + photos.length);
     el.primary.disabled = phase === 'loading' || phase === 'sharing';
     if (phase === 'loading') {
       el.primary.textContent = 'Getting ready… ' + loadedCount + ' of ' + b.photos.length;
@@ -237,20 +311,25 @@ function createRun(opts) {
     el.hint.textContent = hint.trim();
   }
 
-  function renderAndroid() {
+  function renderOneByOne() {
+    const computer = kind === 'files';
     el.body.textContent = 'These are the full-size originals, exactly as Khiara delivered them. ' +
-      'Make sure your phone has at least ' + formatBytes(total) + ' of free space. ' +
-      'If your phone asks to allow multiple downloads, tap Allow.';
+      (computer
+        ? 'Each one downloads as its own file into your Downloads folder. ' +
+          'If your browser asks to allow multiple downloads, click Allow.'
+        : 'Make sure your phone has at least ' + formatBytes(total) + ' of free space. ' +
+          'If your phone asks to allow multiple downloads, tap Allow.');
     el.bar.hidden = phase !== 'saving';
     if (phase === 'saving') el.barFill.style.width = Math.round(100 * saved / photos.length) + '%';
     el.primary.disabled = phase === 'saving';
     el.primary.textContent = phase === 'saving' ? 'Saving ' + saved + ' of ' + photos.length + '…'
       : phase === 'done' ? 'Done'
-        : 'Save all ' + plural(photos.length, 'photo', 'photos');
+        : (mode === 'selected' ? 'Save ' : 'Save all ') + plural(photos.length, 'photo', 'photos');
     el.hint.textContent = phase === 'saving'
       ? 'Keep this page open until it finishes.'
       : phase === 'done'
-        ? 'All done — they are in your Gallery or Google Photos, in the Download folder.'
+        ? (computer ? 'All done — they are in your Downloads folder.'
+          : 'All done — they are in your Gallery or Google Photos, in the Download folder.')
         : '';
   }
 
@@ -268,7 +347,7 @@ function createRun(opts) {
   function tap() {
     if (phase === 'done') { closeDialog(); return; }
     if (kind === 'ios') { if (phase === 'ready') share(); return; }
-    if (kind === 'android') { if (phase === 'ready') saveAndroid(); return; }
+    if (kind === 'android' || kind === 'files') { if (phase === 'ready') saveOneByOne(); return; }
     if (kind === 'ios-noshare') { copyLink(); return; }
     closeDialog();
     opts.onDesktopConfirm();
@@ -299,6 +378,7 @@ function createRun(opts) {
     roundStartedAt = Date.now();
     abort = new AbortController();
     const signal = abort.signal;
+    noteAttempt(b);
     holdWake();
     render();
 
@@ -328,6 +408,7 @@ function createRun(opts) {
       Math.round((Date.now() - roundStartedAt) / 1000) + 's');
 
     if (!files.length) {
+      forgetAttempt();
       // Nothing in this round would load. Say so rather than offer to share
       // an empty list, and move on so one bad round cannot strand the rest.
       note = 'Those photos would not load. Check your connection.';
@@ -370,9 +451,13 @@ function createRun(opts) {
       // Files only. Adding a title or url changes what the sheet offers, and
       // "Save N Images" is the only option that matters here.
       await navigator.share({ files: files });
+      forgetAttempt();
       logTest('Round ' + (round + 1) + ': shared ' + count + ' photos (' + formatBytes(bytes) + ') ✓');
       afterRound();
     } catch (err) {
+      // The sheet closed without saving — the phone survived, so this is not
+      // the crash the note is watching for.
+      forgetAttempt();
       const name = (err && err.name) || 'Error';
       logTest('Round ' + (round + 1) + ': share of ' + count + ' photos (' + formatBytes(bytes) +
         ') did not finish — ' + name + (err && err.message ? ': ' + err.message : ''));
@@ -390,15 +475,20 @@ function createRun(opts) {
     if (round < batches.length) {
       loadRound();
     } else {
-      phase = 'done';
-      if (!note || /would not load/.test(note)) note = '';
-      render();
+      finish();
     }
   }
 
-  // --- Android: plain downloads, one after another ---------------------------
+  function finish() {
+    phase = 'done';
+    if (!note || /would not load/.test(note)) note = '';
+    render();
+    if (opts.onDone) opts.onDone();
+  }
 
-  async function saveAndroid() {
+  // --- Android / computer selection: plain downloads, one after another -------
+
+  async function saveOneByOne() {
     phase = 'saving';
     saved = 0;
     holdWake();
@@ -414,11 +504,10 @@ function createRun(opts) {
       a.remove();
       saved++;
       render();
-      await wait(ANDROID_GAP_MS);
+      await wait(ONE_BY_ONE_GAP_MS);
     }
     releaseWake();
-    phase = 'done';
-    render();
+    finish();
   }
 
   // --- keeping the screen on -------------------------------------------------
@@ -470,7 +559,7 @@ function createRun(opts) {
     el.log.appendChild(li);
   }
 
-  return { start: start, stop: stop, tap: tap };
+  return { start: start, stop: stop, tap: tap, forgetAttempt: forgetAttempt };
 }
 
 function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
