@@ -240,14 +240,16 @@ let dlParts = null;
 let dlNote = null;
 let dlHint = null;
 
-// ios and android save straight to the phone; desktop keeps the zip. An
-// iPhone too old to share files falls back to the zip rather than to nothing.
-// In test mode ?device= can force a path, so each one can be tried anywhere.
+// ios and android save straight to the phone; desktop keeps the zip. A phone
+// never gets the zip — the owner's rule. An iPhone that cannot open the Save
+// menu (usually the link was opened inside Instagram, Gmail or Messenger) is
+// told to open it in Safari instead. In test mode ?device= can force a path,
+// so each one can be tried anywhere.
 let saveKind = 'desktop';
 function pickSaveKind() {
   const forced = saveTest ? pageParams.get('device') : null;
-  let kind = /^(ios|android|desktop)$/.test(forced || '') ? forced : deviceKind(navigator);
-  if (kind === 'ios' && !canShareFiles()) kind = 'desktop';
+  let kind = /^(ios|ios-noshare|android|desktop)$/.test(forced || '') ? forced : deviceKind(navigator);
+  if (kind === 'ios' && !canShareFiles()) kind = 'ios-noshare';
   return kind;
 }
 function canShareFiles() {

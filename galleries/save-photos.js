@@ -166,8 +166,27 @@ function createRun(opts) {
     if (stopped) return;
     el.cancel.textContent = phase === 'done' ? 'Close' : 'Cancel';
     if (kind === 'ios') renderIos();
+    else if (kind === 'ios-noshare') renderNoShare();
     else if (kind === 'android') renderAndroid();
     else renderDesktop();
+  }
+
+  // An iPhone browser with no Save menu — nearly always the link opened inside
+  // Instagram, Gmail or Messenger. The only fix is Safari, so say exactly that
+  // and make it one paste away. The copied link carries no password.
+  function renderNoShare() {
+    el.title.textContent = 'Open in Safari to save your photos';
+    el.body.textContent = 'This page is open inside another app, which cannot save photos to ' +
+      'your Photos app. Tap Copy link, open Safari, paste it into the address bar, ' +
+      'then tap Download all again.';
+    el.bar.hidden = true;
+    el.primary.disabled = false;
+    el.primary.textContent = phase === 'copied' ? 'Link copied' : 'Copy link';
+    el.hint.textContent = phase === 'copied'
+      ? 'Now open Safari and paste it into the address bar.'
+      : phase === 'copy-failed'
+        ? 'Could not copy it. Look for “Open in Safari” or “Open in browser” in this app’s ••• menu.'
+        : '';
   }
 
   function renderIos() {
@@ -248,8 +267,22 @@ function createRun(opts) {
     if (phase === 'done') { closeDialog(); return; }
     if (kind === 'ios') { if (phase === 'ready') share(); return; }
     if (kind === 'android') { if (phase === 'ready') saveAndroid(); return; }
+    if (kind === 'ios-noshare') { copyLink(); return; }
     closeDialog();
     opts.onDesktopConfirm();
+  }
+
+  async function copyLink() {
+    // Drop the forced device, or Safari would be told it is still the app.
+    const url = new URL(location.href);
+    url.searchParams.delete('device');
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      phase = 'copied';
+    } catch (err) {
+      phase = 'copy-failed';
+    }
+    render();
   }
 
   // --- iPhone: load a round, then share it ----------------------------------
