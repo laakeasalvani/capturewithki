@@ -1,4 +1,5 @@
-import { app, auth, db } from '../cms/firebase.js';
+// Its own Firebase app, login in memory only — see gallery-firebase.js.
+import { app, auth, db } from './gallery-firebase.js';
 import { signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
 import { collection, getDocs, query, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js';
@@ -87,27 +88,50 @@ form.addEventListener('submit', async function (e) {
     // The function decides everything. This page never learns whether the
     // gallery exists, whether it expired, or whether only the password was
     // wrong — one message covers all of it, so the link cannot be probed.
-    const res = await openGallery({ galleryId: galleryId, password: password });
+    //
+    // Every step has a deadline. On 2026-09-29 a step waited forever and the
+    // page sat on "Checking…" with no way out; whatever the cause next time,
+    // the client is told what to do instead of being left staring.
+    const res = await withDeadline(openGallery({ galleryId: galleryId, password: password }), 45000, 'password check');
     const token = res.data && res.data.token;
     if (!token) throw new Error('no token');
 
-    await signInWithCustomToken(auth, token);
+    await withDeadline(signInWithCustomToken(auth, token), 30000, 'sign-in');
 
     nameEl.textContent = res.data.title || 'Your gallery';
     errorEl.textContent = '';
-    await loadPhotos(res.data.expiresAt);
+    await withDeadline(loadPhotos(res.data.expiresAt), 45000, 'loading photos');
     show('gallery');
     resumeAfterCrash();
   } catch (err) {
     const code = err && err.code;
-    errorEl.textContent = code === 'functions/resource-exhausted'
-      ? (err.message || 'Too many tries. Please wait a while and try again.')
-      : 'That password is not right. Check the message from Khiara.';
+    console.warn('[gallery] could not open:', code, err && err.message);
+    // Only the server's own refusal means the password was wrong. Anything
+    // else — a timeout, a dropped connection — used to say "password not
+    // right" too, sending a client with the RIGHT password back to Khiara.
+    errorEl.textContent = code === 'functions/permission-denied'
+      ? 'That password is not right. Check the message from Khiara.'
+      : code === 'functions/resource-exhausted'
+        ? (err.message || 'Too many tries. Please wait a while and try again.')
+        : 'This is taking too long to load. Check your internet connection, ' +
+          'then close this page, open the link again and try once more.';
     passwordEl.select();
   } finally {
     enterBtn.disabled = false;
   }
 });
+
+function withDeadline(promise, ms, step) {
+  let timer;
+  const late = new Promise(function (resolve, reject) {
+    timer = setTimeout(function () {
+      const err = new Error(step + ' took longer than ' + Math.round(ms / 1000) + 's');
+      err.code = 'page/timeout';
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, late]).finally(function () { clearTimeout(timer); });
+}
 
 function daysLeft(expiresAt) {
   if (typeof expiresAt !== 'number') return null;

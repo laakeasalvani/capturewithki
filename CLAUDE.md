@@ -52,6 +52,14 @@ truth; delete stale worktrees under `.worktrees/` rather than reviving them.
 7. **Verify claims yourself.** Run `npm test` in `functions/` after any change
    there rather than trusting a report — a subagent has already once reported
    passing tests for a command that was erroring.
+8. **Every page a CLIENT opens loads `cms/no-indexeddb.js` first** (a plain
+   `<script>` in `<head>`, before any module). Safari's IndexedDB can stop
+   answering, and Firebase waits on it before sending anything — on
+   2026-09-29 a gallery sat on "Checking…" forever and the password never
+   left the phone. Galleries also use their own in-memory Firebase app
+   (`galleries/gallery-firebase.js`), never `cms/firebase.js`. Do NOT add
+   the guard to the CMS or `/int/`: they need IndexedDB to keep Khiara signed in.
+   Any wait a client can see must have a deadline and an honest message.
 
 ---
 
