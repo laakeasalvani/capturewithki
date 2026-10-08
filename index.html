@@ -1319,7 +1319,13 @@ img.cms-img-pending{visibility:hidden;}
     sendBtn.disabled = true;
     say('Sending\u2026', false);
 
-    window.cmsSubmitInquiry({
+    // A visitor must never be left on "Sending…". 40s covers a cold start plus
+    // both 10s email sends; anything longer means the request is stuck.
+    var deadline = new Promise(function(resolve, reject){
+      setTimeout(function(){ reject({ code: 'page/timeout' }); }, 40000);
+    });
+
+    Promise.race([deadline, window.cmsSubmitInquiry({
       name: name,
       partnerName: document.getElementById('n2').value.trim(),
       email: mail,
@@ -1329,7 +1335,7 @@ img.cms-img-pending{visibility:hidden;}
       message: document.getElementById('ms').value.trim(),
       honeypot: document.getElementById('cwk-ref').value,
       renderedAt: formRenderedAt
-    }).then(function(){
+    })]).then(function(){
       say('Thank you \u2014 your inquiry is on its way. Expect a reply within 48 hours.', false);
       document.getElementById('n1').value = '';
       document.getElementById('n2').value = '';

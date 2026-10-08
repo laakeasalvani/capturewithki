@@ -77,7 +77,9 @@ export function initGalleries(container) {
   // The plaintext password exists for exactly one moment: the response to
   // createGallery. It is never stored and cannot be looked up again, so it is
   // shown until she dismisses it rather than fading like a toast.
-  function showPassword(galleryId, password, note) {
+  // Every client refusal reads "password is not right", so a link handed out
+  // before Send looks exactly like a wrong password — say so where she copies it.
+  function showPassword(galleryId, password, note, isDraft) {
     const box = document.createElement('div');
     box.className = 'g-password';
     box.innerHTML =
@@ -85,6 +87,10 @@ export function initGalleries(container) {
       '<p class="g-password-value"><code>' + esc(password) + '</code></p>' +
       '<p class="g-password-warn">This is the only time it is shown. Copy it now &#8212; ' +
       'it is stored scrambled and cannot be looked up later.</p>' +
+      (isDraft
+        ? '<p class="g-password-warn"><strong>The link and password will not work yet.</strong> ' +
+          'Add the photos, then press <strong>Send to couple</strong> on this gallery.</p>'
+        : '') +
       '<div class="s-actions">' +
         '<button type="button" class="g-copy-pw">Copy password</button>' +
         '<button type="button" class="g-copy-link s-secondary">Copy link</button>' +
@@ -115,7 +121,7 @@ export function initGalleries(container) {
       const res = await createGalleryFn({ title: title });
       titleEl.value = '';
       createStatus.textContent = '';
-      showPassword(res.data.galleryId, res.data.password, 'Gallery created for ' + title + '.');
+      showPassword(res.data.galleryId, res.data.password, 'Gallery created for ' + title + '.', true);
       await render();
     } catch (err) {
       flash(createStatus, 'Could not create it: ' + (err && (err.code || err.message)));
@@ -214,7 +220,7 @@ export function initGalleries(container) {
       if (!confirm('Make a new password for ' + g.title + '?\n\nThe old one stops working for anyone who has not opened the gallery yet.')) return;
       try {
         const res = await regeneratePasswordFn({ galleryId: g.id });
-        showPassword(g.id, res.data.password, 'New password for ' + g.title + '.');
+        showPassword(g.id, res.data.password, 'New password for ' + g.title + '.', g.status === 'draft');
       } catch (err) {
         flash(status, 'Could not change it: ' + (err && (err.code || err.message)));
       }
