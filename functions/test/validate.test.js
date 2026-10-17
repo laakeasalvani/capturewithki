@@ -100,3 +100,34 @@ test('a boolean or number is still accepted and coerced', () => {
   assert.equal(r.value.name, '123');
   assert.equal(r.value.phone, '5550123');
 });
+
+test('keeps how the client found her', () => {
+  const r = validateInquiry({
+    name: 'Sarah', email: 'sarah@example.com', phone: '1',
+    sessionType: 'x', foundVia: ' Instagram '
+  });
+  assert.equal(r.valid, true);
+  assert.equal(r.value.foundVia, 'Instagram');
+});
+
+// The form makes this required, but a visitor whose page loaded before the
+// question existed sends no foundVia at all. Their inquiry must still land.
+test('accepts an inquiry with no foundVia, from a page loaded before the question existed', () => {
+  const r = validateInquiry({ name: 'Sarah', email: 'a@b.com', phone: '1', sessionType: 'x' });
+  assert.equal(r.valid, true);
+  assert.equal(r.value.foundVia, '');
+});
+
+test('rejects an absurdly long foundVia', () => {
+  const r = validateInquiry({
+    name: 'S', email: 'a@b.com', phone: '1', sessionType: 'x', foundVia: 'x'.repeat(201)
+  });
+  assert.equal(r.valid, false);
+  assert.match(r.error, /too long/i);
+});
+
+test('an object foundVia is refused rather than stringified', () => {
+  const r = validateInquiry({ name: 'S', email: 'a@b.com', phone: '1', sessionType: 'x', foundVia: { a: 1 } });
+  assert.equal(r.valid, false);
+  assert.match(r.error, /did not look right/i);
+});

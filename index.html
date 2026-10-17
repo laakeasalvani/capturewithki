@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20260910030613';
+    var BUILD = '20261017193548';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -1055,6 +1055,22 @@ img.cms-img-pending{visibility:hidden;}
             <option>Wedding, The Grand &mdash; 8 hrs</option>
           </select>
         </div>
+        <!-- Required on the page, optional on the server: a visitor whose page
+             loaded before this question existed must still get through. The
+             first option is the "pick one" prompt; the check below refuses it
+             by position, because the CMS rebuilds these options as plain text. -->
+        <div class="field">
+          <label for="fv" data-cms-id="contact.label.fv" data-cms-type="text">How did you find me?</label>
+          <select id="fv" data-cms-id="contact.options.found" data-cms-type="options">
+            <option>Choose one</option>
+            <option>Social Media Ad</option>
+            <option>Instagram</option>
+            <option>Google search</option>
+            <option>Friend or family referral</option>
+            <option>Past client / wedding guest</option>
+            <option>Other</option>
+          </select>
+        </div>
         <div class="field">
           <label for="ms" data-cms-id="contact.label.ms" data-cms-type="text">Tell me more!</label>
           <textarea id="ms" placeholder="How you met, what you're planning, what matters most to you in your photos." data-cms-id="contact.ph.ms" data-cms-type="attr" data-cms-attr="placeholder"></textarea>
@@ -1309,6 +1325,12 @@ img.cms-img-pending{visibility:hidden;}
       document.getElementById('em').focus();
       return;
     }
+    var foundVia = document.getElementById('fv');
+    if(foundVia.selectedIndex <= 0){
+      say('Let Khiara know how you found her.', true);
+      foundVia.focus();
+      return;
+    }
     // cms/inquiry.js defines this. If the Firebase CDN was unreachable the
     // module never ran, and sending would otherwise throw silently.
     if(typeof window.cmsSubmitInquiry !== 'function'){
@@ -1332,6 +1354,7 @@ img.cms-img-pending{visibility:hidden;}
       phone: phone,
       eventDate: document.getElementById('dt').value,
       sessionType: document.getElementById('cl').value,
+      foundVia: foundVia.value,
       message: document.getElementById('ms').value.trim(),
       honeypot: document.getElementById('cwk-ref').value,
       renderedAt: formRenderedAt

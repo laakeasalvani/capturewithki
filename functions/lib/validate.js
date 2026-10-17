@@ -1,4 +1,4 @@
-const MAX = { name: 200, partnerName: 200, email: 320, phone: 50, eventDate: 40, sessionType: 200, message: 5000 };
+const MAX = { name: 200, partnerName: 200, email: 320, phone: 50, eventDate: 40, sessionType: 200, foundVia: 200, message: 5000 };
 
 // Shown to real visitors on a wedding photographer's contact form, so these
 // read as words rather than field names.
@@ -9,6 +9,7 @@ const LABEL = {
   phone: 'phone number',
   eventDate: 'date',
   sessionType: 'session type',
+  foundVia: 'answer to how you found Khiara',
   message: 'message'
 };
 

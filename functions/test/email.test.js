@@ -288,3 +288,15 @@ test('a refusal from Resend is thrown, not swallowed', async () => {
     globalThis.fetch = original;
   }
 });
+
+test('owner email says how the client found her, in both text and html', () => {
+  const withSource = Object.assign({}, full, { foundVia: 'Social Media Ad' });
+  assert.ok(ownerEmail(withSource).text.includes('Found via:  Social Media Ad'));
+  const html = ownerEmailHtml(withSource);
+  assert.ok(html.includes('Found via'));
+  assert.ok(html.includes('Social Media Ad'));
+});
+
+test('owner email marks a missing foundVia rather than leaving a blank', () => {
+  assert.ok(ownerEmail(full).text.includes('Found via:  Not given'));
+});

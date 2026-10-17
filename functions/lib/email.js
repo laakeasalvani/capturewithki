@@ -170,7 +170,8 @@ export function ownerEmailHtml(i) {
     ['Email', orNone(i.email)],
     ['Phone', orNone(i.phone)],
     ['Date', orNone(i.eventDate)],
-    ['Session', orNone(i.sessionType)]
+    ['Session', orNone(i.sessionType)],
+    ['Found via', orNone(i.foundVia)]
   ].map(function (pair) {
     return '<tr>' +
       '<td style="padding:7px 14px 7px 0;font-family:' + SANS + ';font-size:11px;' +
@@ -218,6 +219,7 @@ export function ownerEmail(i) {
     'Phone:      ' + orNone(i.phone),
     'Date:       ' + orNone(i.eventDate),
     'Session:    ' + orNone(i.sessionType),
+    'Found via:  ' + orNone(i.foundVia),
     '',
     'Message:',
     orNoneMultiline(i.message),

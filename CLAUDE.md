@@ -42,8 +42,8 @@ truth; delete stale worktrees under `.worktrees/` rather than reviving them.
    to do — give exact click-by-click steps instead.
 4. **The site has no build step.** `index.html` + plain ES modules in `cms/` and
    `int/`. npm exists only inside `functions/`. Do not introduce a bundler.
-5. **Do not break the CMS.** `index.html` carries **131** `data-cms-id` markers
-   and the contact-form ids `n1 n2 em ph dt cl ms send sent`. Changing or
+5. **Do not break the CMS.** `index.html` carries **133** `data-cms-id` markers
+   and the contact-form ids `n1 n2 em ph dt cl fv ms send sent`. Changing or
    dropping any of them breaks Khiara's ability to edit her own site. Count them
    before and after any edit to that file with `grep -o data-cms-id index.html | wc -l`
    — `grep -c` counts LINES, not markers, and reads low.

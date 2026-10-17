@@ -79,6 +79,7 @@ function render() {
           '<dt>Phone</dt><dd><a href="tel:' + esc(i.phone) + '">' + esc(i.phone) + '</a></dd>' +
           '<dt>Date</dt><dd>' + orNone(i.eventDate) + '</dd>' +
           '<dt>Session</dt><dd>' + orNone(i.sessionType) + '</dd>' +
+          '<dt>Found via</dt><dd>' + orNone(i.foundVia) + '</dd>' +
         '</dl>' +
         '<p class="q-message">' + orNone(i.message) + '</p>' +
         '<div class="q-actions">' +
