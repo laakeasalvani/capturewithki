@@ -32,7 +32,7 @@ DOC = f"https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(defaul
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "index.html"
 
-EXPECTED_MARKERS = 131  # 114 + 17 menu labels (9 ids, shared between the top menu and footer)
+EXPECTED_MARKERS = 133  # must match CLAUDE.md rule 5 — was left at 131 and refused to run
 FORM_IDS = ["n1", "n2", "em", "ph", "dt", "cl", "ms", "send", "sent"]
 
 
@@ -82,7 +82,8 @@ def main():
             continue
 
         # Only text fields. Attributes and <select> options are edited through
-        # prompts and are a different shape.
+        # prompts and are a different shape. Prices are type "price" and come
+        # from `packages` instead — bin/sync-prices.mjs refreshes those.
         pattern = re.compile(
             r'(<(\w+)([^>]*\bdata-cms-id="' + re.escape(cms_id) + r'"[^>]*\bdata-cms-type="text"[^>]*)>)(.*?)(</\2>)',
             re.S)

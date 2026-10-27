@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20261017193548';
+    var BUILD = '20261027034816';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -714,7 +714,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="media frame marked"><img src="images/gallery-a.jpg" alt="Couples session" data-cms-id="portraits.pkg1.image" data-cms-type="image"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="portraits.pkg1.name" data-cms-type="text">Couples</h2>
-        <div class="svc-price" data-cms-id="portraits.pkg1.price" data-cms-type="text">$175</div>
+        <div class="svc-price" data-cms-id="portraits.pkg1.price" data-cms-type="price" data-price-pkg="couples">$175</div>
         <ul class="svc-list" data-cms-id="portraits.pkg1.list" data-cms-type="text">
           <li>60 min. session</li>
           <li>30&ndash;50 edited images</li>
@@ -733,7 +733,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="media frame marked"><img src="images/gallery-h.jpg" alt="Engagement session" data-cms-id="portraits.pkg2.image" data-cms-type="image"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="portraits.pkg2.name" data-cms-type="text">Engagement</h2>
-        <div class="svc-price" data-cms-id="portraits.pkg2.price" data-cms-type="text">$225</div>
+        <div class="svc-price" data-cms-id="portraits.pkg2.price" data-cms-type="price" data-price-pkg="engagement">$225</div>
         <ul class="svc-list" data-cms-id="portraits.pkg2.list" data-cms-type="text">
           <li>60 min. session</li>
           <li>75+ edited images</li>
@@ -752,7 +752,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="media frame marked"><img src="images/about-banner.jpg" alt="Family session" data-cms-id="portraits.pkg3.image" data-cms-type="image"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="portraits.pkg3.name" data-cms-type="text">Family</h2>
-        <div class="svc-price" data-cms-id="portraits.pkg3.price" data-cms-type="text">$200</div>
+        <div class="svc-price" data-cms-id="portraits.pkg3.price" data-cms-type="price" data-price-pkg="family">$200</div>
         <ul class="svc-list" data-cms-id="portraits.pkg3.list" data-cms-type="text">
           <li>60 min. session</li>
           <li>50+ edited images</li>
@@ -770,7 +770,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="media frame marked"><img src="images/gallery-b.jpg" alt="Maternity session" data-cms-id="portraits.pkg4.image" data-cms-type="image"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="portraits.pkg4.name" data-cms-type="text">Maternity</h2>
-        <div class="svc-price" data-cms-id="portraits.pkg4.price" data-cms-type="text">$200</div>
+        <div class="svc-price" data-cms-id="portraits.pkg4.price" data-cms-type="price" data-price-pkg="maternity">$200</div>
         <ul class="svc-list" data-cms-id="portraits.pkg4.list" data-cms-type="text">
           <li>60 min. session</li>
           <li>50+ edited images</li>
@@ -789,7 +789,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="media frame marked"><img src="images/grid-01.jpg" alt="Senior session" data-cms-id="portraits.pkg5.image" data-cms-type="image"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="portraits.pkg5.name" data-cms-type="text">Senior</h2>
-        <div class="svc-price" data-cms-id="portraits.pkg5.price" data-cms-type="text">$175</div>
+        <div class="svc-price" data-cms-id="portraits.pkg5.price" data-cms-type="price" data-price-pkg="senior">$175</div>
         <ul class="svc-list" data-cms-id="portraits.pkg5.list" data-cms-type="text">
           <li>30&ndash;45 min. session</li>
           <li>25+ edited images</li>
@@ -829,7 +829,7 @@ img.cms-img-pending{visibility:hidden;}
       <div class="media frame marked"><img src="images/contact-photo.jpg" alt="Elopement session" data-cms-id="elopements.pkg1.image" data-cms-type="image"></div>
       <div class="copy">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="elopements.pkg1.name" data-cms-type="text">Elopements</h2>
-        <div class="svc-price" data-cms-id="elopements.pkg1.price" data-cms-type="text">$350</div>
+        <div class="svc-price" data-cms-id="elopements.pkg1.price" data-cms-type="price" data-price-pkg="elopement">$350</div>
         <ul class="svc-list" data-cms-id="elopements.pkg1.list" data-cms-type="text">
           <li>Up to 2 hours of coverage</li>
           <li>150+ edited images</li>
@@ -868,7 +868,7 @@ img.cms-img-pending{visibility:hidden;}
     <div class="pkg-grid">
       <div class="pkg-box">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="weddings.pkg1.name" data-cms-type="text">The Intimate</h2>
-        <div class="svc-price" data-cms-id="weddings.pkg1.price" data-cms-type="text">4 Hours &mdash; Starting from $950</div>
+        <div class="svc-price" data-cms-id="weddings.pkg1.price" data-cms-type="price" data-price-pkg="intimate">4 Hours &mdash; Starting from $950</div>
         <ul class="svc-list" data-cms-id="weddings.pkg1.list" data-cms-type="text">
           <li>4 hours of coverage</li>
           <li>200+ edited images</li>
@@ -877,7 +877,7 @@ img.cms-img-pending{visibility:hidden;}
       </div>
       <div class="pkg-box">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="weddings.pkg2.name" data-cms-type="text">The Classic</h2>
-        <div class="svc-price" data-cms-id="weddings.pkg2.price" data-cms-type="text">6 Hours &mdash; Starting from $1,200</div>
+        <div class="svc-price" data-cms-id="weddings.pkg2.price" data-cms-type="price" data-price-pkg="classic">6 Hours &mdash; Starting from $1,200</div>
         <ul class="svc-list" data-cms-id="weddings.pkg2.list" data-cms-type="text">
           <li>6 hours of coverage</li>
           <li>300+ edited images</li>
@@ -886,7 +886,7 @@ img.cms-img-pending{visibility:hidden;}
       </div>
       <div class="pkg-box">
         <h2 class="h2" style="color:var(--khaki);" data-cms-id="weddings.pkg3.name" data-cms-type="text">The Grand</h2>
-        <div class="svc-price" data-cms-id="weddings.pkg3.price" data-cms-type="text">8 Hours &mdash; Starting from $1,500</div>
+        <div class="svc-price" data-cms-id="weddings.pkg3.price" data-cms-type="price" data-price-pkg="grand">8 Hours &mdash; Starting from $1,500</div>
         <ul class="svc-list" data-cms-id="weddings.pkg3.list" data-cms-type="text">
           <li>8 hours of coverage</li>
           <li>400+ edited images</li>
@@ -1042,7 +1042,7 @@ img.cms-img-pending{visibility:hidden;}
         <div class="field"><label for="dt" data-cms-id="contact.label.dt" data-cms-type="text">Do you have a date in mind?</label><input id="dt" type="date"></div>
         <div class="field">
           <label for="cl" data-cms-id="contact.label.cl" data-cms-type="text">Session you&#8217;re considering</label>
-          <select id="cl" data-cms-id="contact.options.session" data-cms-type="options">
+          <select id="cl" data-cms-id="contact.options.session" data-cms-type="price-options" data-price-options>
             <option>Not sure yet</option>
             <option>Couples &mdash; $175</option>
             <option>Engagement &mdash; $225</option>

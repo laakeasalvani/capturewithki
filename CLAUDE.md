@@ -119,6 +119,33 @@ Two things that look like simplifications and are not:
 The domain also had **no DMARC record at all** until this was fixed, which is
 what made Gmail distrust the mail in the first place. DKIM was already correct.
 
+## Prices — one list, read everywhere
+
+**`packages/{id}` in Firestore is the only place a package price lives.** Do not
+put a price anywhere else.
+
+- **Contracts** read `priceCents` when one is created (`createContract`).
+- **The page** fills every `[data-price-pkg="<id>"]` and the inquiry dropdown
+  (`select[data-price-options]`, `#cl`) from the same list at load —
+  `cms/prices.js`, wording from `functions/lib/price-display.js`.
+- **Editing:** in edit mode Khiara clicks a price → small editor (price +
+  "Starting from" tick box) → saves `priceCents` and `startingFrom` straight to
+  `packages/{id}`. Page, dropdown and every *new* contract change together.
+  Sent contracts keep their frozen price.
+- `startingFrom` unset = weddings yes, everything else no. Wedding lines read
+  "4 Hours — Starting from $950", built from `specs.hours`.
+- `packages` is publicly readable (`firestore.rules`) — it holds nothing that
+  isn't already on the page. Write stays admin-only.
+- If the read fails the wording built into `index.html` stays. Refresh it with
+  `./bin/sync-prices.mjs --write` alongside `./bin/sync-fallback.py`.
+- The 9 price elements are `data-cms-type="price"` (not `text`) and the
+  dropdown is `price-options`, so the old free-text editor ignores them. Their
+  `data-cms-id`s are kept, so the marker count is unchanged at 133. The old
+  `*.price` keys in `content/site` are no longer read.
+- **Not** on the list: the $250/hr overtime, $0.75/mile travel and $25 late
+  fees written into the contract templates, and the Senior "+$25 add a friend"
+  line on the page. Those are still edited by hand.
+
 ## How the CMS works
 
 Khiara clicks the footer gear, logs in with Firebase Auth, then clicks the gear

@@ -8,10 +8,12 @@ import { initPortfolio } from './portfolio.js';
 import { initFilmstrip } from './filmstrip.js';
 import { initTestimonials } from './testimonials.js';
 import { initRetries } from './reveal.js';
+import { initPrices } from './prices.js';
 
 (async function () {
   await loadSiteContent();
   initTextEditing();
+  initPrices();   // not awaited — see cms/prices.js
   initNavEditing();
   initImageEditing();
   await initHero();

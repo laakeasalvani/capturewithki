@@ -213,8 +213,13 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Public read: the website shows every price and builds the inquiry
+    // dropdown from this list (cms/prices.js), and those prices are already
+    // published on the page. Nothing here is private — label, price, hours,
+    // image counts. Only she can change it.
     match /packages/{packageId} {
-      allow read, write: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }
