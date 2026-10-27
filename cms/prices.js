@@ -50,21 +50,40 @@ function renderPrices() {
   });
 }
 
+function optionKey(text) {
+  return String(text || '').split(' — ')[0].trim();
+}
+
 function renderOptions() {
   const list = usablePackages(Object.keys(packages).map(function (k) { return packages[k]; }));
   if (!list.length) return;
   document.querySelectorAll('select[data-price-options]').forEach(function (select) {
-    // The first option is the "Not sure yet" placeholder from index.html.
-    const first = select.options[0] ? select.options[0].textContent : 'Not sure yet';
-    const chosen = select.value;
-    const labels = [first].concat(list.map(inquiryOptionText).filter(Boolean));
+    // The first option is the "Not sure yet" placeholder from index.html —
+    // kept as the very same element so nothing about it changes.
+    const first = select.options[0] || null;
+    // A visitor may have picked a session before this ran. Keep their choice
+    // even if its price just changed: match on the part before the price
+    // ("Couples", "Wedding, The Intimate").
+    const chosenIndex = select.selectedIndex;
+    const chosenKey = chosenIndex > 0 ? optionKey(select.options[chosenIndex].textContent) : null;
+
     select.innerHTML = '';
-    labels.forEach(function (text) {
+    if (first) select.appendChild(first);
+    list.forEach(function (pkg) {
+      const text = inquiryOptionText(pkg);
+      if (!text) return;
       const opt = document.createElement('option');
       opt.textContent = text;
       select.appendChild(opt);
     });
-    if (labels.indexOf(chosen) !== -1) select.value = chosen;
+
+    let restored = 0;
+    if (chosenKey) {
+      for (let i = 1; i < select.options.length; i++) {
+        if (optionKey(select.options[i].textContent) === chosenKey) { restored = i; break; }
+      }
+    }
+    select.selectedIndex = restored;
   });
 }
 
