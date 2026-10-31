@@ -129,3 +129,27 @@ test('the boundary counts as due', () => {
   const justUnder = contract({ sentAt: new Date(NOW - NEVER_OPENED_MS + 1) });
   assert.deepEqual(dueActions([justUnder], NOW), []);
 });
+
+// 2026-10-30: two partners signed at the same instant, and the status stayed at
+// 'opened' with both signatures on it. The ladder read only the status, so it
+// was about to ask a couple who had signed to sign — and then tell Khiara the
+// contract was never signed. The signatures are the truth; the status lagged.
+test('a contract with every signature on file is never chased, whatever its status says', () => {
+  const stuck = contract({
+    status: 'opened', openCount: 4, client2Name: 'Sam',
+    sentAt: new Date(NOW - 80 * HOUR), signReminderCount: 1,
+    signedAt: new Date(NOW - 50 * HOUR), signed2At: new Date(NOW - 50 * HOUR)
+  });
+  assert.deepEqual(dueActions([stuck], NOW), []);
+  assert.deepEqual(dueActions([Object.assign({}, stuck, { sentAt: new Date(NOW - 8 * DAY), signReminderCount: 2 })], NOW), []);
+  const single = contract({ status: 'opened', openCount: 1, sentAt: new Date(NOW - 80 * HOUR), signedAt: new Date(NOW - 50 * HOUR) });
+  assert.deepEqual(dueActions([single], NOW), []);
+});
+
+test('a couple with only one of two signatures is still nudged', () => {
+  const half = contract({
+    status: 'opened', openCount: 4, client2Name: 'Sam',
+    sentAt: new Date(NOW - 80 * HOUR), signReminderCount: 1, signedAt: new Date(NOW - 50 * HOUR)
+  });
+  assert.deepEqual(kinds(dueActions([half], NOW)), ['sign-reminder']);
+});

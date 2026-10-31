@@ -6,7 +6,8 @@ import {
   isValidContractId, validateContractInput, validateClientDetails, MAX_TOTAL_CENTS,
   renderTemplate, STATUSES, canTransition, missingRequiredFields, resolvePackagePrice,
   isValidEventDateISO, formatEventDate, isEventPast, closingStatusFor,
-  dollarsToCents, centsToInput
+  dollarsToCents, centsToInput,
+  planSignature, manualSignPlan, manualUnsignPlan, isSignedBooking
 } from '../lib/contracts.js';
 
 test('the retainer is 30 percent, as the site promises', () => {
@@ -647,4 +648,141 @@ test('every amount survives a round trip through the box', () => {
   for (const cents of [0, 5, 99, 100, 5250, 17500, 17550, 120000, 120005, 999999]) {
     assert.equal(dollarsToCents(centsToInput(cents)), cents, 'round trip failed at ' + cents);
   }
+});
+
+// ---------------------------------------------------------------------------
+// planSignature — whose line a signing request fills, and whether it finishes
+// the agreement. signContract runs this INSIDE a transaction, so `contract` is
+// always the freshest copy: on 2026-10-30 Hanani Andrade and Javier Sanchez
+// signed on two devices 0.1s apart, each request read the other's line as
+// blank, and neither marked the contract signed.
+
+const couple = (over) => Object.assign({
+  status: 'opened', clientName: 'Pat', client2Name: 'Sam'
+}, over);
+const T = { toMillis: () => 1 };
+
+test('the first of two signatures records the line and leaves status alone', () => {
+  const p = planSignature(couple(), 'client1');
+  assert.equal(p.action, 'record');
+  assert.equal(p.slot, 'client1');
+  assert.equal(p.willComplete, false);
+  assert.equal(p.flipsStatus, false);
+});
+
+test('the second signature, in either order, completes the agreement', () => {
+  const a = planSignature(couple({ signedAt: T }), 'client2');
+  assert.deepEqual([a.willComplete, a.flipsStatus], [true, true]);
+  const b = planSignature(couple({ signed2At: T }), 'client1');
+  assert.deepEqual([b.willComplete, b.flipsStatus], [true, true]);
+});
+
+// The Hanani case, as the SECOND request in the transaction sees it once the
+// first has committed.
+test('a partner signing a split second after the other still completes it', () => {
+  const first = planSignature(couple(), 'client2');
+  assert.equal(first.flipsStatus, false);
+  const second = planSignature(couple({ signed2At: T }), 'client1');
+  assert.equal(second.flipsStatus, true);
+});
+
+test('a single signer completes on their own signature', () => {
+  const p = planSignature(couple({ client2Name: '' }), null);
+  assert.deepEqual([p.slot, p.willComplete, p.flipsStatus], ['client1', true, true]);
+});
+
+test('with no slot given, the old turn-taking rule still applies', () => {
+  assert.equal(planSignature(couple(), null).slot, 'client1');
+  assert.equal(planSignature(couple({ signedAt: T }), null).slot, 'client2');
+});
+
+test('a fully signed contract is reported done, never re-signed', () => {
+  assert.equal(planSignature(couple({ signedAt: T, signed2At: T, status: 'signed' }), 'client1').action, 'complete-already');
+});
+
+test('a line already signed is never overwritten', () => {
+  const p = planSignature(couple({ signedAt: T }), 'client1');
+  assert.equal(p.action, 'line-already');
+  assert.equal(p.slot, 'client1');
+});
+
+test('a one-signer contract has no second line to sign', () => {
+  assert.equal(planSignature(couple({ client2Name: '  ' }), 'client2').action, 'refuse-one-signer');
+});
+
+test('a status that cannot become signed is refused when it would complete', () => {
+  assert.equal(planSignature(couple({ status: 'draft', client2Name: '' }), null).action, 'refuse-status');
+});
+
+// Khiara marked it signed by hand (a paper copy, or the system failed). A
+// client who then e-signs gets their signature recorded as evidence, but the
+// status is already right and must not be touched — and the "your agreement
+// is signed" emails were her call when she marked it, not this request's.
+test('e-signing a contract she already marked signed records it without flipping status', () => {
+  const p = planSignature(couple({ status: 'signed', manuallySignedAt: T, client2Name: '' }), null);
+  assert.equal(p.action, 'record');
+  assert.equal(p.willComplete, true);
+  assert.equal(p.flipsStatus, false);
+});
+
+// ---------------------------------------------------------------------------
+// Marking a contract signed by hand.
+
+test('a sent or read contract can be marked signed by hand', () => {
+  assert.deepEqual(manualSignPlan({ status: 'sent' }), { action: 'mark', from: 'sent' });
+  assert.deepEqual(manualSignPlan({ status: 'opened' }), { action: 'mark', from: 'opened' });
+});
+
+test('marking an already-signed contract changes nothing', () => {
+  assert.equal(manualSignPlan({ status: 'signed' }).action, 'already');
+  assert.equal(manualSignPlan({ status: 'paid' }).action, 'already');
+});
+
+test('a draft, voided or cancelled contract cannot be marked signed', () => {
+  for (const status of ['draft', 'void', 'cancelled', 'nonsense']) {
+    assert.equal(manualSignPlan({ status }).action, 'refuse', status);
+  }
+});
+
+const marked = (over) => Object.assign({
+  status: 'signed', manuallySignedAt: T, manuallySignedFrom: 'opened', client2Name: 'Sam'
+}, over);
+
+test('a hand mark can be undone, back to where it was', () => {
+  assert.deepEqual(manualUnsignPlan(marked()), { action: 'unmark', to: 'opened' });
+  assert.deepEqual(manualUnsignPlan(marked({ manuallySignedFrom: 'sent' })), { action: 'unmark', to: 'sent' });
+});
+
+test('only a hand mark can be undone — a real e-signed contract cannot', () => {
+  assert.equal(manualUnsignPlan({ status: 'signed', signedAt: T }).action, 'refuse-not-manual');
+});
+
+// Undoing would put Hanani's contract straight back into the stuck state.
+test('undo is refused once every signature is on file anyway', () => {
+  assert.equal(manualUnsignPlan(marked({ signedAt: T, signed2At: T })).action, 'refuse-fully-signed');
+  assert.equal(manualUnsignPlan(marked({ client2Name: '', signedAt: T })).action, 'refuse-fully-signed');
+});
+
+test('undo waits until the retainer mark is removed', () => {
+  assert.equal(manualUnsignPlan(marked({ retainerReceivedAt: T })).action, 'refuse-retainer');
+});
+
+test('undo is refused from any status but signed', () => {
+  assert.equal(manualUnsignPlan(marked({ status: 'cancelled' })).action, 'refuse-status');
+  assert.equal(manualUnsignPlan(marked({ status: 'paid' })).action, 'refuse-status');
+});
+
+test('a corrupt "from" status is never restored', () => {
+  assert.equal(manualUnsignPlan(marked({ manuallySignedFrom: 'draft' })).action, 'refuse-status');
+  assert.equal(manualUnsignPlan(marked({ manuallySignedFrom: undefined })).action, 'refuse-status');
+});
+
+// The retainer button's gate. signedAt alone used to be the test, which a
+// paper-signed contract marked by hand never has.
+test('a live booking is signed by e-signature or by hand', () => {
+  assert.equal(isSignedBooking({ status: 'signed', signedAt: T }), true);
+  assert.equal(isSignedBooking({ status: 'signed', manuallySignedAt: T }), true);
+  assert.equal(isSignedBooking({ status: 'paid', signedAt: T }), true);
+  assert.equal(isSignedBooking({ status: 'cancelled', signedAt: T }), false);
+  assert.equal(isSignedBooking({ status: 'signed' }), false);
 });

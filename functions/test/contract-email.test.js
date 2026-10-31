@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import {
   formatCents, readyToSignEmail, signedCopyEmail,
   signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail,
-  ownerSignedNoticeEmail
+  ownerSignedNoticeEmail, manualSignedEmail
 } from '../lib/contract-email.js';
 
 // A stand-in for a Firestore Timestamp: chaseContracts hands these builders
@@ -266,4 +266,45 @@ test('missing details degrade to words rather than blanks or undefined', () => {
 test('the subject is a single line whatever the name contains', () => {
   const m = ownerSignedNoticeEmail({ ...signed, clientName: 'Jordan\nBcc: someone@evil.com' });
   assert.doesNotMatch(m.subject, /\n/);
+});
+
+// Sent when Khiara marks a contract signed by hand. No raw signing token is
+// stored anywhere, so unlike signedCopyEmail this one CANNOT carry a link to
+// the signed copy — it points to the link they already hold instead.
+const manual = () => manualSignedEmail({
+  clientName: 'Hanani Andrade',
+  signedAt: new Date(Date.UTC(2026, 9, 30, 6, 16))
+});
+
+test('the hand-marked confirmation says the agreement is signed, in both bodies', () => {
+  const mail = manual();
+  assert.ok(/signed/i.test(mail.subject));
+  assert.ok(mail.text.includes('Hanani Andrade'));
+  assert.ok(mail.html.includes('Hanani Andrade'));
+  assert.ok(/signed/i.test(mail.text));
+});
+
+test('the hand-marked confirmation carries no link it cannot honour', () => {
+  const mail = manual();
+  assert.ok(!/https?:\/\//.test(mail.text));
+  assert.ok(!/<a /.test(mail.html));
+  assert.ok(/original email/i.test(mail.text));
+});
+
+// It may arrive after the retainer was already sent, as Hanani's will.
+test('the hand-marked confirmation is true whether or not the retainer is in', () => {
+  const mail = manual();
+  assert.ok(/already sent your retainer/i.test(mail.text));
+  assert.ok(/payment details/i.test(mail.text));
+});
+
+test('a hostile name cannot inject markup into the hand-marked confirmation', () => {
+  const mail = manualSignedEmail({ clientName: '<script>x</script>', signedAt: new Date() });
+  assert.ok(!mail.html.includes('<script>'));
+});
+
+test('the hand-marked confirmation dates the signing in Oregon time, readably', () => {
+  const mail = manual();
+  assert.ok(mail.text.includes('October 29, 2026'));
+  assert.ok(!mail.text.includes('T06:16'));
 });

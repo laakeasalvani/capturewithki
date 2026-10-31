@@ -35,12 +35,13 @@ import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
   computeFeeBlock, validateClientDetails, missingRequiredFields, resolvePackagePrice,
-  isValidEventDateISO, formatEventDate, closingStatusFor
+  isValidEventDateISO, formatEventDate, closingStatusFor,
+  planSignature, manualSignPlan, manualUnsignPlan, isSignedBooking
 } from './lib/contracts.js';
 import { validatePackage, requiredSpecsFor } from './lib/packages.js';
 import { generateToken, hashToken, hashDocument, isValidTokenShape, verifyToken } from './lib/contract-crypto.js';
 import {
-  readyToSignEmail, signedCopyEmail, formatCents,
+  readyToSignEmail, signedCopyEmail, manualSignedEmail, formatCents,
   signReminderEmail, neverOpenedAlertEmail, unsignedEscalationEmail,
   ownerSignedNoticeEmail
 } from './lib/contract-email.js';
@@ -1121,87 +1122,11 @@ export const signContract = onCall(
 
     if (!found) throw new HttpsError('permission-denied', CONTRACT_DENIED);
     const ref = found.ref;
-    const contract = found.data();
 
     // Verified again in constant time even though the query already matched,
     // same reasoning as openContract.
-    if (!verifyToken(token, contract.tokenHash)) {
+    if (!verifyToken(token, found.data().tokenHash)) {
       throw new HttpsError('permission-denied', CONTRACT_DENIED);
-    }
-
-    // Idempotent. A replayed token, a double-tap, or a client who hits back
-    // and signs again must never produce a second signature record. No new
-    // checkout session is created here either — the fake provider has no
-    // idempotency key, so calling it again on a replay would mint a second,
-    // orphaned session. checkoutUrl is null; a client who lands back on this
-    // path after already being redirected once has no need of a second one.
-    // Two signers, one link. Both partners sign on the same page in turn,
-    // which is how a couple actually does this — sitting together on one
-    // phone. The trade is weaker attribution than two separate links would
-    // give: on one link, nothing proves the second name was typed by the
-    // second person. Each signature therefore captures its OWN ip, user agent
-    // and server timestamp, so two signings made at different moments or on
-    // different devices are at least distinguishable in the record.
-    const needsTwo = !!(contract.client2Name && String(contract.client2Name).trim());
-    const c1Done = !!contract.signedAt;
-    const c2Done = !!contract.signed2At;
-
-    // Fully signed already. Idempotent for the same reasons as before: a
-    // replayed token, a double-tap, or a client who hits back must never
-    // produce a second signature or a second checkout session.
-    if (c1Done && (!needsTwo || c2Done)) {
-      return {
-        ok: true, signedAt: contract.signedAt.toMillis(),
-        checkoutUrl: null, complete: true, awaitingSigner: null
-      };
-    }
-
-    // Whose signature this is.
-    //
-    // Order is NO LONGER enforced. Both signature boxes are on the page from
-    // the start, so either partner can reach for theirs first — and refusing
-    // the one who happened to be ready would be a wall with no explanation on
-    // screen. The owner chose this deliberately over locking the second box.
-    //
-    // Falling back to the old rule when no slot is given keeps a client sitting
-    // on a cached copy of the previous page working: that page only ever showed
-    // one form at a time, in order, so the derived answer is still right for it.
-    const slot = requestedSlot || (c1Done ? 'client2' : 'client1');
-
-    // A single-signer contract has no second line to sign. Without this, a
-    // caller could invent one and write a signature2 onto a document whose
-    // frozen text names only one party.
-    if (slot === 'client2' && !needsTwo) {
-      throw new HttpsError('invalid-argument', 'This agreement only needs one signature.');
-    }
-
-    // That specific line is already signed. Idempotent for the same reasons as
-    // the fully-signed check above, but per-slot: with both boxes live, a
-    // double-tap on one of them must not overwrite a signature — including its
-    // timestamp, IP and user agent, which are the evidence that it happened
-    // when and where it says.
-    if ((slot === 'client1' && c1Done) || (slot === 'client2' && c2Done)) {
-      return {
-        ok: true,
-        signedAt: (slot === 'client2' ? contract.signed2At : contract.signedAt).toMillis(),
-        checkoutUrl: null,
-        complete: false,
-        awaitingSigner: slot === 'client1' ? 'client2' : 'client1',
-        signedSlot: slot,
-        alreadySigned: true
-      };
-    }
-
-    // Complete once the OTHER line is already done — which, now that either may
-    // be signed first, is a question about the other slot rather than about
-    // which slot this is.
-    const willComplete = !needsTwo || (slot === 'client1' ? c2Done : c1Done);
-
-    // Only checked when this signature actually completes the agreement.
-    // Client 1 signing a two-signer contract leaves the status alone, because
-    // one of two signatures is not a signed contract.
-    if (willComplete && !canTransition(contract.status, 'signed')) {
-      throw new HttpsError('failed-precondition', CONTRACT_DENIED);
     }
 
     // The IP comes from the request, never from the browser. Everything a
@@ -1211,66 +1136,115 @@ export const signContract = onCall(
     const ip = String(forwardedHeader).split(',')[0].trim() || raw.ip || 'unknown';
     const userAgent = String((raw.headers && raw.headers['user-agent']) || '').slice(0, 500);
 
-    // Signature and audit row commit together or not at all — the OPPOSITE
-    // of createContract's choice to swallow an audit failure. There, a
-    // missing audit row on creation is recoverable because the document's
-    // own timestamps survive; a retry only risks a duplicate draft. Here the
-    // idempotency check above makes a lost audit row unrecoverable: once
-    // signedAt is set, every future attempt sees it and returns early
-    // without ever writing the audit row again. A single batch removes the
-    // possibility of the two writes splitting.
-    const auditRef = ref.collection('audit').doc();
-    const batch = db.batch();
-    // Every timestamp here is a serverTimestamp and ONLY EVER a
-    // serverTimestamp — never a JS Date or a number. This project has already
-    // been bitten once by trusting a client clock, in the spam check that
-    // would have binned real clients whose phone ran fast; the stakes here are
-    // a contested contract date. openContract calls .toMillis() on these
-    // fields with no guard that they really are Timestamps — this function is
-    // what creates them, so that assumption must always hold.
-    const signatureRecord = {
-      typedName: typedName,
-      ip: ip,
-      userAgent: userAgent,
-      // Copied, not referenced, so the signature record stands alone even
-      // if every other field on the contract were altered later.
-      documentHash: contract.documentHash,
-      consentGiven: true,
-      consentTextVersion: 'esign-disclosure-v1'
-    };
-
-    // Status moves to 'signed' only when nobody else still has to sign, and
-    // that is now decided by willComplete for BOTH slots. It used to be
-    // hardcoded on the client2 branch, which was safe only while client2 could
-    // not be reached before client1 — with either order allowed, a second
-    // partner signing first would otherwise have marked the whole agreement
-    // signed while client 1's line was still blank.
-    const signedNow = willComplete ? { status: 'signed' } : {};
-    const contractUpdate = slot === 'client2'
-      ? Object.assign(
-          { signed2At: FieldValue.serverTimestamp(), signature2: signatureRecord },
-          signedNow
-        )
-      : Object.assign(
-          { signedAt: FieldValue.serverTimestamp(), signature: signatureRecord },
-          signedNow
-        );
-
-    batch.update(ref, contractUpdate);
-    batch.set(auditRef, {
-      event: slot === 'client2' ? 'signed-client2' : 'signed',
-      at: FieldValue.serverTimestamp(),
-      typedName: typedName,
-      ip: ip,
-      documentHash: contract.documentHash
-    });
-
+    // Two signers, one link. Both partners sign on the same page, in either
+    // order — usually together on one phone. The trade is weaker attribution
+    // than two separate links would give: on one link, nothing proves the
+    // second name was typed by the second person. Each signature therefore
+    // captures its OWN ip, user agent and server timestamp, so two signings
+    // made at different moments or on different devices are at least
+    // distinguishable in the record.
+    //
+    // Read, decide and write in ONE transaction. This used to read the
+    // contract, decide, then write in a separate batch — and on 2026-10-30
+    // Hanani Andrade (iPhone) and Javier Sanchez (Windows) pressed sign 0.1s
+    // apart. Both requests read before either wrote, each saw the other line
+    // blank, each decided it was the first of two, and the contract sat at
+    // 'opened' with both signatures on it: no confirmation email, no notice
+    // to Khiara, and no retainer button on her dashboard. In a transaction
+    // Firestore retries the second request, and it sees the first signature.
+    //
+    // Signature and audit row also commit together or not at all — the
+    // OPPOSITE of createContract's choice to swallow an audit failure. The
+    // idempotency checks make a lost audit row unrecoverable here: once
+    // signedAt is set, every future attempt returns early without ever
+    // writing the audit row again.
+    let contract;
+    let plan;
     try {
-      await batch.commit();
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        contract = snap.exists ? snap.data() : null;
+        // Voided between the lookup and now: voidContract destroys tokenHash.
+        if (!contract || !verifyToken(token, contract.tokenHash)) {
+          plan = { action: 'denied' };
+          return;
+        }
+        plan = planSignature(contract, requestedSlot);
+        if (plan.action !== 'record') return;
+
+        // Every timestamp here is a serverTimestamp and ONLY EVER a
+        // serverTimestamp — never a JS Date or a number. This project has
+        // already been bitten once by trusting a client clock, in the spam
+        // check that would have binned real clients whose phone ran fast; the
+        // stakes here are a contested contract date. openContract calls
+        // .toMillis() on these fields with no guard that they really are
+        // Timestamps — this function is what creates them, so that assumption
+        // must always hold.
+        const signatureRecord = {
+          typedName: typedName,
+          ip: ip,
+          userAgent: userAgent,
+          // Copied, not referenced, so the signature record stands alone even
+          // if every other field on the contract were altered later.
+          documentHash: contract.documentHash,
+          consentGiven: true,
+          consentTextVersion: 'esign-disclosure-v1'
+        };
+        const update = plan.slot === 'client2'
+          ? { signed2At: FieldValue.serverTimestamp(), signature2: signatureRecord }
+          : { signedAt: FieldValue.serverTimestamp(), signature: signatureRecord };
+        // Status moves to 'signed' only when nobody else still has to sign —
+        // and not at all if she already marked it signed by hand.
+        if (plan.flipsStatus) update.status = 'signed';
+
+        tx.update(ref, update);
+        tx.set(ref.collection('audit').doc(), {
+          event: plan.slot === 'client2' ? 'signed-client2' : 'signed',
+          at: FieldValue.serverTimestamp(),
+          typedName: typedName,
+          ip: ip,
+          documentHash: contract.documentHash
+        });
+      });
     } catch (err) {
       console.warn('[signContract] could not record signature:', describeError(err));
       throw new HttpsError('internal', 'Something went wrong. Please try again.');
     }
+
+    if (plan.action === 'denied') throw new HttpsError('permission-denied', CONTRACT_DENIED);
+    if (plan.action === 'refuse-status') throw new HttpsError('failed-precondition', CONTRACT_DENIED);
+    if (plan.action === 'refuse-one-signer') {
+      throw new HttpsError('invalid-argument', 'This agreement only needs one signature.');
+    }
+    // Fully signed already. A replayed token, a double-tap, or a client who
+    // hits back must never produce a second signature or a second checkout
+    // session — the fake provider has no idempotency key, so calling it again
+    // on a replay would mint a second, orphaned session.
+    if (plan.action === 'complete-already') {
+      return {
+        ok: true,
+        signedAt: contract.signedAt.toMillis(),
+        checkoutUrl: null, complete: true, awaitingSigner: null
+      };
+    }
+    if (plan.action === 'line-already') {
+      return {
+        ok: true,
+        signedAt: (plan.slot === 'client2' ? contract.signed2At : contract.signedAt).toMillis(),
+        checkoutUrl: null,
+        complete: false,
+        awaitingSigner: plan.slot === 'client1' ? 'client2' : 'client1',
+        signedSlot: plan.slot,
+        alreadySigned: true
+      };
+    }
+
+    const slot = plan.slot;
+    const willComplete = plan.willComplete;
+    // What to do once the agreement completes — payment page, confirmation
+    // email, her notice — happens only when THIS request completed it. If she
+    // had already marked it signed by hand, she made that call then.
+    const completedNow = plan.flipsStatus;
 
     // AFTER the signature is safely recorded, never before. If the payment
     // provider is unreachable, the client has still signed and that fact
@@ -1281,11 +1255,11 @@ export const signContract = onCall(
     // configured — not a failure that happens to look like one. No session
     // is created and checkoutUrl stays null; nothing here is logged as a
     // warning, because nothing has gone wrong.
-    // willComplete as well as paymentsEnabled: there is nothing to pay for
+    // completedNow as well as paymentsEnabled: there is nothing to pay for
     // while one of two signatures is still outstanding, and minting a session
     // now would hand Client 1 a payment page for an agreement that is not yet
     // an agreement.
-    if (willComplete && paymentsEnabled()) {
+    if (completedNow && paymentsEnabled()) {
       try {
         // Dispatched through the seam, so this line is identical whether the
         // fake payer or Stripe is configured. Switching between them is
@@ -1313,7 +1287,7 @@ export const signContract = onCall(
     // Only when the agreement is complete. Sending "your signed agreement"
     // after the first of two signatures would tell the couple it was done
     // while it was still waiting on one of them.
-    if (willComplete) {
+    if (completedNow) {
     const mail = signedCopyEmail({
       clientName: contract.clientName,
       contractUrl: SITE_ORIGIN + '/sign/?t=' + token,
@@ -1525,12 +1499,14 @@ export const markRetainerReceived = onCall(
     if (!snap.exists) throw new HttpsError('not-found', 'No such contract.');
     const contract = snap.data();
 
-    // signedAt alone is not enough. It is written once and never cleared, and
+    // A signature alone is not enough. signedAt is written once and never cleared, and
     // canTransition permits signed -> cancelled and paid -> cancelled, so a
     // called-off booking still carries it. Requiring a live status too means a
     // cancelled contract cannot have a retainer recorded against it — which
     // matters the moment a cancel control exists.
-    if (!contract.signedAt || (contract.status !== 'signed' && contract.status !== 'paid')) {
+    // isSignedBooking also accepts a contract she marked signed by hand, which
+    // a paper signing leaves with no signedAt at all.
+    if (!isSignedBooking(contract)) {
       throw new HttpsError('failed-precondition', 'That contract is not a signed, active booking.');
     }
 
@@ -1566,6 +1542,139 @@ export const markRetainerReceived = onCall(
 
     console.log('[markRetainerReceived]', received ? 'marked:' : 'unmarked:', contractId);
     return { ok: true };
+  }
+);
+
+// markContractSigned is her override for when signing did not record what
+// actually happened: a client signed a paper copy, or the system got it wrong
+// — as it did on 2026-10-30, when two partners signing at the same instant
+// left Hanani Andrade's contract at 'opened' with both signatures on it.
+//
+// It never touches the e-signature fields. A hand mark is its own record —
+// manuallySignedAt / By / From plus an audit row — so the evidence of who
+// typed what, where and when stays exactly as the clients left it, and anyone
+// reading the record can tell a hand mark from an e-signature.
+//
+// signed:false undoes a mis-tap; manualUnsignPlan decides when that is safe.
+// emailClient:true sends the couple a "your agreement is signed" email, which
+// is the one they would have had if signing had worked.
+export const markContractSigned = onCall(
+  { region: 'us-west1', cors: true, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    await requireAdmin(request);
+    const d = request.data || {};
+    const contractId = typeof d.contractId === 'string' ? d.contractId.trim() : '';
+    if (!isValidContractId(contractId)) {
+      throw new HttpsError('invalid-argument', 'That contract id is not valid.');
+    }
+    // Strict, for the same reason as markRetainerReceived: the STRING "false"
+    // must not mean true.
+    const signed = d.signed !== false && d.signed !== 'false';
+    const emailClient = signed && (d.emailClient === true || d.emailClient === 'true');
+
+    const ref = db.collection('contracts').doc(contractId);
+    let contract;
+    let plan;
+    // A transaction, because a client may be e-signing this very contract at
+    // the same moment — the exact race this button exists to clean up after.
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        contract = snap.exists ? snap.data() : null;
+        if (!contract) { plan = { action: 'missing' }; return; }
+        plan = signed ? manualSignPlan(contract) : manualUnsignPlan(contract);
+
+        if (plan.action === 'mark') {
+          tx.update(ref, {
+            status: 'signed',
+            manuallySignedAt: FieldValue.serverTimestamp(),
+            manuallySignedBy: request.auth.uid,
+            manuallySignedFrom: plan.from
+          });
+          tx.set(ref.collection('audit').doc(), {
+            event: 'marked-signed',
+            at: FieldValue.serverTimestamp(),
+            by: request.auth.uid,
+            from: plan.from,
+            emailClient: emailClient
+          });
+        } else if (plan.action === 'unmark') {
+          tx.update(ref, {
+            status: plan.to,
+            manuallySignedAt: FieldValue.delete(),
+            manuallySignedBy: FieldValue.delete(),
+            manuallySignedFrom: FieldValue.delete()
+          });
+          tx.set(ref.collection('audit').doc(), {
+            event: 'signed-unmarked',
+            at: FieldValue.serverTimestamp(),
+            by: request.auth.uid,
+            to: plan.to
+          });
+        }
+      });
+    } catch (err) {
+      console.warn('[markContractSigned] could not update:', describeError(err));
+      throw new HttpsError('internal', 'Something went wrong. Please try again.');
+    }
+
+    // Idempotent: two taps, or two tabs, change nothing and send no second email.
+    if (plan.action === 'missing') throw new HttpsError('not-found', 'No such contract.');
+    if (plan.action === 'already') return { ok: true, status: contract.status, already: true };
+    if (plan.action === 'refuse') {
+      throw new HttpsError('failed-precondition',
+        'Only a contract that has been sent can be marked signed.');
+    }
+    if (plan.action === 'refuse-not-manual') {
+      throw new HttpsError('failed-precondition',
+        'The clients signed this one themselves, so it cannot be unmarked.');
+    }
+    if (plan.action === 'refuse-fully-signed') {
+      throw new HttpsError('failed-precondition',
+        'Every signature is on file, so this contract really is signed.');
+    }
+    if (plan.action === 'refuse-retainer') {
+      throw new HttpsError('failed-precondition',
+        'Undo the retainer first, then undo the signed mark.');
+    }
+    if (plan.action === 'refuse-status') {
+      throw new HttpsError('failed-precondition', 'This contract cannot be unmarked from here.');
+    }
+
+    if (plan.action === 'unmark') {
+      console.log('[markContractSigned] unmarked:', contractId, '->', plan.to);
+      return { ok: true, status: plan.to };
+    }
+
+    // AFTER the mark is committed, never before, and a failure is reported
+    // rather than thrown: the contract IS marked signed, and her dashboard
+    // must say so. emailed:false lets the page tell her the email did not go.
+    let emailed = null;
+    if (emailClient) {
+      // The latest real signature if there is one — Hanani's couple signed on
+      // 30 October, and saying otherwise would misdate their agreement.
+      const stamps = [contract.signedAt, contract.signed2At].filter(Boolean).map((t) => t.toDate());
+      const signedAt = stamps.length ? new Date(Math.max.apply(null, stamps)) : new Date();
+      const mail = manualSignedEmail({ clientName: contract.clientName, signedAt: signedAt });
+      try {
+        await sendEmail({
+          apiKey: RESEND_API_KEY.value(),
+          to: contractRecipients(contract),
+          replyTo: OWNER_EMAIL,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html
+        });
+        emailed = true;
+      } catch (err) {
+        console.warn('[markContractSigned] confirmation email failed:', describeError(err));
+        emailed = false;
+      }
+    }
+
+    console.log('[markContractSigned] marked:', contractId, 'from', plan.from,
+      emailClient ? (emailed ? '(emailed)' : '(email failed)') : '(no email)');
+    return { ok: true, status: 'signed', emailed: emailed };
   }
 );
 

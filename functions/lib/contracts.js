@@ -218,6 +218,96 @@ export function closingStatusFor(from) {
   return null;
 }
 
+// Whose signature line a signing request fills, and whether it finishes the
+// agreement. signContract calls this INSIDE a Firestore transaction, so the
+// contract it is handed is always the freshest copy.
+//
+// That is the whole fix for 2026-10-30: Hanani Andrade and Javier Sanchez
+// signed on two devices 0.1s apart. Each request read the contract before the
+// other had written, each saw the other line blank, each decided it was the
+// first of two — and the contract sat at 'opened' with both signatures on it.
+// In a transaction the second one is retried and sees the first.
+//
+// Both boxes are on screen at once, so either partner may sign first. With no
+// slot given, the old turn-taking rule applies, which keeps a client on a
+// cached copy of the previous one-form-at-a-time page working.
+//
+// willComplete: every required signature is now on file.
+// flipsStatus:  this request moves status to 'signed' (and sends the emails).
+// The two differ only when Khiara already marked it signed by hand — the
+// status is already right then, and the confirmation was her call.
+export function planSignature(contract, requestedSlot) {
+  const c = contract || {};
+  const needsTwo = !!(c.client2Name && String(c.client2Name).trim());
+  const c1Done = !!c.signedAt;
+  const c2Done = !!c.signed2At;
+
+  if (c1Done && (!needsTwo || c2Done)) return { action: 'complete-already' };
+
+  const slot = requestedSlot === 'client1' || requestedSlot === 'client2'
+    ? requestedSlot
+    : (c1Done ? 'client2' : 'client1');
+
+  // Without this, a caller could invent a second line and write a signature2
+  // onto a document whose frozen text names only one party.
+  if (slot === 'client2' && !needsTwo) return { action: 'refuse-one-signer' };
+
+  // Per-slot idempotency: a double-tap must never overwrite a signature's
+  // timestamp, IP and user agent, which are the evidence it happened.
+  if ((slot === 'client1' && c1Done) || (slot === 'client2' && c2Done)) {
+    return { action: 'line-already', slot: slot };
+  }
+
+  const willComplete = !needsTwo || (slot === 'client1' ? c2Done : c1Done);
+  const alreadySigned = c.status === 'signed' || c.status === 'paid';
+  const flipsStatus = willComplete && !alreadySigned;
+
+  if (flipsStatus && !canTransition(c.status, 'signed')) return { action: 'refuse-status' };
+
+  return { action: 'record', slot: slot, willComplete: willComplete, flipsStatus: flipsStatus };
+}
+
+// Marking a contract signed by hand — her way out when a client signed a paper
+// copy, or when the system got it wrong, as it did for Hanani. Only an offer
+// that actually went out can be marked: a draft was never sent, and a voided
+// or cancelled contract is closed.
+export function manualSignPlan(contract) {
+  const status = (contract || {}).status;
+  if (status === 'signed' || status === 'paid') return { action: 'already' };
+  if (status === 'sent' || status === 'opened') return { action: 'mark', from: status };
+  return { action: 'refuse' };
+}
+
+// Undoing a hand mark, for a mis-tap. Deliberately narrow: it puts back the
+// status the contract had, and nothing else.
+//   - Only a hand mark. A contract the clients e-signed is signed, full stop.
+//   - Not once every signature is on file anyway — that would recreate the
+//     exact stuck state the button exists to fix.
+//   - Not while a retainer is recorded; she undoes that first, so the
+//     dashboard never shows a retainer against an unsigned offer.
+//   - Never to a status other than the two it could have come from, so a
+//     corrupt field cannot resurrect a draft.
+export function manualUnsignPlan(contract) {
+  const c = contract || {};
+  if (c.status !== 'signed') return { action: 'refuse-status' };
+  if (!c.manuallySignedAt) return { action: 'refuse-not-manual' };
+  const needsTwo = !!(c.client2Name && String(c.client2Name).trim());
+  if (c.signedAt && (!needsTwo || c.signed2At)) return { action: 'refuse-fully-signed' };
+  if (c.retainerReceivedAt) return { action: 'refuse-retainer' };
+  const to = c.manuallySignedFrom;
+  if (to !== 'sent' && to !== 'opened') return { action: 'refuse-status' };
+  return { action: 'unmark', to: to };
+}
+
+// A live, signed booking — the gate for recording a retainer. signedAt alone
+// is not enough: it survives cancellation, and a contract marked signed by
+// hand after a paper signing never has it.
+export function isSignedBooking(contract) {
+  const c = contract || {};
+  if (c.status !== 'signed' && c.status !== 'paid') return false;
+  return !!(c.signedAt || c.manuallySignedAt);
+}
+
 // The package price is a DEFAULT, not a fixed price.
 //
 // Her weddings are advertised "starting from $750 / $1,000 / $1,200", and a

@@ -180,6 +180,74 @@ export function signedCopyEmail(o) {
   return { subject: subject, text: text, html: html };
 }
 
+// A date a client can read, in Oregon time — the same zone every date on the
+// contract and the signing page is pinned to. 06:16 UTC on 30 October is the
+// evening of the 29th where Hanani and Javier actually signed. Falls back to
+// formatTimestamp for anything that is not a real date, so it cannot throw.
+function formatBusinessDate(v) {
+  const date = v && typeof v.toDate === 'function' ? v.toDate() : v;
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return formatTimestamp(v);
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'America/Los_Angeles', year: 'numeric', month: 'long', day: 'numeric'
+  });
+}
+
+// Sent when Khiara marks a contract signed by hand and ticks "email the
+// couple". It cannot be signedCopyEmail: that one links to the signed copy,
+// and the link needs the raw signing token, which is never stored. So this
+// points them at the link they already hold, in her original email.
+//
+// It may well arrive after the retainer was sent — Hanani's did — so the
+// payment line has to be true either way.
+export function manualSignedEmail(o) {
+  const d = o || {};
+  const name = oneLine(d.clientName);
+  const signedAt = formatBusinessDate(d.signedAt);
+
+  const subject = 'Your signed CaptureWithKi agreement';
+  const viewLine = 'You can view your agreement any time using the link in Khiara\'s original email.';
+  const payLine = 'If you have already sent your retainer, there is nothing more you need to do. ' +
+    'If not, Khiara will be in touch with the payment details.';
+
+  const text = [
+    'Hi ' + name + ',',
+    '',
+    'Your photography agreement is signed and on file as of ' + signedAt + '.',
+    '',
+    viewLine,
+    '',
+    payLine,
+    '',
+    'Khiara',
+    'CaptureWithKi'
+  ].join('\n');
+
+  const html =
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ' +
+      'style="background:' + C.bg + ';padding:24px 0;">' +
+      '<tr><td align="center">' +
+        '<table role="presentation" width="560" cellpadding="0" cellspacing="0" ' +
+          'style="background:' + C.paper + ';border:1px solid ' + C.line + ';padding:32px;">' +
+          '<tr><td style="font-family:' + SERIF + ';font-size:22px;color:' + C.ink + ';">' +
+            'Your agreement is signed' +
+          '</td></tr>' +
+          '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
+            'Hi ' + escapeHtml(name) + ', your photography agreement is signed and on file as of ' +
+            escapeHtml(signedAt) + '.' +
+          '</td></tr>' +
+          '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
+            escapeHtml(viewLine) +
+          '</td></tr>' +
+          '<tr><td style="font-family:' + SANS + ';font-size:15px;color:' + C.ink + ';padding-top:16px;">' +
+            escapeHtml(payLine) +
+          '</td></tr>' +
+        '</table>' +
+      '</td></tr>' +
+    '</table>';
+
+  return { subject: subject, text: text, html: html };
+}
+
 // ---------------------------------------------------------------------------
 // The chase ladder (Task 6, narrowed by Task 4 to the signature alone — there
 // is no payment left to chase). All three below are built by chaseContracts

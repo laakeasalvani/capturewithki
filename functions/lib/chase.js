@@ -40,6 +40,12 @@ export function dueActions(contracts, now) {
   for (const c of contracts) {
     if (!c || typeof c !== 'object') continue;
     if (['paid', 'void', 'cancelled', 'draft', 'signed'].indexOf(c.status) !== -1) continue;
+    // Every signature on file means signed, whatever the status says. On
+    // 2026-10-30 two partners signing at the same instant left a contract at
+    // 'opened' with both signatures on it, and this ladder — reading only the
+    // status — was hours from asking them to sign again.
+    const needsTwo = !!(c.client2Name && String(c.client2Name).trim());
+    if (c.signedAt && (!needsTwo || c.signed2At)) continue;
 
     const sentAt = toMillis(c.sentAt);
     if (sentAt === null) continue;

@@ -14,6 +14,7 @@ const createContractFn = httpsCallable(fns, 'createContract');
 const sendContractFn = httpsCallable(fns, 'sendContract');
 const markRetainerReceivedFn = httpsCallable(fns, 'markRetainerReceived');
 const voidContractFn = httpsCallable(fns, 'voidContract');
+const markContractSignedFn = httpsCallable(fns, 'markContractSigned');
 
 // A contract is never opened, signed, or paid the instant it's sent — the
 // window below is how long "sent, nothing back yet" is still normal. Past it,
@@ -39,6 +40,15 @@ function isClosed(status) {
 // record has to survive it — the client signed something.
 function isAgreed(status) {
   return status === 'signed' || status === 'paid';
+}
+
+// Every signature the contract needs is on file. Mirrors manualUnsignPlan in
+// functions/lib/contracts.js, which is what actually enforces it: undoing a
+// hand mark on a contract like this would put it straight back into the stuck
+// state the mark was there to fix, so the button is not offered.
+function fullyESigned(c) {
+  const needsTwo = !!(c.client2Name && String(c.client2Name).trim());
+  return !!c.signedAt && (!needsTwo || !!c.signed2At);
 }
 
 function esc(v) {
@@ -683,6 +693,9 @@ export function initContracts(container) {
         '<div><dt>First opened</dt><dd>' + (c.firstOpenedAt ? esc(fmtWhen(c.firstOpenedAt)) + ' (' + (c.openCount || 1) + '&times;)' : 'Never') + '</dd></div>' +
         '<div><dt>Signed</dt><dd>' + esc(c.signedAt ? fmtWhen(c.signedAt) : 'Not signed') + '</dd></div>' +
         '<div><dt>Signed by</dt><dd class="c-signed-by"></dd></div>' +
+        (c.manuallySignedAt
+          ? '<div><dt>Marked signed by hand</dt><dd>' + esc(fmtWhen(c.manuallySignedAt)) + '</dd></div>'
+          : '') +
         '<div><dt>Retainer received</dt><dd>' + (c.retainerReceivedAt ? esc(fmtWhen(c.retainerReceivedAt)) : 'Not yet') + '</dd></div>' +
       '</dl>' +
       // The exact document the client signed, plus the evidence, wherever she
@@ -710,11 +723,31 @@ export function initContracts(container) {
             '<span class="s-status c-card-status" aria-live="polite"></span>' +
           '</div>'
         : '') +
+      // Her override for when signing did not record what happened — a paper
+      // signing, or the system getting it wrong, as it did for Hanani Andrade
+      // when both partners pressed sign at the same instant. The email box is
+      // ticked by default because the couple would have had that email if
+      // signing had worked; she unticks it when, say, they signed on paper in
+      // front of her and need nothing more.
+      (c.status === 'sent' || c.status === 'opened'
+        ? '<div class="s-actions c-signed-row">' +
+            '<button type="button" class="c-signed-mark s-secondary">Mark as signed</button>' +
+            '<label class="c-signed-email"><input type="checkbox" checked> ' +
+              'Also email ' + (c.client2Name && String(c.client2Name).trim() ? 'the couple' : 'the client') +
+              ' their signed confirmation</label>' +
+            '<span class="s-status c-signed-status" aria-live="polite"></span>' +
+          '</div>'
+        : '') +
       (c.status === 'signed'
         ? '<div class="s-actions">' +
             (c.retainerReceivedAt
               ? '<button type="button" class="c-retainer-undo s-secondary">Undo — retainer not actually received</button>'
               : '<button type="button" class="c-retainer-mark">Mark retainer received</button>') +
+            // Only for a hand mark, only before a retainer is recorded, and
+            // never once the clients' own signatures complete it anyway.
+            (c.manuallySignedAt && !c.retainerReceivedAt && !fullyESigned(c)
+              ? '<button type="button" class="c-signed-undo s-secondary">Undo — not actually signed</button>'
+              : '') +
             '<span class="s-status c-retainer-status" aria-live="polite"></span>' +
           '</div>'
         : '') +
@@ -799,6 +832,7 @@ export function initContracts(container) {
       'signed-client2': 'Signed by the second client',
       'retainer-received': 'Retainer marked received',
       'retainer-unmarked': 'Retainer mark removed',
+      'marked-signed': 'Marked signed by hand', 'signed-unmarked': 'Signed mark removed',
       paid: 'Payment recorded', 'paid-reconciled': 'Payment found by reconciliation',
       refunded: 'Refunded', voided: 'Voided'
     };
@@ -1077,6 +1111,59 @@ export function initContracts(container) {
           } catch (err) {
             retainerStatus.textContent = 'Could not undo: ' + describeErr(err);
             undoBtn.disabled = false;
+          }
+        });
+      }
+
+      // Marking it signed by hand. Asks first, naming the client, because the
+      // wrong card is the likeliest mistake and this one can send an email.
+      // The result of that email is shown in an alert rather than the status
+      // line, because refreshContracts re-renders the card and would wipe it.
+      const signedMarkBtn = card.querySelector('.c-signed-mark');
+      const signedStatus = card.querySelector('.c-signed-status');
+      if (signedMarkBtn) {
+        signedMarkBtn.addEventListener('click', async function () {
+          const emailBox = card.querySelector('.c-signed-email input');
+          const emailClient = !!(emailBox && emailBox.checked);
+          const who = [c.clientName, c.client2Name].filter(function (n) {
+            return n && String(n).trim();
+          }).join(' and ') || 'this client';
+          const ok = window.confirm(
+            'Mark the contract for ' + who + ' as signed?\n\n' +
+            (emailClient
+              ? 'They will be emailed a confirmation that their agreement is signed.'
+              : 'No email will be sent.') +
+            '\nYou can then record the retainer.'
+          );
+          if (!ok) return;
+
+          signedMarkBtn.disabled = true;
+          signedStatus.textContent = 'Saving…';
+          try {
+            const res = await markContractSignedFn({ contractId: c.id, signed: true, emailClient: emailClient });
+            await refreshContracts();
+            if (res.data && res.data.emailed === false) {
+              window.alert('Marked signed — but the confirmation email to ' + who +
+                ' did not send. You may want to email them yourself.');
+            }
+          } catch (err) {
+            signedStatus.textContent = 'Could not save: ' + describeErr(err);
+            signedMarkBtn.disabled = false;
+          }
+        });
+      }
+      const signedUndoBtn = card.querySelector('.c-signed-undo');
+      if (signedUndoBtn) {
+        signedUndoBtn.addEventListener('click', async function () {
+          signedUndoBtn.disabled = true;
+          retainerStatus.textContent = 'Saving…';
+          try {
+            await markContractSignedFn({ contractId: c.id, signed: false });
+            retainerStatus.textContent = '';
+            await refreshContracts();
+          } catch (err) {
+            retainerStatus.textContent = 'Could not undo: ' + describeErr(err);
+            signedUndoBtn.disabled = false;
           }
         });
       }
