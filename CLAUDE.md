@@ -164,9 +164,10 @@ one file, `review/index.html`, with no Firebase SDK.
   `inquiries` with `kind: 'review-feedback'` and emails her. So it appears in the
   dashboard's Inquiries tab and the unseen-inquiry alarm covers it.
   `int/contracts.js` filters that kind out of its client picker.
-- The Google link uses place ID `ChIJu18zRqM4co8RuKeBOT8353g`, in two places in
-  the HTML. Google Maps shows **two** CaptureWithKi listings; this is the one
-  with her photo. If the duplicate is removed and this ID changes, update them.
+- The Google link is `https://g.page/r/CbingTk_N-d4ECE/review`, the profile's own
+  review link, in two places in the HTML. A second, empty CaptureWithKi listing
+  was removed from the account on 2026-11-08 but may linger on Maps; this link is
+  the one with her photo.
 
 ## How the CMS works
 
