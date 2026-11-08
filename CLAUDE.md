@@ -152,16 +152,16 @@ put a price anywhere else.
 one file, `review/index.html`, with no Firebase SDK.
 
 - 4–5 stars go straight to Google's review box. 1–3 stars see a feedback form
-  with no Google link; Laakea removed it on 2026-11-08 after being told the risk.
-  The only Google route left for those ratings is the link on the thank-you
-  screen after sending. Google's review policy bars discouraging negative reviews
-  or selectively soliciting positive ones, and a violation can cost her the
-  listing's reviews, so this page is a known risk under that policy.
+  and a thank-you screen, neither with a Google link; Laakea had them removed on
+  2026-11-08 after being told the risk. Google's review policy bars discouraging
+  negative reviews or selectively soliciting positive ones, and a violation can
+  cost her the listing's reviews, so this page is review gating and a known risk
+  under that policy.
 - The form posts to the `submitReviewFeedback` function, which saves to
   `inquiries` with `kind: 'review-feedback'` and emails her. So it appears in the
   dashboard's Inquiries tab and the unseen-inquiry alarm covers it.
   `int/contracts.js` filters that kind out of its client picker.
-- The Google link uses place ID `ChIJu18zRqM4co8RuKeBOT8353g`, in four places in
+- The Google link uses place ID `ChIJu18zRqM4co8RuKeBOT8353g`, in two places in
   the HTML. Google Maps shows **two** CaptureWithKi listings; this is the one
   with her photo. If the duplicate is removed and this ID changes, update them.
 
