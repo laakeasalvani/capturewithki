@@ -75,6 +75,8 @@ h1{font-family:var(--display);font-weight:300;font-size:clamp(30px,8vw,38px);lin
 .btn:hover{background:#4d583f;}
 .btn[disabled]{opacity:.65;cursor:default;}
 :focus-visible{outline:2px solid var(--khaki-dark);outline-offset:2px;}
+/* Headings take focus from script when the screen changes; they are not controls. */
+h1:focus-visible{outline:none;}
 
 .rates{list-style:none;margin:0;padding:0;display:grid;gap:8px;}
 .rate{
