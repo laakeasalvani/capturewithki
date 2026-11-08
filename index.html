@@ -38,7 +38,7 @@
   // cache has never seen. bin/stamp-version.sh keeps BUILD and version.json in
   // step; they must always match in a commit.
   (function () {
-    var BUILD = '20261027040731';
+    var BUILD = '20261108233254';
     var KEY = 'cwkStaleReload';
 
     // Without storage there is no way to remember an attempt, and retrying
@@ -96,6 +96,31 @@
 <meta name="twitter:description" content="Wedding and lifestyle photographer in Portland, Oregon and beyond.">
 <meta name="twitter:image" content="https://capturewithki.com/images/link-preview.jpg">
 <link rel="canonical" href="https://capturewithki.com/">
+<!-- Tells Google this site, her Instagram and her Business Profile are one business.
+     Only state what is true and public: no street address (the profile has none)
+     and no ratings, which must come from real reviews. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ProfessionalService",
+  "@id": "https://capturewithki.com/#business",
+  "name": "CaptureWithKi",
+  "alternateName": "Capture With Ki",
+  "url": "https://capturewithki.com/",
+  "image": "https://capturewithki.com/images/link-preview.jpg",
+  "description": "Wedding and lifestyle photographer based in Portland, Oregon. Weddings, elopements, engagements and portraits.",
+  "founder": { "@type": "Person", "name": "Khiara Salvani" },
+  "areaServed": [
+    { "@type": "State", "name": "Oregon" },
+    { "@type": "State", "name": "Washington" }
+  ],
+  "hasMap": "https://www.google.com/maps?cid=8711992748858779576",
+  "sameAs": [
+    "https://www.instagram.com/capturewithki/",
+    "https://www.google.com/maps?cid=8711992748858779576"
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
