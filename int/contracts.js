@@ -149,7 +149,8 @@ export function initContracts(container) {
     snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
     // Already-archived inquiries are done deals or dead ends — not worth
     // cluttering the one list she uses to start a contract.
-    return out.filter(function (i) { return i.archived !== true; });
+    // Review-page feedback shares the collection but is not a potential booking.
+    return out.filter(function (i) { return i.archived !== true && i.kind !== 'review-feedback'; });
   }
 
   async function loadPackages() {

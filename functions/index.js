@@ -32,6 +32,8 @@ import { dueEscalations, escalationEmail, BACKLOG_MS } from './lib/escalate.js';
 import { validateKeaInquiry, keaOwnerEmail, keaClientEmail,
          keaOwnerEmailHtml, keaClientEmailHtml, sendKeaEmail,
          KEA_OWNER_EMAIL } from './lib/kea.js';
+import { validateReviewFeedback, reviewFeedbackEmail,
+         reviewFeedbackEmailHtml } from './lib/review-feedback.js';
 import {
   isValidContractId, MAX_PHONE, MAX_EVENT_DATE, renderTemplate, canTransition,
   computeFeeBlock, validateClientDetails, missingRequiredFields, resolvePackagePrice,
@@ -382,6 +384,101 @@ export const keaInquiry = onRequest(
     }
 
     // The enquiry is safely recorded either way, so the visitor sees success.
+    res.json({ ok: true });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Review page feedback (/review/)
+//
+// onRequest for the same reason as keaInquiry: the page is one plain file with
+// no Firebase SDK, so nothing on it can wait on Safari's IndexedDB. Stored in
+// `inquiries` so it shows in her dashboard and the unseen-inquiry alarm covers
+// it; the Firestore rules already refuse every browser write to that collection.
+// ---------------------------------------------------------------------------
+
+const REVIEW_ORIGINS = [
+  'https://capturewithki.com',
+  'https://www.capturewithki.com',
+  'http://localhost:8765',
+  'http://127.0.0.1:8765'
+];
+
+export const submitReviewFeedback = onRequest(
+  { region: 'us-west1', secrets: [RESEND_API_KEY], cors: REVIEW_ORIGINS },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ ok: false, error: 'Method not allowed.' });
+      return;
+    }
+
+    const data = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body))
+      ? req.body : {};
+    const now = Date.now();
+
+    if (isBotSubmission({ honeypot: data.honeypot, renderedAt: data.renderedAt, now: now })) {
+      res.json({ ok: true });
+      return;
+    }
+
+    const check = validateReviewFeedback(data);
+    if (!check.valid) {
+      res.status(400).json({ ok: false, error: check.error });
+      return;
+    }
+    const feedback = check.value;
+
+    if (req.ip) {
+      // Prefixed so this never spends a visitor's contact-form allowance.
+      const limit = await checkRateLimit(db, hashIp('review:' + req.ip), now);
+      if (!limit.allowed) {
+        res.status(429).json({
+          ok: false,
+          error: 'That is a lot of messages in a short time. Please email ' + OWNER_EMAIL + ' directly.'
+        });
+        return;
+      }
+    } else {
+      console.warn('[submitReviewFeedback] no caller IP; skipping rate limit');
+    }
+
+    // Record FIRST. A failed email is recoverable; lost feedback is not.
+    let ref;
+    try {
+      ref = await db.collection('inquiries').add(Object.assign({}, feedback, {
+        kind: 'review-feedback',
+        createdAt: FieldValue.serverTimestamp(),
+        status: 'new',
+        emailToOwnerSent: false
+      }));
+    } catch (err) {
+      console.error('[submitReviewFeedback] could not save:', describeError(err));
+      res.status(500).json({
+        ok: false,
+        error: 'Something went wrong saving your feedback. Please email ' + OWNER_EMAIL + ' directly.'
+      });
+      return;
+    }
+
+    let patch;
+    try {
+      const m = reviewFeedbackEmail(feedback);
+      await sendEmail({ apiKey: RESEND_API_KEY.value(), to: OWNER_EMAIL, replyTo: feedback.email,
+                        subject: m.subject, text: m.text, html: reviewFeedbackEmailHtml(feedback) });
+      patch = { emailToOwnerSent: true };
+      console.log('[submitReviewFeedback] owner email accepted by Resend');
+    } catch (err) {
+      patch = { emailError: 'owner: ' + describeError(err) };
+      console.warn('[submitReviewFeedback] owner email FAILED:', describeError(err));
+    }
+
+    // Must never fail the request: the feedback is already safely saved.
+    try {
+      await ref.update(patch);
+    } catch (err) {
+      console.warn('[submitReviewFeedback] could not record email status:', describeError(err));
+    }
+
     res.json({ ok: true });
   }
 );

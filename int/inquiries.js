@@ -66,6 +66,18 @@ function render() {
   visible.forEach(function (i) {
     const who = i.partnerName ? esc(i.name) + ' &amp; ' + esc(i.partnerName) : esc(i.name);
     const isNew = i.status !== 'replied';
+    // Feedback from /review/ has no phone, date, session or "found via", so
+    // those rows would only ever read "Not given".
+    const isFeedback = i.kind === 'review-feedback';
+    const fields = isFeedback
+      ? '<dt>Type</dt><dd>Review page feedback</dd>' +
+        '<dt>Rating</dt><dd>' + esc(i.rating) + (i.rating === 1 ? ' star' : ' stars') + '</dd>' +
+        '<dt>Email</dt><dd><a href="mailto:' + esc(i.email) + '">' + esc(i.email) + '</a></dd>'
+      : '<dt>Email</dt><dd><a href="mailto:' + esc(i.email) + '">' + esc(i.email) + '</a></dd>' +
+        '<dt>Phone</dt><dd><a href="tel:' + esc(i.phone) + '">' + esc(i.phone) + '</a></dd>' +
+        '<dt>Date</dt><dd>' + orNone(i.eventDate) + '</dd>' +
+        '<dt>Session</dt><dd>' + orNone(i.sessionType) + '</dd>' +
+        '<dt>Found via</dt><dd>' + orNone(i.foundVia) + '</dd>';
     html +=
       '<article class="q-card' + (isNew ? ' q-new' : '') + '" data-id="' + esc(i.id) + '">' +
         '<header class="q-head">' +
@@ -74,13 +86,7 @@ function render() {
         '</header>' +
         ((i.emailError || i.emailToOwnerSent === false)
           ? '<p class="q-failed">The email notification for this one failed.</p>' : '') +
-        '<dl class="q-fields">' +
-          '<dt>Email</dt><dd><a href="mailto:' + esc(i.email) + '">' + esc(i.email) + '</a></dd>' +
-          '<dt>Phone</dt><dd><a href="tel:' + esc(i.phone) + '">' + esc(i.phone) + '</a></dd>' +
-          '<dt>Date</dt><dd>' + orNone(i.eventDate) + '</dd>' +
-          '<dt>Session</dt><dd>' + orNone(i.sessionType) + '</dd>' +
-          '<dt>Found via</dt><dd>' + orNone(i.foundVia) + '</dd>' +
-        '</dl>' +
+        '<dl class="q-fields">' + fields + '</dl>' +
         '<p class="q-message">' + orNone(i.message) + '</p>' +
         '<div class="q-actions">' +
           '<button type="button" class="q-archive s-secondary" data-id="' + esc(i.id) + '">' +
