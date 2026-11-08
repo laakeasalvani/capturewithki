@@ -72,7 +72,9 @@ function render() {
     const fields = isFeedback
       ? '<dt>Type</dt><dd>Review page feedback</dd>' +
         '<dt>Rating</dt><dd>' + esc(i.rating) + (i.rating === 1 ? ' star' : ' stars') + '</dd>' +
-        '<dt>Email</dt><dd><a href="mailto:' + esc(i.email) + '">' + esc(i.email) + '</a></dd>'
+        '<dt>Email</dt><dd>' + (i.email
+          ? '<a href="mailto:' + esc(i.email) + '">' + esc(i.email) + '</a>'
+          : orNone(i.email)) + '</dd>'
       : '<dt>Email</dt><dd><a href="mailto:' + esc(i.email) + '">' + esc(i.email) + '</a></dd>' +
         '<dt>Phone</dt><dd><a href="tel:' + esc(i.phone) + '">' + esc(i.phone) + '</a></dd>' +
         '<dt>Date</dt><dd>' + orNone(i.eventDate) + '</dd>' +

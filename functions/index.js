@@ -463,6 +463,7 @@ export const submitReviewFeedback = onRequest(
     let patch;
     try {
       const m = reviewFeedbackEmail(feedback);
+      // A blank email means no reply_to at all; sendEmail leaves it off.
       await sendEmail({ apiKey: RESEND_API_KEY.value(), to: OWNER_EMAIL, replyTo: feedback.email,
                         subject: m.subject, text: m.text, html: reviewFeedbackEmailHtml(feedback) });
       patch = { emailToOwnerSent: true };

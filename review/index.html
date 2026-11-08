@@ -21,7 +21,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%236E7C5C'/%3E%3Ctext x='32' y='46' font-family='Georgia,serif' font-style='italic' font-size='40' fill='%23F2ECE0' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&family=Montserrat:wght@500&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   color-scheme:light;
@@ -54,12 +54,6 @@ body{
   padding:clamp(26px,6vw,38px) clamp(20px,6vw,34px);text-align:center;
   box-shadow:0 22px 60px rgba(0,0,0,.4);
 }
-.back{
-  position:absolute;top:12px;left:10px;width:44px;height:44px;padding:0;
-  display:flex;align-items:center;justify-content:center;
-  background:none;border:0;border-radius:8px;color:var(--khaki-dark);cursor:pointer;
-}
-.back:hover{background:var(--bg);}
 .mark{
   display:block;font-family:var(--display);font-style:italic;font-size:22px;
   color:var(--khaki-dark);text-decoration:none;margin-bottom:14px;
@@ -87,15 +81,50 @@ h1:focus-visible{outline:none;}
 .rate:hover{border-color:var(--khaki);background:var(--bg);}
 .rate-stars{color:var(--gold);font-size:19px;letter-spacing:2px;}
 
-form{text-align:left;margin:0;}
-label{display:block;font-weight:400;font-size:14px;margin:0 0 14px;}
-input,textarea{
-  display:block;width:100%;margin-top:5px;padding:11px 12px;background:#fff;color:var(--ink);
-  border:1px solid var(--line);border-radius:8px;font:300 16px/1.5 var(--sans);
+/* The 1-3 star screens: layout from Laakea's recording, in the site's colors. */
+.panel{
+  position:relative;width:100%;max-width:480px;background:var(--cream);
+  border:1.5px solid var(--khaki-dark);border-radius:3px;padding:18px 18px 14px;
+  box-shadow:0 22px 60px rgba(0,0,0,.45);font-family:Roboto,Arial,sans-serif;font-weight:400;
 }
-textarea{min-height:120px;resize:vertical;}
+.panel h1{
+  font:500 18px/1.3 Montserrat,Arial,sans-serif;color:var(--ink);text-align:center;
+  margin:0 0 14px;padding:4px 34px;
+}
+.back{
+  position:absolute;top:12px;left:8px;width:44px;height:44px;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  background:none;border:0;color:var(--ink);cursor:pointer;
+}
+.bar button:focus-visible{outline-color:#fff;outline-offset:-3px;}
+.box{background:#fff;padding:20px 18px 18px;color:#2b2f36;text-align:left;}
+.box h2{font:500 21px/1.25 Roboto,Arial,sans-serif;color:#2b2f36;margin:0 0 4px;}
+.sub{font-size:13px;line-height:1.4;color:#667085;margin:0;padding-bottom:12px;border-bottom:1px solid #d9dce1;}
+#feedbackForm .sub{margin-bottom:14px;}
+.box-sent{text-align:center;}
+.panel .box-sent h1{font:500 21px/1.25 Roboto,Arial,sans-serif;color:#2b2f36;margin:0;padding:0;}
+#stepSent{padding-bottom:18px;}
+.box-sent .sub{border-bottom:0;padding:0;margin-top:6px;font-size:14px;}
+form{margin:0;}
+.box label{display:block;font-size:13px;line-height:1.35;color:#4a4f57;margin:0 0 12px;}
+.box input,.box textarea{
+  display:block;width:100%;margin-top:5px;padding:10px 12px;background:#f5f7f9;color:#2b2f36;
+  border:1px solid #eceff2;border-radius:3px;font:400 16px/1.4 Roboto,Arial,sans-serif;
+}
+.box input::placeholder,.box textarea::placeholder{color:#98a0ab;}
+.box textarea{min-height:104px;resize:vertical;}
+.bar{background:var(--khaki-dark);margin-top:12px;display:flex;justify-content:flex-end;}
+.bar button{
+  min-height:44px;padding:8px 12px;background:none;border:0;color:#fff;
+  font:500 14px Roboto,Arial,sans-serif;cursor:pointer;
+}
+.bar button[disabled]{opacity:.65;cursor:default;}
 .trap{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
-.error{color:#8a2f2f;background:#fdf3f3;border-radius:6px;padding:9px 12px;font-size:14px;margin:0 0 14px;}
+.error{color:#8a2f2f;background:#fdf3f3;border-radius:3px;padding:9px 12px;font-size:14px;margin:0 0 4px;}
+@media (prefers-reduced-motion:no-preference){
+  .panel .box{animation:slide .35s ease-out;}
+  @keyframes slide{from{opacity:0;transform:translateX(36px);}to{opacity:1;transform:none;}}
+}
 .alt{margin:18px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:14px;color:var(--muted);text-align:center;}
 .alt a{color:var(--khaki-dark);text-underline-offset:3px;}
 @media (prefers-reduced-motion:no-preference){
@@ -107,10 +136,7 @@ textarea{min-height:120px;resize:vertical;}
 <body>
 <div class="photo" aria-hidden="true"></div>
 <main class="stage">
-  <div class="card">
-    <button class="back" id="backBtn" type="button" aria-label="Back to the star ratings" hidden>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
-    </button>
+  <div class="card" id="card">
     <a class="mark" href="/">CaptureWithKi</a>
 
     <section class="step" id="stepStart">
@@ -132,25 +158,35 @@ textarea{min-height:120px;resize:vertical;}
       </ul>
     </section>
 
-    <section class="step" id="stepFeedback" hidden>
-      <h1 tabindex="-1">I'm sorry to hear that</h1>
-      <p class="copy">Tell me what happened and I'll do my best to make it right.</p>
-      <form id="feedbackForm" novalidate>
-        <label>Name<input id="fName" name="name" type="text" autocomplete="name" maxlength="200" required></label>
-        <label>Email<input id="fEmail" name="email" type="email" autocomplete="email" maxlength="320" required></label>
-        <label>Your feedback<textarea id="fMessage" name="message" maxlength="5000" required></textarea></label>
+  </div>
+
+  <!-- The 1-3 star path. Styled to match Laakea's reference recording, not the site. -->
+  <section class="step panel" id="stepFeedback" hidden>
+    <button class="back" id="backBtn" type="button" aria-label="Back to the star ratings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    </button>
+    <h1 tabindex="-1">How would you rate us?</h1>
+    <form id="feedbackForm" novalidate>
+      <div class="box">
+        <h2>Sorry to hear that you're not satisfied.</h2>
+        <p class="sub">Please provide us with your feedback and we'll do our best to improve.</p>
+        <label>Name (optional)<input id="fName" name="name" type="text" placeholder="Name" autocomplete="name" maxlength="200"></label>
+        <label>Email (optional)<input id="fEmail" name="email" type="email" placeholder="Email" autocomplete="email" maxlength="320"></label>
+        <label>Your Feedback (Please let us know what can we do to improve?)<textarea id="fMessage" name="message" placeholder="Your Feedback" maxlength="5000" required></textarea></label>
         <!-- For bots only. Not named like anything a browser would autofill. -->
         <div class="trap" aria-hidden="true"><label>Leave empty<input id="fTrap" type="text" tabindex="-1" autocomplete="off"></label></div>
         <p class="error" id="fError" role="alert" hidden></p>
-        <button class="btn" type="submit" id="fSend">Send feedback</button>
-      </form>
-    </section>
+      </div>
+      <div class="bar"><button type="submit" id="fSend">Next &#9654;</button></div>
+    </form>
+  </section>
 
-    <section class="step" id="stepSent" hidden>
-      <h1 tabindex="-1">Thank you</h1>
-      <p class="copy">Khiara has your message and will reach out to you by email.</p>
-    </section>
-  </div>
+  <section class="step panel" id="stepSent" hidden>
+    <div class="box box-sent">
+      <h1 tabindex="-1">Thank you for your feedback.</h1>
+      <p class="sub" id="sentCopy" hidden>Khiara will reach out to you soon.</p>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -168,7 +204,7 @@ textarea{min-height:120px;resize:vertical;}
 
   function show(id) {
     steps.forEach(function (s) { $(s).hidden = s !== id; });
-    $('backBtn').hidden = id !== 'stepFeedback';
+    $('card').hidden = id === 'stepFeedback' || id === 'stepSent';
     $(id).querySelector('h1').focus({ preventScroll: true });
     window.scrollTo(0, 0);
   }
@@ -191,7 +227,7 @@ textarea{min-height:120px;resize:vertical;}
     $('fError').textContent = msg;
     $('fError').hidden = false;
     $('fSend').disabled = false;
-    $('fSend').textContent = 'Send feedback';
+    $('fSend').textContent = 'Next ▶';
   }
 
   $('feedbackForm').addEventListener('submit', function (e) {
@@ -200,8 +236,7 @@ textarea{min-height:120px;resize:vertical;}
     var name = $('fName').value.trim();
     var email = $('fEmail').value.trim();
     var message = $('fMessage').value.trim();
-    if (!name) { fail('Please add your name.'); $('fName').focus(); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fail('Please add a valid email so Khiara can reply.'); $('fEmail').focus(); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fail('That email address does not look right.'); $('fEmail').focus(); return; }
     if (!message) { fail('Please add your feedback.'); $('fMessage').focus(); return; }
 
     $('fSend').disabled = true;
@@ -220,7 +255,12 @@ textarea{min-height:120px;resize:vertical;}
       })
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (body) {
-        if (res.ok && body.ok) { show('stepSent'); return; }
+        if (res.ok && body.ok) {
+          // She has no way to reach someone who left no email, so don't promise it.
+          $('sentCopy').hidden = !email;
+          show('stepSent');
+          return;
+        }
         fail(body.error || 'That did not send. Please try again, or email ' + OWNER_EMAIL + '.');
       });
     }).catch(function () {

@@ -157,6 +157,9 @@ one file, `review/index.html`, with no Firebase SDK.
   negative reviews or selectively soliciting positive ones, and a violation can
   cost her the listing's reviews, so this page is review gating and a known risk
   under that policy.
+- The 1–3 star screens take their layout from a recording Laakea supplied (panel,
+  white box, "Next" bar) but use the site's colors. Name and email are optional
+  there, so feedback can arrive as "Anonymous" with no address.
 - The form posts to the `submitReviewFeedback` function, which saves to
   `inquiries` with `kind: 'review-feedback'` and emails her. So it appears in the
   dashboard's Inquiries tab and the unseen-inquiry alarm covers it.

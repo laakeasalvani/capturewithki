@@ -103,6 +103,15 @@ test('saves as an inquiry, emails Khiara, and replies go to the client', async (
   assert.deepEqual(sent[0].reply_to, ['dana@example.com']);
 });
 
+test('accepts anonymous feedback and sends no reply-to', async () => {
+  const before = sent.length;
+  const r = await post({ rating: 1, name: '', email: '', message: 'Photos came late.' }, 6);
+  assert.equal(r.status, 200);
+  assert.equal(docs[docs.length - 1].name, 'Anonymous');
+  assert.equal(sent.length, before + 1);
+  assert.equal(sent[sent.length - 1].reply_to, undefined);
+});
+
 test('tells a bot it succeeded and saves nothing', async () => {
   const before = docs.length;
   const r = await post(Object.assign({}, VALID, { honeypot: 'filled' }), 2);

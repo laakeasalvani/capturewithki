@@ -28,11 +28,23 @@ test('refuses a missing or impossible rating', () => {
   }
 });
 
-test('requires a name, a usable email and the feedback itself', () => {
-  assert.equal(validateReviewFeedback(withField({ name: ' ' })).valid, false);
-  assert.equal(validateReviewFeedback(withField({ email: '' })).valid, false);
-  assert.equal(validateReviewFeedback(withField({ email: 'not-an-email' })).valid, false);
+test('requires only the feedback itself', () => {
+  const r = validateReviewFeedback(withField({ name: ' ', email: '' }));
+  assert.equal(r.valid, true);
+  assert.equal(r.value.name, 'Anonymous');
+  assert.equal(r.value.email, '');
   assert.equal(validateReviewFeedback(withField({ message: '' })).valid, false);
+});
+
+test('an email, when given, must look like one', () => {
+  assert.equal(validateReviewFeedback(withField({ email: 'not-an-email' })).valid, false);
+});
+
+test('says so when there is no address to reply to', () => {
+  const f = withField({ email: '' });
+  assert.ok(reviewFeedbackEmail(f).text.includes('did not leave an email'));
+  assert.ok(reviewFeedbackEmailHtml(f).includes('did not leave an email'));
+  assert.ok(!reviewFeedbackEmail(VALID).text.includes('did not leave an email'));
 });
 
 test('refuses oversized fields', () => {

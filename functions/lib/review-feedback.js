@@ -44,10 +44,10 @@ export function validateReviewFeedback(data) {
   }
   value.rating = data.rating;
 
-  if (!value.name) return { valid: false, error: 'Please add your name.' };
-  // Required because she cannot make anything right without a way to reply.
-  if (!value.email) return { valid: false, error: 'Please add your email.' };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email)) {
+  // Name and email are optional on the form. The dashboard and the alarm both
+  // lead with the name, so a blank one still needs to read as something.
+  if (!value.name) value.name = 'Anonymous';
+  if (value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email)) {
     return { valid: false, error: 'That email address does not look right.' };
   }
   if (!value.message) return { valid: false, error: 'Please add your feedback.' };
@@ -72,12 +72,12 @@ export function reviewFeedbackEmail(f) {
       '',
       'Rating:  ' + starWord(f.rating),
       'Name:    ' + oneLine(f.name),
-      'Email:   ' + oneLine(f.email),
+      'Email:   ' + (oneLine(f.email) || 'Not given'),
       '',
       'Feedback:',
       f.message,
       '',
-      'Reply to this email to answer them directly.'
+      f.email ? 'Reply to this email to answer them directly.' : 'They did not leave an email address.'
     ].join('\n')
   };
 }
@@ -96,11 +96,11 @@ export function reviewFeedbackEmailHtml(f) {
     '<tr><td style="padding:18px 28px;background:' + C.khaki + ';font-family:' + SERIF + ';font-size:20px;color:' + C.paper + ';">' +
       'Feedback from your review page</td></tr>' +
     '<tr><td style="padding:20px 28px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' +
-      row('Rating', starWord(f.rating)) + row('Name', oneLine(f.name)) + row('Email', oneLine(f.email)) +
+      row('Rating', starWord(f.rating)) + row('Name', oneLine(f.name)) + row('Email', oneLine(f.email) || 'Not given') +
     '</table></td></tr>' +
     '<tr><td style="padding:18px 28px 8px;font-family:' + SANS + ';font-size:15px;line-height:1.8;color:' + C.ink + ';white-space:pre-wrap;">' +
       escapeHtml(f.message) + '</td></tr>' +
     '<tr><td style="padding:8px 28px 26px;font-family:' + SANS + ';font-size:13px;color:' + C.muted + ';">' +
-      'Reply to this email to answer them directly.</td></tr>' +
+      (f.email ? 'Reply to this email to answer them directly.' : 'They did not leave an email address.') + '</td></tr>' +
     '</table></body></html>';
 }
